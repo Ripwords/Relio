@@ -3262,6 +3262,36 @@ enum Fixture {
         #expect(sspn.headroom == Money(ringgit: 8000))   // the cap, not more
     }
 
+    @Test("a sub-limit's rejected excess cannot consume the parent's headroom")
+    func subLimitExcessDoesNotReachParent() throws {
+        // MEDICAL_CHECKUP is a RM 1,000 sub-limit inside MEDICAL_SERIOUS's RM 10,000.
+        // Claiming RM 1,500 against the sub-limit is RM 1,000 of relief, not RM 1,500.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 1500)])
+
+        let child = try #require(result.assessment(for: ReliefCode("MEDICAL_CHECKUP")))
+        #expect(child.claimed == Money(ringgit: 1500))   // what the user entered
+        #expect(child.allowed == Money(ringgit: 1000))   // what LHDN allows
+
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 1500))  // raw, for display
+        #expect(parent.allowed == Money(ringgit: 1000))  // NOT 1500
+        #expect(parent.headroom == Money(ringgit: 9000))
+    }
+
+    @Test("a parent's own claim and its children's allowed amounts share one ceiling")
+    func parentAndChildrenShareTheCeiling() throws {
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_SERIOUS"), 9500),
+                      Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 900)])
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 10400))
+        #expect(parent.allowed == Money(ringgit: 10000))   // the ceiling binds
+        #expect(parent.headroom == .zero)
+    }
+
     @Test("an automatic relief is granted without any entry")
     func automaticGrant() throws {
         let individual = try #require(
@@ -3481,6 +3511,9 @@ public struct EvaluationResult: Hashable, Sendable {
     public var estimatedTax: Money?
 
     /// Every assessment including nested sub-limits, depth-first.
+    ///
+    /// For lookup, not for totalling: a sub-limit's amount is already inside its
+    /// parent's, so reducing this over `allowed` double-counts. Use `totalAllowed`.
     public var allAssessments: [ReliefAssessment] {
         assessments.flatMap(\.selfAndDescendants)
     }
@@ -3567,7 +3600,17 @@ private func assess(rule: ReliefRule,
 
     let ownEntries = entriesByCode[rule.code] ?? []
     let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
-    let entered = children.reduce(ownClaimed) { $0 + $1.claimed }
+
+    // Two different totals, and the difference matters.
+    //
+    // `claimed` is what the user entered, raw, so the UI can show "you logged RM 1,500".
+    // `allowed` aggregates each child's *capped* amount, because a sub-limit binds
+    // before the parent ceiling does: RM 1,500 against the RM 1,000 medical check-up
+    // sub-limit is RM 1,000 of relief, not RM 1,500. Summing children's raw claims here
+    // would let the RM 500 a sub-limit already rejected go on to consume parent
+    // headroom, overstating relief and understating tax.
+    let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
 
     let cap = effectiveCap(rule.cap, year: year)
     let eligibility = Eligibility.eligible      // Task 13 computes this properly
@@ -3576,11 +3619,13 @@ private func assess(rule: ReliefRule,
     // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
     // from the household, not from a receipt.
     let granted = rule.automatic && eligibility.isEligible
-    let claimed = granted ? cap : entered
+    let claimed = granted ? cap : claimedTotal
     // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
     // entry (SSPN's net deposit can be negative) would otherwise push headroom above
     // the cap and inflate the opportunity figure.
-    let allowed = granted ? cap : max(entered.clamped(to: cap), .zero)
+    let allowed = granted
+        ? cap
+        : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
     let headroom = max(cap - allowed, .zero)
 
     return ReliefAssessment(code: rule.code,
@@ -3995,7 +4040,10 @@ change Task 11's `ownClaimed` line to reuse it —
 ```swift
     let ownEntries = entriesByCode[rule.code] ?? []
     let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
-    let entered = children.reduce(ownClaimed) { $0 + $1.claimed }
+    // See Task 11: `claimed` is raw for display, `allowed` aggregates children's capped
+    // amounts so a sub-limit's rejected excess cannot consume parent headroom.
+    let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
 
     let resolved = effectiveCap(rule.cap, rule: rule, year: year)
     let cap = resolved.cap
@@ -4008,8 +4056,10 @@ change Task 11's `ownClaimed` line to reuse it —
     let requirements = checkRequirements(rule: rule, entries: ownEntries)
 
     let granted = rule.automatic && eligibility.isEligible
-    let claimed = granted ? cap : entered
-    let allowed = granted ? cap : entered.clamped(to: cap)
+    let claimed = granted ? cap : claimedTotal
+    let allowed = granted
+        ? cap
+        : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
     let headroom = max(cap - allowed, .zero)
 ```
 
