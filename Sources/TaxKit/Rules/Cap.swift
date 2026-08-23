@@ -40,11 +40,9 @@ public enum Cap: Codable, Hashable, Sendable {
     case perDependent(Money)
     /// A ceiling selected by a fact about the claim.
     case tiered(on: TieredFact, tiers: [Tier])
-    /// No ceiling. Reserved; no shipped relief uses it.
-    case none
 
     private enum CodingKeys: String, CodingKey { case kind, sen, on, tiers }
-    private enum Kind: String, Codable { case fixed, perDependent, tiered, none }
+    private enum Kind: String, Codable { case fixed, perDependent, tiered }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -56,8 +54,6 @@ public enum Cap: Codable, Hashable, Sendable {
         case .tiered:
             self = .tiered(on: try c.decode(TieredFact.self, forKey: .on),
                            tiers: try c.decode([Tier].self, forKey: .tiers))
-        case .none:
-            self = .none
         }
     }
 
@@ -74,8 +70,6 @@ public enum Cap: Codable, Hashable, Sendable {
             try c.encode(Kind.tiered, forKey: .kind)
             try c.encode(fact, forKey: .on)
             try c.encode(tiers, forKey: .tiers)
-        case .none:
-            try c.encode(Kind.none, forKey: .kind)
         }
     }
 
@@ -87,8 +81,6 @@ public enum Cap: Codable, Hashable, Sendable {
             return amount
         case .tiered(_, let tiers):
             return tiers.map(\.amount).max() ?? .zero
-        case .none:
-            return Money(sen: .max)
         }
     }
 }
