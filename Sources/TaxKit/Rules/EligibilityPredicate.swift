@@ -97,8 +97,15 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
                                               : "Spouse must not be registered disabled")
 
         case .claimant(let allowed):
-            return Self.check(facts.claimant, in: allowed,
-                              asking: .dependentDetails, label: "Claimed for")
+            // A claimant list scopes WHO an entry may be for; it is validated per entry,
+            // not as a household gate. With no entry in context there is nothing to
+            // refuse, so an absent claimant is satisfied rather than a question.
+            // Per-entry claimant validation belongs to Plan 2, which owns the UI that
+            // records it.
+            guard let claimant = facts.claimant else { return .satisfied }
+            return allowed.contains(claimant)
+                ? .satisfied
+                : .failed(reason: "Claimed for must be \(Self.describe(allowed))")
 
         case .dependentAge(let min, let max):
             guard let age = facts.dependent?.ageAtYearEnd else {

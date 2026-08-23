@@ -169,7 +169,7 @@ private func resolveEligibility(rule: ReliefRule,
         return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
     }
 
-    switch predicate.evaluate(year.facts(claimant: nil, frequencyFor: rule)) {
+    switch evaluateAcrossDependents(predicate: predicate, rule: rule, year: year) {
     case .satisfied:
         return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
     case .failed(let reason):
@@ -177,6 +177,46 @@ private func resolveEligibility(rule: ReliefRule,
     case .unknown(let questions):
         return .needsInfo(questions: (questions + capQuestions).deduplicated())
     }
+}
+
+/// A dependent-referencing predicate on a fixed-cap rule ("do you have a child aged 2
+/// or under?") is existential over the household, not a claim about one dependent in
+/// particular. Evaluate the predicate once per recorded dependent and take the best
+/// outcome, with precedence `.satisfied` > `.unknown` > `.failed`: one qualifying
+/// dependent is enough to earn the relief, and an unresolved dependent must not be
+/// out-voted by a sibling who definitively fails.
+///
+/// With no dependents recorded at all, evaluate once with no dependent bound, exactly
+/// as before — the app cannot tell "no children" from "not told us yet", so `.unknown`
+/// there is honest.
+///
+/// `.perDependent` caps never reach here: `effectiveCap` already binds each dependent
+/// in turn and `resolveEligibility` exempts them from this household-level check.
+private func evaluateAcrossDependents(predicate: EligibilityPredicate,
+                                      rule: ReliefRule,
+                                      year: TaxYearSnapshot) -> PredicateOutcome {
+    guard !year.dependents.isEmpty else {
+        return predicate.evaluate(year.facts(claimant: nil, frequencyFor: rule))
+    }
+
+    var unknownQuestions: [ProfileQuestion] = []
+    var firstFailureReason: String?
+    for dependent in year.dependents {
+        var facts = year.facts(claimant: nil, frequencyFor: rule)
+        facts.dependent = dependent.facts
+        switch predicate.evaluate(facts) {
+        case .satisfied:
+            return .satisfied
+        case .unknown(let questions):
+            unknownQuestions.append(contentsOf: questions)
+        case .failed(let reason):
+            if firstFailureReason == nil { firstFailureReason = reason }
+        }
+    }
+    if !unknownQuestions.isEmpty {
+        return .unknown(missing: unknownQuestions.deduplicated())
+    }
+    return .failed(reason: firstFailureReason ?? "Condition must not hold")
 }
 
 /// Set difference of the documents attached to each entry against the kinds the rule

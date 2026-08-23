@@ -48,10 +48,8 @@
       },
       "code" : "PARENTS_MEDICAL",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails"
-          ]
+        "eligible" : {
+
         }
       },
       "headroom" : {
@@ -335,10 +333,8 @@
           },
           "code" : "MEDICAL_LEARNDIS",
           "eligibility" : {
-            "needsInfo" : {
-              "questions" : [
-                "dependentDetails"
-              ]
+            "eligible" : {
+
             }
           },
           "headroom" : {
@@ -375,10 +371,8 @@
       },
       "code" : "MEDICAL_SERIOUS",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails"
-          ]
+        "eligible" : {
+
         }
       },
       "headroom" : {
@@ -424,10 +418,8 @@
       },
       "code" : "LIFESTYLE",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails"
-          ]
+        "eligible" : {
+
         }
       },
       "headroom" : {
@@ -466,10 +458,8 @@
       },
       "code" : "LIFESTYLE_SPORTS",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails"
-          ]
+        "eligible" : {
+
         }
       },
       "headroom" : {
@@ -508,10 +498,9 @@
       },
       "code" : "BREASTFEEDING",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails",
-            "lastClaimYear"
+        "ineligible" : {
+          "reasons" : [
+            "Dependent must be 2 years old or under"
           ]
         }
       },
@@ -530,14 +519,11 @@
         }
       ],
       "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
-      "taxSaved" : {
-        "sen" : 19000
-      },
       "unverified" : false
     },
     {
       "allowed" : {
-        "sen" : 240000
+        "sen" : 0
       },
       "cap" : {
         "sen" : 300000
@@ -550,14 +536,14 @@
       },
       "code" : "CHILDCARE",
       "eligibility" : {
-        "needsInfo" : {
-          "questions" : [
-            "dependentDetails"
+        "ineligible" : {
+          "reasons" : [
+            "Dependent must be 6 years old or under"
           ]
         }
       },
       "headroom" : {
-        "sen" : 60000
+        "sen" : 300000
       },
       "name" : "Childcare centre or kindergarten fees",
       "notes" : "Centre must be registered.",
@@ -572,9 +558,6 @@
         }
       ],
       "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
-      "taxSaved" : {
-        "sen" : 11400
-      },
       "unverified" : false
     },
     {
@@ -1115,13 +1098,13 @@
     }
   ],
   "chargeableIncome" : {
-    "sen" : 8643000
+    "sen" : 8883000
   },
   "estimatedTax" : {
-    "sen" : 682170
+    "sen" : 727770
   },
   "totalOpportunity" : {
-    "sen" : 633720
+    "sen" : 666870
   },
   "unresolved" : [
     {

@@ -90,6 +90,21 @@ import Foundation
         #expect(p.evaluate(facts()) == .unknown(missing: [.dependentDetails]))
     }
 
+    @Test("claimant: a nil claimant is satisfied — it scopes an entry, not a household gate")
+    func claimantNilIsSatisfied() {
+        // {"op": "claimant", "in": [...]} says WHO an entry may be for. With no entry
+        // in context (the household-level eligibility check on a fixed-cap rule such
+        // as LIFESTYLE or MEDICAL_SERIOUS) there is nothing to refuse, so this must not
+        // produce a spurious .unknown asking dependentDetails. Per-entry validation is
+        // Plan 2's concern.
+        let p = EligibilityPredicate.claimant(in: [.individual, .spouse, .child])
+        #expect(p.evaluate(facts()) == .satisfied)
+        #expect(p.evaluate(facts { $0.claimant = .individual }) == .satisfied)
+        guard case .failed = p.evaluate(facts { $0.claimant = .parent }) else {
+            Issue.record("expected .failed for a claimant outside the allowed list"); return
+        }
+    }
+
     @Test("yaRange is evaluated against the ruleset year, which is always known")
     func yaRange() {
         let p = EligibilityPredicate.yaRange(from: 2025, to: 2027)
