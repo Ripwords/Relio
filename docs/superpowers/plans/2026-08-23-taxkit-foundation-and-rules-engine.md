@@ -1545,6 +1545,28 @@ import Foundation
         }
     }
 
+    @Test("any: an unknown child outranks a failed sibling — the honest answer is ask, not no")
+    func anyPrefersUnknownOverFailed() {
+        let p = EligibilityPredicate.any([
+            .maritalStatus(in: [.married]),   // fails: the taxpayer is single
+            .spouseHasIncome(false)           // unknown: never asked
+        ])
+        // Collapsing this to .failed is the defect that silently costs RM 4,000.
+        #expect(p.evaluate(facts { $0.maritalStatus = .single })
+                == .unknown(missing: [.spouseHasIncome]))
+    }
+
+    @Test("all: a failed child outranks an unknown sibling accumulated before it")
+    func allPrefersFailedOverUnknown() {
+        let p = EligibilityPredicate.all([
+            .spouseHasIncome(false),          // unknown, seen first
+            .maritalStatus(in: [.married])    // fails: the taxpayer is single
+        ])
+        guard case .failed = p.evaluate(facts { $0.maritalStatus = .single }) else {
+            Issue.record("expected .failed to win over an earlier unknown"); return
+        }
+    }
+
     @Test("not inverts satisfied and failed but preserves unknown")
     func notInverts() {
         let known = facts { $0.maritalStatus = .married }
@@ -1597,6 +1619,34 @@ import Foundation
         ])
         let data = try JSONEncoder().encode(original)
         #expect(try JSONDecoder().decode(EligibilityPredicate.self, from: data) == original)
+    }
+
+    @Test("every predicate case survives a JSON round trip")
+    func everyCaseRoundTrips() throws {
+        let cases: [EligibilityPredicate] = [
+            .always,
+            .maritalStatus(in: [.single, .widowed]),
+            .spouseHasIncome(true),
+            .assessmentType(.combinedUnderSpouse),
+            .employmentType(in: [.selfEmployed, .publicServantPensionable]),
+            .gender(.female),
+            .selfIsDisabled(true),
+            .spouseIsDisabled(false),
+            .claimant(in: [.parent, .grandparent]),
+            .dependentAge(min: 0, max: 6),
+            .dependentEducation(in: [.tertiaryOverseas]),
+            .dependentIsDisabled(true),
+            .yaRange(from: nil, to: 2027),
+            .claimFrequency(everyNYears: 2),
+            .not(.always),
+            .all([.always]),
+            .any([.always])
+        ]
+        for original in cases {
+            let data = try JSONEncoder().encode(original)
+            #expect(try JSONDecoder().decode(EligibilityPredicate.self, from: data) == original,
+                    "round trip failed for \(original)")
+        }
     }
 
     @Test("decodes the wire format used in the rulebook JSON")
