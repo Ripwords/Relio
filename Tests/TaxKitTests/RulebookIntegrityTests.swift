@@ -5,7 +5,7 @@ import Foundation
 @Suite("Rulebook integrity") struct RulebookIntegrityTests {
 
     /// Every YA shipped in the bundle. Extended in Task 9.
-    static let shippedYears = [2025]
+    static let shippedYears = [2023, 2024, 2025]
 
     static func load(_ year: Int) throws -> RuleSet {
         let url = try #require(
@@ -180,5 +180,89 @@ import Foundation
             #expect(gated || perDependent || unconditional,
                     "\(relief.code) is automatic with nothing gating it")
         }
+    }
+
+    @Test("every code in every ruleset has a generated ReliefCode constant")
+    func generatedCodesAreUpToDate() throws {
+        var inJSON: Set<String> = []
+        for year in Self.shippedYears {
+            let rules = try Self.load(year)
+            inJSON.formUnion(rules.allReliefs.map(\.code.rawValue))
+            inJSON.formUnion(rules.retiredCodes.map(\.retired.rawValue))
+        }
+        let generated = Set(ReliefCode.allGenerated.map(\.rawValue))
+
+        let missingConstants = inJSON.subtracting(generated).sorted()
+        let missingMessage = "rulebook codes with no constant — run `swift package "
+            + "--allow-writing-to-package-directory generate-relief-codes`: \(missingConstants)"
+        #expect(inJSON.subtracting(generated).isEmpty, "\(missingMessage)")
+
+        let missingCodes = generated.subtracting(inJSON).sorted()
+        let missingCodesMessage = "constants with no rulebook code — codes are append-only, so this means a "
+            + "code was deleted instead of retired: \(missingCodes)"
+        #expect(generated.subtracting(inJSON).isEmpty, "\(missingCodesMessage)")
+    }
+
+    @Test("a code that disappears between years is retired, never deleted")
+    func disappearingCodesAreRetired() throws {
+        let years = Self.shippedYears.sorted()
+        for (earlier, later) in zip(years, years.dropFirst()) {
+            let before = Set(try Self.load(earlier).allReliefs.map(\.code))
+            let after = try Self.load(later)
+            let afterCodes = Set(after.allReliefs.map(\.code))
+            let retired = Set(after.retiredCodes.map(\.retired))
+
+            let vanished = before.subtracting(afterCodes).subtracting(retired)
+            let vanishedMessage = "YA\(later) drops \(vanished.map(\.rawValue).sorted()) without a "
+                + "retiredCodes entry — historical entries would stop resolving"
+            #expect(vanished.isEmpty, "\(vanishedMessage)")
+        }
+    }
+
+    @Test("YA2024 matches LHDN where it differs from YA2025")
+    func ya2024Spot() throws {
+        let rules = try Self.load(2024)
+        #expect(rules.relief(for: ReliefCode("DISABLED_SELF"))?.cap == .fixed(Money(ringgit: 6000)))
+        #expect(rules.relief(for: ReliefCode("DISABLED_SPOUSE"))?.cap == .fixed(Money(ringgit: 5000)))
+        #expect(rules.relief(for: ReliefCode("CHILD_DISABLED"))?.cap == .perDependent(Money(ringgit: 6000)))
+        #expect(rules.relief(for: ReliefCode("MEDICAL_LEARNDIS"))?.cap == .fixed(Money(ringgit: 4000)))
+        #expect(rules.relief(for: ReliefCode("INSURANCE_EDU_MEDICAL"))?.cap == .fixed(Money(ringgit: 3000)))
+        #expect(rules.relief(for: ReliefCode("HOUSING_LOAN_INTEREST")) == nil)
+        #expect(rules.relief(for: ReliefCode("MEDICAL_DENTAL")) != nil)
+    }
+
+    @Test("YA2023 matches LHDN where it differs from YA2024")
+    func ya2023Spot() throws {
+        let rules = try Self.load(2023)
+        #expect(rules.relief(for: ReliefCode("MEDICAL_DENTAL")) == nil)
+        #expect(rules.relief(for: ReliefCode("PARENTS_CHECKUP")) == nil)
+        #expect(rules.relief(for: ReliefCode("PARENTS_MEDICAL"))?.cap == .fixed(Money(ringgit: 8000)))
+        #expect(rules.relief(for: .lifestyle)?.cap == .fixed(Money(ringgit: 2500)))
+    }
+
+    @Test("caps that LHDN kept flat really are flat across all three years")
+    func unchangedCapsAreStable() throws {
+        let stable: [ReliefCode] = [
+            ReliefCode("SELF_AND_DEPENDENTS"), ReliefCode("PARENTS_MEDICAL"),
+            ReliefCode("DISABLED_EQUIPMENT"), ReliefCode("EDUCATION_SELF"),
+            ReliefCode("MEDICAL_SERIOUS"), .lifestyle, ReliefCode("LIFESTYLE_SPORTS"),
+            ReliefCode("BREASTFEEDING"), ReliefCode("CHILDCARE"), ReliefCode("SSPN"),
+            ReliefCode("SPOUSE_ALIMONY"), ReliefCode("CHILD_UNDER_18"),
+            ReliefCode("CHILD_PRE_TERTIARY"), ReliefCode("CHILD_TERTIARY"),
+            ReliefCode("CHILD_DISABLED_TERTIARY"), ReliefCode("INSURANCE_LIFE_EPF"),
+            ReliefCode("PRS_ANNUITY"), ReliefCode("SOCSO_EIS"), ReliefCode("EV_CHARGING")
+        ]
+        let sets = try Self.shippedYears.map { try Self.load($0) }
+        for code in stable {
+            let caps = sets.compactMap { $0.relief(for: code)?.cap }
+            #expect(caps.count == sets.count, "\(code) is missing from a year")
+            #expect(Set(caps).count == 1, "\(code) cap changed across years: \(caps)")
+        }
+    }
+
+    @Test("rate bands are identical across YA2023, YA2024 and YA2025")
+    func bandsAreIdenticalAcrossYears() throws {
+        let tables = try Self.shippedYears.map { try Self.load($0).brackets }
+        #expect(Set(tables).count == 1)
     }
 }
