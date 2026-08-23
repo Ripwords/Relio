@@ -135,11 +135,12 @@
 
     { "code": "SPOUSE_ALIMONY", "name": "Spouse, or alimony to a former wife",
       "cap": { "kind": "fixed", "sen": 400000 },
-      "automatic": true,
       "eligibility": { "op": "any", "of": [
         { "op": "spouseHasIncome", "is": false },
-        { "op": "assessmentType", "is": "joint" }
+        { "op": "assessmentType", "is": "joint" },
+        { "op": "maritalStatus", "in": ["divorced"] }
       ] },
+      "notes": "LHDN item 14 covers both spouse relief and alimony to a former wife. Not automatic: alimony must actually have been paid under a formal agreement, so the amount is entered rather than granted.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "DISABLED_SPOUSE", "name": "Disabled spouse",
