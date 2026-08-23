@@ -131,4 +131,20 @@ import Foundation
                                     versus: try loader.ruleSet(for: 2024))
         #expect(result.lines.contains { $0.code == .lifestyle } == false)
     }
+
+    @Test("the total does not double-count a sub-limit that also appears as a line")
+    func totalExcludesNestedLines() throws {
+        // MEDICAL_LEARNDIS is a child of MEDICAL_SERIOUS and rose RM4,000 -> RM6,000
+        // in YA2025, so it produces both a parent line and a child line.
+        let entries = [Fixture.entry(ReliefCode("MEDICAL_LEARNDIS"), 6000)]
+        let result = counterfactual(entries: entries,
+                                    year: Fixture.year(2025, gross: Money(ringgit: 110_000)),
+                                    under: try loader.ruleSet(for: 2025),
+                                    versus: try loader.ruleSet(for: 2024))
+
+        let naive = result.lines.reduce(Money.zero) { $0 + $1.difference }
+        #expect(result.totalReliefDifference == Money(ringgit: 2000))
+        #expect(naive == Money(ringgit: 4000), "the lines really do double-count")
+        #expect(result.totalReliefDifference < naive)
+    }
 }

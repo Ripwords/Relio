@@ -122,9 +122,21 @@ private func assess(rule: ReliefRule,
     let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
     let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
     let claimed = granted ? cap : claimedTotal
-    let allowed = granted
-        ? cap
-        : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
+
+    // A definitively ineligible relief allows nothing, no matter what was entered
+    // against it — otherwise it would silently reduce chargeable income. `claimed`
+    // still carries the raw total above so the UI can show what was logged.
+    // `.needsInfo` must NOT be treated as ineligible: that would undo the
+    // three-valued eligibility design and cost the user relief over an unanswered
+    // question.
+    let isIneligible = if case .ineligible = eligibility { true } else { false }
+    let allowed: Money = if granted {
+        cap
+    } else if isIneligible {
+        .zero
+    } else {
+        max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
+    }
     let headroom = max(cap - allowed, .zero)
 
     return ReliefAssessment(code: rule.code,
@@ -157,7 +169,7 @@ private func resolveEligibility(rule: ReliefRule,
         return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
     }
 
-    switch predicate.evaluate(year.facts(claimant: nil)) {
+    switch predicate.evaluate(year.facts(claimant: nil, frequencyFor: rule)) {
     case .satisfied:
         return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
     case .failed(let reason):
@@ -194,7 +206,7 @@ private func effectiveCap(_ cap: Cap,
         var total = Money.zero
         var missing: [ProfileQuestion] = []
         for dependent in year.dependents {
-            var facts = year.facts(claimant: .child)
+            var facts = year.facts(claimant: .child, frequencyFor: rule)
             facts.dependent = dependent.facts
             switch rule.eligibility?.evaluate(facts) ?? .satisfied {
             case .satisfied:
@@ -233,15 +245,28 @@ extension TaxYearSnapshot {
         }
     }
 
-    /// The household facts, for a claim made in respect of `claimant`.
-    func facts(claimant: Claimant?) -> Facts {
-        Facts(yearOfAssessment: year,
+    /// The household facts, for a claim made in respect of `claimant`, resolving
+    /// `claimHistory` against `rule`'s own record in `lastClaimedYear`.
+    ///
+    /// A year present in `lastClaimedYear[rule.code]` becomes `.lastClaimed`; an
+    /// absent key becomes `.unknown` — the app simply has no record either way — never
+    /// `.neverClaimed`, which would let a `claimFrequency` predicate assume a fact
+    /// nobody has confirmed.
+    func facts(claimant: Claimant?, frequencyFor rule: ReliefRule) -> Facts {
+        let history: ClaimHistory = if let lastYear = lastClaimedYear[rule.code] {
+            .lastClaimed(yearsAgo: year - lastYear)
+        } else {
+            .unknown
+        }
+        return Facts(yearOfAssessment: year,
               maritalStatus: maritalStatus,
               spouseHasIncome: spouseHasIncome,
               assessmentType: assessmentType,
               employmentType: employmentType,
               gender: gender,
               claimant: claimant,
+              claimHistory: history,
+              propertyPriceSen: propertyPriceSen,
               selfIsDisabled: selfIsDisabled,
               spouseIsDisabled: spouseIsDisabled)
     }

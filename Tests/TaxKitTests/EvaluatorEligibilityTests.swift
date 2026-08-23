@@ -130,4 +130,65 @@ import Foundation
         }
         #expect(questions == [.propertyPrice])
     }
+
+    @Test("an ineligible relief with entries allows nothing and does not cut tax")
+    func ineligibleReliefAllowsNothing() throws {
+        // A male taxpayer logging breastfeeding-equipment expenses: the gender
+        // predicate fails outright, so none of it is claimable.
+        var year = Fixture.year(gross: Money(ringgit: 110_000))
+        year.gender = .male
+        let entry = Fixture.entry(ReliefCode("BREASTFEEDING"), 900)
+
+        let result = evaluate(ruleSet: try Fixture.rules(), year: year, entries: [entry])
+        let relief = try #require(result.assessment(for: ReliefCode("BREASTFEEDING")))
+
+        guard case .ineligible = relief.eligibility else {
+            Issue.record("expected .ineligible, got \(relief.eligibility)"); return
+        }
+        #expect(relief.claimed == Money(ringgit: 900))   // still shown to the user
+        #expect(relief.allowed == .zero)                 // but not claimable
+        #expect(relief.taxSaved == nil)
+
+        // And it must not have quietly reduced the tax bill.
+        let baseline = evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
+        #expect(result.chargeableIncome == baseline.chargeableIncome)
+        #expect(result.estimatedTax == baseline.estimatedTax)
+    }
+
+    @Test("a needsInfo relief with entries is still claimable")
+    func needsInfoReliefStillAllows() throws {
+        // Contrast: an unanswered question must not behave like a refusal.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(),
+            year: Fixture.year(gross: Money(ringgit: 110_000)),
+            entries: [Fixture.entry(ReliefCode("SPOUSE_ALIMONY"), 4000)])
+        let relief = try #require(result.assessment(for: ReliefCode("SPOUSE_ALIMONY")))
+        guard case .needsInfo = relief.eligibility else {
+            Issue.record("expected .needsInfo, got \(relief.eligibility)"); return
+        }
+        #expect(relief.allowed == Money(ringgit: 4000))
+    }
+
+    @Test("a recorded prior claim resolves a frequency-limited relief")
+    func claimHistoryResolvesFrequency() throws {
+        // Breastfeeding equipment is claimable once every two years of assessment.
+        var year = Fixture.year()
+        year.gender = .female
+        year.dependents = [DependentSnapshot(name: "Baby", ageAtYearEnd: 1)]
+
+        year.lastClaimedYear = [ReliefCode("BREASTFEEDING"): 2024]
+        let tooSoon = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
+                .assessment(for: ReliefCode("BREASTFEEDING")))
+        guard case .ineligible = tooSoon.eligibility else {
+            Issue.record("claimed last year — expected .ineligible, got \(tooSoon.eligibility)")
+            return
+        }
+
+        year.lastClaimedYear = [ReliefCode("BREASTFEEDING"): 2023]
+        let longEnough = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
+                .assessment(for: ReliefCode("BREASTFEEDING")))
+        #expect(longEnough.eligibility == .eligible)
+    }
 }

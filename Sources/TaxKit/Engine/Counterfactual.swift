@@ -80,10 +80,18 @@ public func counterfactual(entries: [EntrySnapshot],
         taxDifference = otherTax - baseTax
     }
 
+    // `lines` is built from `allAssessments`, which includes nested sub-limits
+    // alongside their parents — deliberately, so the user can see which sub-limit
+    // moved. Summing `lines` would therefore double-count: a sub-limit change shows
+    // up both on its own line and inside its parent's `allowed`. `totalAllowed`
+    // already excludes sub-limits for exactly this reason, so the total here is
+    // derived from it rather than from the lines array.
+    let totalReliefDifference = base.totalAllowed - other.totalAllowed
+
     return CounterfactualResult(
         baselineYA: baseline.yearOfAssessment,
         comparisonYA: comparison.yearOfAssessment,
         lines: lines,
-        totalReliefDifference: lines.reduce(Money.zero) { $0 + $1.difference },
+        totalReliefDifference: totalReliefDifference,
         taxDifference: taxDifference)
 }
