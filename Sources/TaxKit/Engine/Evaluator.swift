@@ -63,33 +63,32 @@ private func assess(rule: ReliefRule,
 
     let ownEntries = entriesByCode[rule.code] ?? []
     let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
-
-    // Two different totals, and the difference matters.
-    //
-    // `claimed` is what the user entered, raw, so the UI can show "you logged RM 1,500".
-    // `allowed` aggregates each child's *capped* amount, because a sub-limit binds
-    // before the parent ceiling does: RM 1,500 against the RM 1,000 medical check-up
-    // sub-limit is RM 1,000 of relief, not RM 1,500. Summing children's raw claims here
-    // would let the RM 500 a sub-limit already rejected go on to consume parent
-    // headroom, overstating relief and understating tax.
+    // See Task 11: `claimed` is raw for display, `allowed` aggregates children's capped
+    // amounts so a sub-limit's rejected excess cannot consume parent headroom.
     let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
     let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
 
     let resolved = effectiveCap(rule.cap, rule: rule, year: year)
     let cap = resolved.cap
-    let eligibility: Eligibility = resolved.missing.isEmpty
-        ? .eligible
-        : .needsInfo(questions: resolved.missing)      // Task 13 computes this properly
 
-    // An automatic relief is granted in full once it is eligible — LHDN gives the
-    // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
-    // from the household, not from a receipt.
-    let granted = rule.automatic && eligibility.isEligible
+    // Eligibility must be settled before the grant decision: an automatic relief is
+    // granted only when it is actually eligible, never while a question is outstanding.
+    let eligibility = resolveEligibility(rule: rule,
+                                         year: year,
+                                         capQuestions: resolved.missing)
+    let requirements = checkRequirements(rule: rule, entries: ownEntries)
+
+    // A per-dependent cap has already excluded any dependent whose facts are
+    // incomplete, so an outstanding question about one child must not withhold the
+    // relief the household has already earned for another. Granting here cannot
+    // overstate: the ambiguous dependent contributed nothing to `cap`.
+    //
+    // This exemption is only safe for per-dependent caps. A fixed automatic relief is
+    // gated by its predicate as a whole — granting DISABLED_SELF while we still do not
+    // know whether the taxpayer is registered disabled would overstate relief outright.
+    let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
+    let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
     let claimed = granted ? cap : claimedTotal
-    // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
-    // entry (SSPN's net deposit can be negative) would otherwise push headroom above
-    // the cap and inflate the opportunity figure. `ownClaimed` is floored before adding
-    // children so the negative-SSPN floor still applies to the parent's own entries.
     let allowed = granted
         ? cap
         : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
@@ -102,12 +101,49 @@ private func assess(rule: ReliefRule,
                             allowed: allowed,
                             headroom: headroom,
                             eligibility: eligibility,
-                            requirements: [],
+                            requirements: requirements,
                             taxSaved: nil,
                             unverified: rule.unverified,
                             sourceURL: rule.sourceURL,
                             notes: rule.notes,
                             children: children)
+}
+
+/// Combines the rule's predicate with any question the cap could not be resolved without.
+///
+/// A per-dependent rule is deliberately exempt from the household-level predicate check:
+/// its predicate is about each dependent, and `effectiveCap` has already applied it
+/// per dependent. Re-running it here with no dependent in context would report a
+/// spurious `.needsInfo`.
+private func resolveEligibility(rule: ReliefRule,
+                                year: TaxYearSnapshot,
+                                capQuestions: [ProfileQuestion]) -> Eligibility {
+    let isPerDependent = if case .perDependent = rule.cap { true } else { false }
+
+    guard let predicate = rule.eligibility, !isPerDependent else {
+        return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
+    }
+
+    switch predicate.evaluate(year.facts(claimant: nil)) {
+    case .satisfied:
+        return capQuestions.isEmpty ? .eligible : .needsInfo(questions: capQuestions)
+    case .failed(let reason):
+        return .ineligible(reasons: [reason])
+    case .unknown(let questions):
+        return .needsInfo(questions: (questions + capQuestions).deduplicated())
+    }
+}
+
+/// Set difference of the documents attached to each entry against the kinds the rule
+/// requires. This is the whole of the requirement-check feature.
+private func checkRequirements(rule: ReliefRule,
+                               entries: [EntrySnapshot]) -> [RequirementCheck] {
+    rule.requiredDocuments.map { kind in
+        let lacking = entries.filter { !$0.documentKinds.contains(kind) }.map(\.id)
+        return RequirementCheck(kind: kind,
+                                status: lacking.isEmpty ? .satisfied
+                                                        : .missing(entryIDs: lacking))
+    }
 }
 
 /// Resolves a declared cap into a concrete ceiling for this user, along with any
