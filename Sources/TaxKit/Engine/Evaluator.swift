@@ -75,8 +75,11 @@ private func assess(rule: ReliefRule,
     let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
     let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
 
-    let cap = effectiveCap(rule.cap, year: year)
-    let eligibility = Eligibility.eligible      // Task 13 computes this properly
+    let resolved = effectiveCap(rule.cap, rule: rule, year: year)
+    let cap = resolved.cap
+    let eligibility: Eligibility = resolved.missing.isEmpty
+        ? .eligible
+        : .needsInfo(questions: resolved.missing)      // Task 13 computes this properly
 
     // An automatic relief is granted in full once it is eligible — LHDN gives the
     // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
@@ -107,15 +110,70 @@ private func assess(rule: ReliefRule,
                             children: children)
 }
 
-/// Resolves a declared cap into a concrete ceiling for this user.
-/// Extended in Tasks 12 and 13.
-private func effectiveCap(_ cap: Cap, year: TaxYearSnapshot) -> Money {
+/// Resolves a declared cap into a concrete ceiling for this user, along with any
+/// question that had to go unanswered to get there.
+private func effectiveCap(_ cap: Cap,
+                          rule: ReliefRule,
+                          year: TaxYearSnapshot) -> (cap: Money, missing: [ProfileQuestion]) {
     switch cap {
     case .fixed(let amount):
-        return amount
-    case .perDependent(let amount):
-        return amount
-    case .tiered(_, let tiers):
-        return tiers.map(\.amount).max() ?? .zero
+        return (amount, [])
+
+    case .perDependent(let perChild):
+        // Each dependent is tested against this rule's own predicate, so
+        // CHILD_TERTIARY counts only tertiary students and CHILD_UNDER_18 only under-18s.
+        var total = Money.zero
+        var missing: [ProfileQuestion] = []
+        for dependent in year.dependents {
+            var facts = year.facts(claimant: .child)
+            facts.dependent = dependent.facts
+            switch rule.eligibility?.evaluate(facts) ?? .satisfied {
+            case .satisfied:
+                total = total + perChild.applying(Decimal(dependent.claimPercentage) / 100)
+            case .failed:
+                continue
+            case .unknown(let questions):
+                missing.append(contentsOf: questions)
+            }
+        }
+        return (total, missing.deduplicated())
+
+    case .tiered(let fact, let tiers):
+        let ordered = tiers.sorted { ($0.maxSen ?? .max) < ($1.maxSen ?? .max) }
+        guard let value = year.value(of: fact) else {
+            // Show the best case and ask, rather than hiding the relief behind a zero.
+            return (ordered.map(\.amount).max() ?? .zero, [fact.question])
+        }
+        let selected = ordered.first { tier in tier.maxSen.map { value <= $0 } ?? true }
+        return (selected?.amount ?? .zero, [])
+    }
+}
+
+extension TieredFact {
+    var question: ProfileQuestion {
+        switch self {
+        case .propertyPrice: .propertyPrice
+        }
+    }
+}
+
+extension TaxYearSnapshot {
+    func value(of fact: TieredFact) -> Int? {
+        switch fact {
+        case .propertyPrice: propertyPriceSen
+        }
+    }
+
+    /// The household facts, for a claim made in respect of `claimant`.
+    func facts(claimant: Claimant?) -> Facts {
+        Facts(yearOfAssessment: year,
+              maritalStatus: maritalStatus,
+              spouseHasIncome: spouseHasIncome,
+              assessmentType: assessmentType,
+              employmentType: employmentType,
+              gender: gender,
+              claimant: claimant,
+              selfIsDisabled: selfIsDisabled,
+              spouseIsDisabled: spouseIsDisabled)
     }
 }

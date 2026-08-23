@@ -269,6 +269,17 @@ import Foundation
         #expect(Set(tables).count == 1)
     }
 
+    @Test("no automatic relief has sub-limits", arguments: shippedYears)
+    func automaticRelievesHaveNoChildren(year: Int) throws {
+        // The evaluator grants an automatic relief its full cap without consulting
+        // children. If one ever gained a sub-limit, that sub-limit's claims would be
+        // silently ignored.
+        for relief in try Self.load(year).allReliefs where relief.automatic {
+            #expect(relief.children.isEmpty,
+                    "\(relief.code) is automatic and has \(relief.children.count) children")
+        }
+    }
+
     @Test("sports relief rose from RM 500 to RM 1,000 in YA2024 and stayed there")
     func sportsReliefTimeline() throws {
         #expect(try Self.load(2023).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
