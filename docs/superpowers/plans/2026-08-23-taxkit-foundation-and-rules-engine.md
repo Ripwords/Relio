@@ -43,6 +43,7 @@ Sources/TaxKit/
     EligibilityPredicate.swift             closed Codable predicate tree + Facts
     ReliefRule.swift                       one relief, possibly with children
     RuleSet.swift                          one Year of Assessment
+    RuleBundle.swift                       the one accessor for TaxKit's own bundle
     RuleSetLoading.swift                   protocol + BundledRuleSetLoader
     RuleSetDiff.swift                      ReliefDelta and diff(_:_:)
   Engine/
@@ -1027,7 +1028,6 @@ import Foundation
           "code": "CHILD_UNDER_18",
           "name": "Child under 18",
           "cap": { "kind": "perDependent", "sen": 200000 },
-      "automatic": true,
           "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/"
         },
         {
@@ -2118,8 +2118,32 @@ git commit -m "feat: add three-valued eligibility predicate language"
 
 **Files:**
 - Create: `Sources/TaxKit/Resources/Rules/ya-2025.json`
+- Create: `Sources/TaxKit/Rules/RuleBundle.swift`
 - Delete: `Sources/TaxKit/Resources/Rules/.keep.json`
 - Test: `Tests/TaxKitTests/RulebookIntegrityTests.swift`
+
+**Reaching the rulebook from a test.** `Bundle.module` written inside a *test* file resolves
+to the test target's own bundle, not TaxKit's — so the tests cannot see the shipped
+rulebook that way. Do **not** solve this by copying the resource into the test target as
+well: that makes the integrity suite validate a duplicate while the loader in Task 15
+reads the original, and the day those diverge the tests pass on data the app does not
+ship. Instead TaxKit exposes its own bundle internally, and the tests reach it through
+`@testable import`:
+
+```swift
+// Sources/TaxKit/Rules/RuleBundle.swift
+import Foundation
+
+/// TaxKit's own resource bundle.
+///
+/// `Bundle.module` is resolved per target, so the same expression written inside a test
+/// file names the test bundle instead. Everything that reads a shipped rulebook — the
+/// loader and the integrity tests alike — goes through this one accessor, so they can
+/// never end up reading different copies.
+enum RuleBundle {
+    static var current: Bundle { .module }
+}
+```
 
 **Interfaces:**
 - Consumes: `RuleSet` (Task 6), `EligibilityPredicate` (Task 7).
@@ -2161,8 +2185,8 @@ import Foundation
 
     static func load(_ year: Int) throws -> RuleSet {
         let url = try #require(
-            Bundle.module.url(forResource: "ya-\(year)", withExtension: "json",
-                              subdirectory: "Rules"),
+            RuleBundle.current.url(forResource: "ya-\(year)", withExtension: "json",
+                                   subdirectory: "Rules"),
             "ya-\(year).json is not in the bundle")
         return try JSONDecoder().decode(RuleSet.self, from: try Data(contentsOf: url))
     }
@@ -2443,6 +2467,7 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "CHILD_UNDER_18", "name": "Child under 18",
       "cap": { "kind": "perDependent", "sen": 200000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "max": 17 }
@@ -4322,9 +4347,9 @@ public struct BundledRuleSetLoader: RuleSetLoading {
 
     public func ruleSet(for year: Int) throws -> RuleSet {
         guard availableYears.contains(year),
-              let url = Bundle.module.url(forResource: "ya-\(year)",
-                                          withExtension: "json",
-                                          subdirectory: "Rules")
+              let url = RuleBundle.current.url(forResource: "ya-\(year)",
+                                               withExtension: "json",
+                                               subdirectory: "Rules")
         else { throw RuleSetLoadingError.noRulesForYear(year) }
 
         do {
