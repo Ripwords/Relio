@@ -2037,7 +2037,7 @@ In `Sources/TaxKit/Rules/ReliefRule.swift`, add the stored property after
 add `eligibility` to `CodingKeys`:
 
 ```swift
-        case code, name, cap, requiredDocuments, eligibility, children, sourceURL, unverified, notes
+        case code, name, cap, automatic, requiredDocuments, eligibility, children, sourceURL, unverified, notes
 ```
 
 and decode it after `requiredDocuments`:
