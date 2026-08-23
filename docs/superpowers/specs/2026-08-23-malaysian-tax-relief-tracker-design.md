@@ -388,7 +388,7 @@ Cumulative base is precomputed so bracket tax is a lookup plus one multiplicatio
 | 3 | Basic supporting equipment for disabled self/spouse/child/parent | 6,000 | |
 | 4 | Disabled individual | 7,000 | |
 | 5 | Education fees (self) | 7,000 | Upskilling / self-enhancement courses sub-limit 2,000 |
-| 6 | Medical — serious illness, fertility, vaccination, dental | 10,000 | Vaccination sub-limit 1,000; dental exam and treatment sub-limit 1,000 |
+| 6 | Medical — serious illness, fertility, vaccination, dental | 10,000 | Vaccination sub-limit 1,000; dental exam and treatment sub-limit 1,000 (both also present in YA2024) |
 | 7 | Full medical check-up, COVID-19 test, mental health, self-test kit, disease-detection fee | within 10,000 | Sub-limit 1,000 |
 | 8 | Learning-disability diagnosis / early intervention, child 18 and under | within 10,000 | Sub-limit 6,000 |
 | 9 | Lifestyle — books, PC/smartphone/tablet, internet, upskilling courses | 2,500 | Self, spouse or child |
@@ -417,14 +417,17 @@ Cumulative base is precomputed so bracket tax is a lookup plus one multiplicatio
 3. Disabled spouse 5,000 -> **6,000**.
 4. Disabled child 6,000 -> **8,000**.
 5. Learning-disability sub-limit 4,000 -> **6,000**.
-6. Dental examination and treatment added as a 1,000 sub-limit under medical.
+6. Medical check-up sub-limit broadened to cover self-health-check equipment and
+   disease-detection test fees (a conditions change, not a cap change).
 7. Sports relief extended to **parents**.
 8. Education and medical insurance 3,000 -> **4,000**.
 9. EV charging extended to **domestic food-waste composting machines**.
 10. **New:** housing loan interest relief for first homes.
 
-YA2023 -> YA2024 deltas (parents relief gains dental and full check-up sub-limit; sports
-relief scope) are encoded the same way.
+YA2023 -> YA2024 deltas are encoded the same way, and are narrower: parents relief gains
+dental treatment plus a RM 1,000 full-check-up sub-limit, and a RM 1,000 dental
+examination and treatment sub-limit is added under medical. Every other YA2023 figure
+carries forward to YA2024 unchanged.
 
 ---
 
