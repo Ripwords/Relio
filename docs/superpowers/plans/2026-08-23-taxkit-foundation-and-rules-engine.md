@@ -34,7 +34,7 @@ Sources/TaxKit/
     Money.swift                            value type, arithmetic, overflow traps
     RoundingRule.swift                     half-up / down / up / bankers
     Money+Split.swift                      largest-remainder allocation
-    Money+Formatting.swift                 the single ms_MY formatter
+    Money+Formatting.swift                 the single en_MY formatter
   Rules/
     ReliefCode.swift                       RawRepresentable wrapper (hand-written core)
     ReliefCode+Generated.swift             GENERATED — one constant per code
