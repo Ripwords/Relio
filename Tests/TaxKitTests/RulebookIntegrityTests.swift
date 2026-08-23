@@ -9,7 +9,7 @@ import Foundation
 
     static func load(_ year: Int) throws -> RuleSet {
         let url = try #require(
-            Bundle.module.url(forResource: "ya-\(year)", withExtension: "json",
+            RuleBundle.current.url(forResource: "ya-\(year)", withExtension: "json",
                               subdirectory: "Rules"),
             "ya-\(year).json is not in the bundle")
         return try JSONDecoder().decode(RuleSet.self, from: try Data(contentsOf: url))

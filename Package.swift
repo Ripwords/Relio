@@ -33,7 +33,7 @@ let package = Package(
         .testTarget(
             name: "TaxKitTests",
             dependencies: ["TaxKit"],
-            resources: [.copy("Fixtures"), .copy("../../Sources/TaxKit/Resources/Rules")],
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
