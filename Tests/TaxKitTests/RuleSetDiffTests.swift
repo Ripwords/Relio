@@ -69,6 +69,39 @@ import Foundation
                      to: try loader.ruleSet(for: 2025)).isEmpty)
     }
 
+    @Test("lines with equal magnitude are ordered deterministically")
+    func tiesAreBrokenByCode() throws {
+        // DISABLED_SELF and DISABLED_SPOUSE both rose by exactly RM 1,000 in YA2025,
+        // so an OKU household produces two lines of identical magnitude.
+        var year = Fixture.year(2025, gross: Money(ringgit: 110_000))
+        year.selfIsDisabled = true
+        year.spouseIsDisabled = true
+        year.maritalStatus = .married
+
+        func order() throws -> [String] {
+            counterfactual(entries: [],
+                           year: year,
+                           under: try loader.ruleSet(for: 2025),
+                           versus: try loader.ruleSet(for: 2024))
+                .lines.map(\.code.rawValue)
+        }
+        let first = try order()
+        #expect(try order() == first, "ordering must be reproducible")
+
+        let tied = first.filter {
+            $0 == "DISABLED_SELF" || $0 == "DISABLED_SPOUSE"
+        }
+        #expect(tied == ["DISABLED_SELF", "DISABLED_SPOUSE"],
+                "equal magnitudes must fall back to code order")
+    }
+
+    @Test("an unshipped year throws the specific noRulesForYear case")
+    func unknownYearThrowsSpecificCase() {
+        #expect(throws: RuleSetLoadingError.noRulesForYear(1999)) {
+            try loader.ruleSet(for: 1999)
+        }
+    }
+
     @Test("the counterfactual prices this year's spending under last year's rules")
     func counterfactualPricesTheChange() throws {
         var year = Fixture.year(2025, gross: Money(ringgit: 110_000))

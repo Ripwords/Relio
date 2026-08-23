@@ -39,7 +39,15 @@ public func diff(from earlier: RuleSet, to later: RuleSet) -> [ReliefDelta] {
                                       from: old.cap.nominalCeiling,
                                       to: new.cap.nominalCeiling))
         }
-        if old.eligibility != new.eligibility || old.requiredDocuments != new.requiredDocuments {
+        // A tiered cap can change without its ceiling moving — a Budget that adjusts the
+        // RM 500,000-to-750,000 housing band while leaving the top tier alone. Comparing
+        // only `nominalCeiling` would report no change at all, so the restructure is
+        // reported as a conditions change instead.
+        let capStructureChanged = old.cap != new.cap
+            && old.cap.nominalCeiling == new.cap.nominalCeiling
+        if capStructureChanged
+            || old.eligibility != new.eligibility
+            || old.requiredDocuments != new.requiredDocuments {
             deltas.append(.conditionsChanged(code, name: new.name,
                                              from: old.notes, to: new.notes))
         }

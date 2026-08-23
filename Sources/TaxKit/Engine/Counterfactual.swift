@@ -19,7 +19,9 @@ public struct CounterfactualResult: Hashable, Sendable {
     /// Only reliefs whose allowed amount actually differs, biggest difference first.
     public var lines: [CounterfactualLine]
     public var totalReliefDifference: Money
-    /// Difference in estimated tax. `nil` when income is unknown.
+    /// Difference in estimated tax, `comparison - baseline`. Positive means the
+    /// baseline year leaves the user better off — the same convention as `difference`
+    /// and `totalReliefDifference`. `nil` when income is unknown.
     public var taxDifference: Money?
 }
 
@@ -63,7 +65,15 @@ public func counterfactual(entries: [EntrySnapshot],
             difference: Money.zero - assessment.allowed))
     }
 
-    lines.sort { abs($0.difference.sen) > abs($1.difference.sen) }
+    // Swift's sort is not stable, and ties are reachable: DISABLED_SELF,
+    // DISABLED_SPOUSE and INSURANCE_EDU_MEDICAL all moved by exactly RM 1,000 between
+    // YA2024 and YA2025. Without a tie-break the Compare screen could reorder between
+    // launches, so equal magnitudes fall back to the code.
+    lines.sort {
+        abs($0.difference.sen) == abs($1.difference.sen)
+            ? $0.code.rawValue < $1.code.rawValue
+            : abs($0.difference.sen) > abs($1.difference.sen)
+    }
 
     var taxDifference: Money?
     if let baseTax = base.estimatedTax, let otherTax = other.estimatedTax {
