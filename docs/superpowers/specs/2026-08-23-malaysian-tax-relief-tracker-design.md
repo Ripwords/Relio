@@ -1,0 +1,661 @@
+# Malaysian Tax Relief Tracker — Design
+
+**Date:** 2026-08-23
+**Status:** Approved design, pending implementation plan
+**Platforms:** iOS 26+, iPadOS 26+, macOS 26+, watchOS 26+
+
+---
+
+## 1. Purpose
+
+A native Apple-platform app that helps Malaysian individual taxpayers capture receipts,
+track relief usage against LHDN caps per Year of Assessment, verify that each claim meets
+its documentary requirements, compare how rules changed between years, and ask an
+on-device assistant how to maximise their claim.
+
+The app is account-less and server-less. All data lives on the user's devices and in their
+own iCloud.
+
+### Success criteria
+
+1. A user can log their first receipt within 30 seconds of first launch, without an account
+   and without entering income.
+2. Every ringgit figure the app displays traces to either the user's own entry or a
+   rulebook value carrying an LHDN source URL.
+3. The same data appears correctly on iPhone, iPad, Mac and Watch, with conflicts resolved
+   newest-write-wins.
+4. The app is fully useful with the AI assistant disabled.
+
+---
+
+## 2. Non-goals (v1)
+
+Named explicitly so scope does not drift:
+
+- Direct submission to LHDN e-Filing (no public API exists).
+- Bank statement or email auto-import.
+- Shared household or family accounts.
+- Business income (Form B), partnership, or non-resident tax treatment.
+- Android or web clients.
+- Tax advice. The app produces estimates and cites sources; it is not a licensed tax agent.
+
+---
+
+## 3. Architecture
+
+```
+TaxTracker.xcodeproj
+├── TaxKit/                        local Swift package — ~70% of the code
+│   ├── Money/                     Money, RoundingRule, formatting
+│   ├── Models/                    @Model types, CloudKit-safe
+│   ├── Rules/                     RuleSet decoding, ReliefCode, YA diffing
+│   ├── Engine/                    evaluate(), bracket maths, assessments
+│   ├── Documents/                 DocumentPipeline actor, iCloud file store
+│   ├── Assistant/                 Foundation Models session + read-only tools
+│   ├── Store/                     TaxStore actor — the only write path
+│   └── Tests/                     pure Swift, no simulator required
+├── TaxTracker/                    iOS + iPadOS + macOS (single SwiftUI target)
+├── TaxTracker Watch/              watchOS
+├── TaxTracker ShareExtension/     accept PDFs/images from Mail, WhatsApp, Safari
+└── TaxTracker Widgets/            Home Screen, Lock Screen, Smart Stack, complications
+```
+
+Rationale: one multiplatform SwiftUI target covers iPhone/iPad/Mac natively via
+`NavigationSplitView`. Mac Catalyst was rejected because it costs real drag-and-drop of
+PDF e-invoices and native file export, which are the Mac's whole reason to exist here.
+Per-platform targets were rejected as 4x the UI code for a form-and-list app.
+
+The engine and money layers have no SwiftData or SwiftUI dependency, so the tax maths is
+testable without booting a simulator.
+
+---
+
+## 4. Money
+
+Money never uses `Double`. The canonical representation is a whole number of sen.
+
+```swift
+public struct Money: Hashable, Codable, Sendable, Comparable {
+    public private(set) var sen: Int
+
+    public init(sen: Int)
+    public init(ringgit: Decimal)                          // half-up to sen at the boundary
+
+    public static func + (Money, Money) -> Money           // traps on overflow, never wraps
+    public static func - (Money, Money) -> Money
+    public func clamped(to cap: Money) -> Money
+
+    /// The ONLY way to apply a percentage. There is no Money x Money.
+    public func applying(_ rate: Decimal, rounding: RoundingRule = .halfUp) -> Money
+
+    /// Splits that provably sum back to self (largest-remainder allocation).
+    public func split(into n: Int) -> [Money]
+    public func split(weights: [Int]) -> [Money]
+
+    /// Charting only. Named to discourage use.
+    public var lossyDoubleForCharting: Double { get }
+}
+```
+
+Rules:
+
+1. No `Double` in any calculation path.
+2. Rates are `Decimal`, applied only through `applying(_:rounding:)` with rounding explicit
+   at the call site. Malaysian tax rounds half-up; asserted once, centrally.
+3. `split` uses largest-remainder so `Money(ringgit: 2500).split(into: 3)` yields
+   833.34 / 833.33 / 833.33 and sums exactly. This is the 50/50 spouse child-relief case
+   and the shared-pool allocation case, both of which naively lose sen.
+4. Bracket tax is table-driven from precomputed cumulative bases (section 8), not an
+   accumulating loop.
+5. One formatter: `Money.formatted()`, `ms_MY` locale, `RM 2,500.00`. A lint rule bans
+   string interpolation of amounts.
+
+Property-based tests (swift-testing) assert: `split` always sums to the whole,
+`clamped` never exceeds cap, and `a + b - b == a` across the `Int` range.
+
+---
+
+## 5. Data model
+
+All `@Model` types are CloudKit-mirroring-safe: every property has a default, every
+relationship is optional, no `@Attribute(.unique)`.
+
+```
+TaxYear                              Dependent
+├─ year: Int                         ├─ name, dateOfBirth
+├─ grossIncome: Money?    optional   ├─ kind: .child | .parent | .grandparent
+├─ epf, socso: Money?     income     ├─ isDisabled: Bool
+├─ maritalStatus                     └─ yearStatuses: [DependentYearStatus]
+├─ spouseHasIncome: Bool                (Codable value type, not an entity —
+├─ assessmentType                        education level changes per YA)
+├─ employmentType
+└─ entries ──┐
+             ▼
+      ReliefEntry  <────────>  Document  ────────>  DocumentFile
+      ├─ reliefCode            ├─ kind: DocumentKind   ├─ uuid, uti, byteCount
+      ├─ amount: Money         ├─ vendor               ├─ contentHash (SHA-256)
+      ├─ claimedFor            ├─ documentDate         └─ downloadState
+      ├─ dependentID: UUID?    ├─ total: Money?
+      ├─ dedupeKey: String     ├─ ocrText: String?
+      ├─ needsDocument: Bool   ├─ eInvoiceUUID: String?
+      ├─ updatedAt, deletedAt  ├─ thumbnail: Data      (~30 KB, synced)
+      └─ mergedInto: UUID?     └─ updatedAt, deletedAt
+
+ChatMessage · UserPreferences
+```
+
+```swift
+/// Stored inline on Dependent, not an entity: low edit frequency, and it keeps
+/// the CloudKit relationship graph flat.
+public struct DependentYearStatus: Codable, Hashable, Sendable {
+    public var year: Int
+    public var educationLevel: EducationLevel   // .none .preTertiary .tertiaryLocal .tertiaryOverseas
+    public var claimPercentage: Int             // 100 or 50 when split with a spouse
+    public var isFullTime: Bool
+}
+```
+
+`ChatMessage` (role, text, createdAt, year) and `UserPreferences` (accent, assistant
+enabled, capture quality, income module on/off) are small and sync with everything else.
+Chat history is capped at the most recent 200 messages and prunable from Settings.
+
+### Decisions
+
+- **Entries reference rules by `ReliefCode`, never by relationship.** The rulebook is
+  bundled JSON, not database rows. When YA2026 renames or splits a category, logged entries
+  do not migrate; the engine resolves the code against whichever ruleset applies. This is
+  the most important decoupling in the design.
+
+- **ReliefEntry <-> Document is many-to-many.** A serious-illness claim needs an official
+  receipt *and* a medical certificate; one hospital bill can back two entries. Requirement
+  checking is a set-difference of attached `DocumentKind`s against the rulebook's
+  `requiredDocuments`, so feature 3 falls out of the model.
+
+- **`DocumentKind`**: `.officialReceipt`, `.taxInvoice`, `.eInvoice`, `.medicalCertificate`,
+  `.referralLetter`, `.insuranceStatement`, `.epfStatement`, `.bankStatement`, `.other`.
+
+- **All writes go through `actor TaxStore`**, which stamps `updatedAt` and recomputes
+  `dedupeKey`. No view touches `modelContext` directly. One forgotten `touch()` in a view
+  silently rots the sync story, so the discipline is structural, not conventional.
+
+- **Soft delete** (`deletedAt: Date?`) everywhere. Enables Recently Deleted and prevents a
+  delete-vs-edit race across devices from resolving as data loss.
+
+- `VersionedSchema` + `SchemaMigrationPlan` from the first commit — a shipped store across
+  four platforms cannot be wiped.
+
+---
+
+## 6. Sync
+
+`ModelConfiguration(cloudKitDatabase: .automatic)` against the user's **private** CloudKit
+database. CloudKit resolves conflicts field-by-field, newest server write wins, which is
+the last-updated-timestamp behaviour required. `updatedAt` is maintained additionally for
+UI display and for the reconciliation sweep.
+
+### Deduplication
+
+CloudKit forbids unique constraints, so duplicates are made detectable and collapsible
+rather than preventable:
+
+1. `ReliefEntry.dedupeKey` = SHA-256 of `(reliefCode, amount.sen, documentDate, vendor.normalised())`,
+   computed in `TaxStore` on every write.
+2. `DocumentFile.contentHash` = SHA-256 of the normalised image bytes — catches the same
+   photo imported on two devices with different metadata.
+3. `Document.eInvoiceUUID` from a MyInvois QR is the strongest key when present.
+4. On every sync-complete event, `TaxStore` runs a **reconciliation sweep**: group by
+   `dedupeKey`; where a group has more than one live record, keep the newest `updatedAt`,
+   union its document links onto the survivor, and soft-delete the rest with
+   `mergedInto: UUID` so the merge is auditable and reversible. The sweep is deterministic,
+   so every device converges on the same survivor independently.
+5. Same-session duplicates are caught earlier by a UX prompt at entry time.
+
+### Binary files do not live in CloudKit
+
+Full-resolution documents go to the app's iCloud Drive ubiquity container at
+`Documents/Receipts/<uuid>.<ext>` — a folder the user can open in Files.app. Only the
+~30 KB thumbnail lives in SwiftData.
+
+| Benefit | Why it matters |
+|---|---|
+| Evictable | A 2 GB archive costs ~0 bytes locally; re-downloads on tap |
+| Watch-safe | The Watch only ever syncs thumbnails |
+| 7-year retention | LHDN requires 7 years; the archive is a plain, backup-able folder |
+| Fast onboarding | The mirrored database stays small, so a new device syncs in seconds |
+
+File states surfaced in UI: `.local`, `.notDownloaded`, `.downloading(Double)`,
+`.uploading`, `.missing`. Observed via `NSMetadataQuery`; `startDownloadingUbiquitousItem`
+on tap; `evictUbiquitousItem` for the Settings "free up space" action.
+
+Three failure modes handled explicitly:
+
+1. Record exists, file gone (deleted in Files.app) -> `.missing`, repairable amber row.
+2. File exists, no record (app died mid-import) -> orphan sweep moves it to `.Trash/`
+   after 30 days.
+3. iCloud signed out -> writes go to local Application Support and queue for migration.
+   The app remains fully usable offline and account-less.
+
+**Ordering rule: file to disk first, record second, always.** An orphan file is
+recoverable; a record pointing at a file that was never written is permanently broken.
+Capture is idempotent and resumes on launch.
+
+---
+
+## 7. Rules engine
+
+One pure function, no SwiftData dependency, golden-file tested per YA:
+
+```swift
+public func evaluate(ruleSet: RuleSet,
+                     year: TaxYearSnapshot,
+                     entries: [EntrySnapshot]) -> [ReliefAssessment]
+```
+
+### Why the JSON must be a small language
+
+A flat `{code, cap}` list cannot express the reliefs that actually exist:
+
+| Real rule | Requirement |
+|---|---|
+| Medical RM 10,000 with a RM 1,000 check-up sub-limit inside it | Nested caps |
+| Life insurance RM 3,000 + EPF RM 4,000, RM 7,000 combined | Shared pools |
+| Child relief per child, splittable 50/50 with spouse | Per-dependent multiplicity |
+| Housing loan interest RM 7,000 (home <= RM 500k) or RM 5,000 (<= RM 750k) | Tiered on a condition |
+| Breastfeeding equipment, once every two YAs | Frequency limits |
+
+```jsonc
+{
+  "yearOfAssessment": 2025,
+  "revision": 1,
+  "verifiedOn": "2026-08-23",
+  "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/",
+  "brackets": [ /* section 8 */ ],
+  "reliefs": [
+    {
+      "code": "MEDICAL_SERIOUS",
+      "name": "Medical — serious illness, fertility, vaccination, dental",
+      "cap": { "kind": "fixed", "sen": 1000000 },
+      "requiredDocuments": ["officialReceipt", "medicalCertificate"],
+      "eligibility": { "claimantIn": ["self", "spouse", "child"] },
+      "children": [
+        { "code": "MEDICAL_VACCINATION",  "cap": { "kind": "fixed", "sen": 100000 } },
+        { "code": "MEDICAL_DENTAL",       "cap": { "kind": "fixed", "sen": 100000 } },
+        { "code": "MEDICAL_CHECKUP",      "cap": { "kind": "fixed", "sen": 100000 } },
+        { "code": "MEDICAL_LEARNDIS",     "cap": { "kind": "fixed", "sen": 600000 } }
+      ],
+      "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/"
+    }
+  ]
+}
+```
+
+`cap.kind` is a closed enum: `fixed` | `sharedPool(id)` | `perDependent` | `tiered(on:)` | `none`.
+
+`eligibility` is a closed, `Codable` predicate tree — `all` / `any` / `not` over a fixed
+fact set: `maritalStatus`, `spouseHasIncome`, `assessmentType`, `dependentAge`,
+`dependentEducation`, `isDisabled`, `employmentType`, `gender`, `yaRange`, `claimFrequency`.
+Deliberately not a scripting language: no `eval`, nothing that cannot be exhaustively
+switched over in Swift.
+
+### ReliefCode is generated, not stringly-typed
+
+A SPM build plugin regenerates `ReliefCode` constants from the shipped JSON on every build:
+
+```swift
+public struct ReliefCode: RawRepresentable, Hashable, Codable, Sendable {
+    public let rawValue: String
+    public static let lifestyle      = ReliefCode("LIFESTYLE")
+    public static let medicalSerious = ReliefCode("MEDICAL_SERIOUS")
+    // ...
+}
+```
+
+- Codes are **append-only and never reused**. Merges are declared explicitly:
+  `{"retired": "BOOKS", "supersededBy": "LIFESTYLE", "fromYA": 2021}`.
+- Resolution returns `ResolvedRelief` or `.unresolved(code, reason)`. Unresolved codes
+  render as a visible amber row — *"Book purchases — not a separate relief in YA2025.
+  Move to Lifestyle?"* — never a silent drop. A dropped claim is a lost ringgit.
+- A build-time test asserts every code in every shipped ruleset resolves and that no code
+  was deleted without an alias.
+
+### Eligibility has three states
+
+```swift
+public enum Eligibility {
+    case eligible
+    case ineligible(reasons: [String])
+    case needsInfo(questions: [ProfileQuestion])   // the important one
+}
+```
+
+If the app does not know whether the spouse has income, the honest answer is
+*"answer one question to unlock RM 4,000"*, not a silent zero. Every `needsInfo` becomes a
+home-screen prompt and a topic the assistant can raise.
+
+`ReliefAssessment` returns `cap`, `claimed`, `headroom`, `eligibility`,
+`requirements: [RequirementCheck]`, and `taxSaved: Money?` (nil when income is absent).
+
+### Year comparison — two diffs
+
+```swift
+public func diff(_ a: RuleSet, _ b: RuleSet) -> [ReliefDelta]
+// .added · .removed(supersededBy:) · .capChanged(from:to:) · .conditionsChanged
+```
+
+The **rule diff** is generic. The feature worth building is the **personalised
+counterfactual**: replay the user's YA2025 entries against YA2024's ruleset and report the
+delta in ringgit. Same `evaluate()` call, different ruleset argument — nearly free, because
+the engine is pure.
+
+---
+
+## 8. Verified rulebook data
+
+Retrieved from https://www.hasil.gov.my/individu/pelepasan-cukai/ and
+https://www.hasil.gov.my/individu/kadar-cukai/ on 2026-08-23. v1 ships YA2023, YA2024 and
+YA2025. Every relief carries `sourceURL` and `verifiedOn`, surfaced in Settings as
+*"YA2025 rules verified against LHDN on 23 Aug 2026"*.
+
+**Any figure that cannot be verified against hasil.gov.my is marked `"unverified": true`,
+excluded from tax-saved maths, and rendered with a "verify with LHDN" note.** A confidently
+wrong cap is worse than a missing one.
+
+### Rate bands — YA2023, YA2024 and YA2025 (identical)
+
+Cumulative base is precomputed so bracket tax is a lookup plus one multiplication.
+
+| Chargeable income (RM) | Rate | Cumulative base tax at lower bound (RM) |
+|---|---|---|
+| 0 – 5,000 | 0% | 0 |
+| 5,001 – 20,000 | 1% | 0 |
+| 20,001 – 35,000 | 3% | 150 |
+| 35,001 – 50,000 | 6% | 600 |
+| 50,001 – 70,000 | 11% | 1,500 |
+| 70,001 – 100,000 | 19% | 3,700 |
+| 100,001 – 400,000 | 25% | 9,400 |
+| 400,001 – 600,000 | 26% | 84,400 |
+| 600,001 – 2,000,000 | 28% | 136,400 |
+| Above 2,000,000 | 30% | 528,400 |
+
+`tax = cumulativeBase + (chargeable - lowerBound).applying(rate)`
+
+### YA2025 reliefs
+
+| # | Relief | Cap (RM) | Notes |
+|---|---|---|---|
+| 1 | Individual and dependent relatives | 9,000 | Automatic |
+| 2 | Parents **and grandparents** — medical, dental, special needs, carer | 8,000 | Full medical check-up sub-limit 1,000; condition certified by a medical practitioner |
+| 3 | Basic supporting equipment for disabled self/spouse/child/parent | 6,000 | |
+| 4 | Disabled individual | 7,000 | |
+| 5 | Education fees (self) | 7,000 | Upskilling / self-enhancement courses sub-limit 2,000 |
+| 6 | Medical — serious illness, fertility, vaccination, dental | 10,000 | Vaccination sub-limit 1,000; dental exam and treatment sub-limit 1,000 |
+| 7 | Full medical check-up, COVID-19 test, mental health, self-test kit, disease-detection fee | within 10,000 | Sub-limit 1,000 |
+| 8 | Learning-disability diagnosis / early intervention, child 18 and under | within 10,000 | Sub-limit 6,000 |
+| 9 | Lifestyle — books, PC/smartphone/tablet, internet, upskilling courses | 2,500 | Self, spouse or child |
+| 10 | Lifestyle additional — sports equipment, facility rental, competition fees, gym | 1,000 | YA2025 extends to **parents** |
+| 11 | Breastfeeding equipment, child 2 and under | 1,000 | Once every two YAs |
+| 12 | Childcare / kindergarten fees, child 6 and under | 3,000 | Registered centre |
+| 13 | SSPN net deposit | 8,000 | Deposits minus withdrawals in the year |
+| 14 | Spouse / alimony to former wife | 4,000 | |
+| 15 | Disabled spouse | 6,000 | |
+| 16a | Child under 18 | 2,000 each | Splittable 50/50 |
+| 16b | Child 18+, full-time A-Level / matriculation / pre-degree | 2,000 each | |
+| 16b | Child 18+, full-time tertiary (local diploma+, overseas degree+) | 8,000 each | Recognised institution |
+| 16c | Disabled child | 8,000 each | |
+| 16c | Disabled child 18+ in recognised tertiary study | +8,000 | On top of 16c |
+| 17 | Life insurance and EPF | 7,000 | EPF sub-limit 4,000; life/takaful sub-limit 3,000 |
+| 18 | PRS and deferred annuity | 3,000 | |
+| 19 | Education and medical insurance | 4,000 | |
+| 20 | SOCSO / EIS contributions | 350 | |
+| 21 | EV charging facilities **and domestic food-waste composting machines** | 2,500 | Not for business use |
+| 22 | **NEW** Housing loan interest, first home | 7,000 or 5,000 | 7,000 for homes <= RM 500k; 5,000 for RM 500k–750k; SPA dated 1 Jan 2025 – 31 Dec 2027 |
+
+### YA2024 -> YA2025 changes (drives the Compare screen)
+
+1. Parents relief extended to **grandparents**.
+2. Disabled individual 6,000 -> **7,000**.
+3. Disabled spouse 5,000 -> **6,000**.
+4. Disabled child 6,000 -> **8,000**.
+5. Learning-disability sub-limit 4,000 -> **6,000**.
+6. Dental examination and treatment added as a 1,000 sub-limit under medical.
+7. Sports relief extended to **parents**.
+8. Education and medical insurance 3,000 -> **4,000**.
+9. EV charging extended to **domestic food-waste composting machines**.
+10. **New:** housing loan interest relief for first homes.
+
+YA2023 -> YA2024 deltas (parents relief gains dental and full check-up sub-limit; sports
+relief scope) are encoded the same way.
+
+---
+
+## 9. Document pipeline
+
+`actor DocumentPipeline`, six resumable stages:
+
+```
+raw image / PDF
+   1 normalise   HEIC, 2000px long edge, EXIF stripped except date
+   2 hash        SHA-256 of normalised bytes -> contentHash
+   3 thumbnail   320px, ~30 KB -> SwiftData, syncs everywhere
+   4 barcode     VNDetectBarcodesRequest -> MyInvois QR -> eInvoiceUUID, mark verified
+   5 OCR         VNRecognizeTextRequest .accurate; en-US, zh-Hans, zh-Hant
+                 (Malay is Latin script; English recogniser with correction off)
+   6 extract     vendor · date · total · SST no. · suggested relief
+```
+
+Stage 4 is the Malaysia-specific win: MyInvois e-invoicing is rolling out to all businesses
+through 2026 and every compliant invoice carries a QR with a validation UUID, giving a
+government-verified vendor, date and total plus the strongest dedupe key available.
+
+Stage 6 uses the on-device model with guided generation:
+
+```swift
+@Generable struct ExtractedReceipt {
+    @Guide("Merchant name as printed")            var vendor: String
+    @Guide("Document date, ISO-8601")             var date: String?
+    @Guide("Grand total in RM")                   var total: Decimal?
+    @Guide("Best-matching relief code, or null")  var suggestedRelief: String?
+    @Guide("0.0-1.0")                             var confidence: Double
+}
+```
+
+Regex heuristics are the fallback on non-Apple-Intelligence devices. Below 0.7 confidence
+fields prefill but stay visibly unconfirmed. The app never files a claim the user has not
+looked at.
+
+### Capture sources
+
+| Source | Platform |
+|---|---|
+| `VNDocumentCameraViewController` (multi-page, deskew, shadow removal) | iPhone, iPad |
+| Share extension — e-invoices arrive by email and WhatsApp | iPhone, iPad, Mac |
+| Drag and drop from Mail | Mac |
+| Photos / Files picker | all |
+| Quick capture with no document -> `needsDocument` entry | Watch |
+
+`needsDocument` entries surface on iPhone as a "4 receipts pending photo" inbox.
+
+---
+
+## 10. Assistant
+
+Powered by Apple Foundation Models on-device. No API key, no server, no network. Tax data
+never leaves the device.
+
+**Design rule: the model chooses what to talk about; the app supplies every number.**
+
+### Three enforcement layers
+
+**1. Tools are the only data path.** No entries, rules or income in the prompt itself.
+
+```
+QueryHeadroomTool      claimed / cap / headroom per relief for a YA
+LookupReliefRuleTool   cap, conditions, required documents, sourceURL
+TaxImpactTool          marginal ringgit impact, from the verified bracket table
+FindEntriesTool        search own entries by category, date, vendor
+CompareYearsTool       the personalised counterfactual
+MissingDocumentsTool   claims failing their requirement check
+```
+
+Every tool is read-only. **There is no write tool.** The model emits a `ProposedAction`
+that renders as a card with a button; the app performs the mutation through `TaxStore`.
+
+**2. Numeric fact-check pass.** Before rendering, the app scans generated text for
+`RM <number>`, `<number>%` and year tokens and cross-checks each against the values the
+tools returned that turn. Unmatched values are stripped and the turn retried. Cheap,
+deterministic, and it catches the most damaging failure mode.
+
+**3. Instructions assume bad faith from the model:** answer only from tool results; never
+state a cap, rate or figure not returned by a tool; if tools return nothing, say so and
+link LHDN; always name the Year of Assessment; never advise on structuring, backdating or
+under-reporting — decline and point to a licensed tax agent. Guardrail violations render as
+a plain refusal, not an error.
+
+### Context budget
+
+~4k tokens. Tools return summaries, never dumps — `QueryHeadroomTool` sends about nine rows
+of `code / cap / used / left`, not 400 entries. `session.prewarm()` on chat open,
+`streamResponse` for output, transcript trimmed to recent turns plus a pinned header.
+
+### Seeded prompts
+
+The chat is never a blank box. Prompts are generated from actual state: *"Why can't I claim
+spouse relief?"* (an eligibility is `.needsInfo`), *"What's my biggest missed relief?"*
+(headroom exists), *"What changed in YA2025 for me?"* (the diff is non-empty), *"Which
+claims are missing documents?"* (a requirement check failed).
+
+### No-model fallback
+
+Where `SystemLanguageModel.default.availability` is `.unavailable`, the chat tab is
+replaced by **Opportunities**: `evaluate()` output sorted by `taxSaved` descending, with
+the same `ProposedAction` buttons. Every insight the assistant offers is computed
+deterministically first; the model is a conversational layer over the rules engine, never
+the source of the insight. A Settings toggle disables the assistant entirely.
+
+---
+
+## 11. Interface
+
+Three tabs. Compare lives in the year-title menu; Settings lives in the toolbar.
+
+```
+iPhone                      iPad / Mac
++-----------------+         +--------+--------------+-----------+
+|                 |         | YA2025 | Reliefs      | Detail    |
+|    content      |         | ------ | Lifestyle    |  cap/used |
+|                 |         | Home   | Medical      |  entries  |
++-----------------+         | Docs   | Education    |  docs     |
+|  Home Docs Ask  |         | Chat   | SSPN         |  source   |
++-----------------+         +--------+--------------+-----------+
+```
+
+### Home answers one question
+
+```
+  YA 2025 v                                    (gear)
+
+     RM 2,616
+     still claimable            <- the only large number on screen
+
+  [ Answer 1 question -> unlock RM 4,000 ]     <- eligibility .needsInfo
+  [ 4 receipts waiting for a photo       ]     <- from Watch capture
+
+  Biggest opportunities
+  SSPN          ##........   RM 8,000 left  -> RM 1,520
+  Medical       #####.....   RM 2,100 left  ->   RM 399
+  Lifestyle     ########..     RM 800 left  ->   RM 152
+                                    See all 9 >
+
+                                          (+)
+```
+
+The headline is the total across every eligible relief; the list shows the top three by
+ringgit recoverable, not alphabetically. With income off, the right column
+disappears and the layout is unchanged.
+
+The `-> RM` figures are marginal: `headroom.applying(marginalRate)`. In the example the
+user's chargeable income sits in the 70,001-100,000 band, so the rate is 19%. Where
+headroom would cross a band boundary the engine splits the calculation across bands rather
+than applying a single rate.
+
+### Per platform
+
+| | Unique role |
+|---|---|
+| iPhone | Scan, review, ask — the whole app |
+| iPad | Three-column; Apple Pencil Scribble into amount fields |
+| Mac | Drag PDFs from Mail · multi-select table · Quick Look · export (CSV for a tax agent, PDF summary, ZIP archive for the 7-year record) · full keyboard entry |
+| Watch | Crown-scrub the amount, tap the category, done in ~8s. Complication and Smart Stack showing headroom |
+| All | App Intents / Siri: *"Log RM 120 books in Tax Tracker"* · Home and Lock Screen widgets |
+
+### What "minimal, clean, smooth" means concretely
+
+1. One accent colour; everything else semantic system colours, so Dark Mode, Increase
+   Contrast and tinting are correct for free.
+2. System font, Dynamic Type throughout, no fixed point sizes. Money uses
+   `.monospacedDigit()` so figures do not jitter while animating.
+3. Two kinds of motion only: `matchedGeometryEffect` from row to detail, and springs on
+   value change. No decorative animation. `.accessibilityReduceMotion` honoured.
+4. Nothing blocks the main thread. Predicates push into SwiftData; OCR and hashing run on
+   the pipeline actor; lists render thumbnails only. Budget: no frame over 8 ms.
+5. Empty states are the design. First launch is one button.
+6. Every destructive action is undoable — soft delete plus an undo toast, all platforms.
+7. One money formatter; interpolation of amounts is lint-banned.
+8. VoiceOver reads "Lifestyle, RM 1,700 of RM 2,500 used", never "68 percent".
+
+Standard SwiftUI components throughout so iOS 26 Liquid Glass materials apply
+automatically. Onboarding is three skippable screens; income is optional.
+
+---
+
+## 12. Testing
+
+| Layer | Approach |
+|---|---|
+| Money | Property-based: split sums, clamp bounds, overflow traps |
+| Rules engine | Golden files per YA — a fixture profile plus entries, asserted against a checked-in expected `[ReliefAssessment]` |
+| Rulebook integrity | Every code resolves; every relief has `sourceURL` and `verifiedOn`; no code deleted without an alias |
+| Bracket maths | Table-driven cases at every band boundary and one ringgit either side |
+| Dedupe | Simulated two-device divergence, assert deterministic convergence |
+| Pipeline | Fixture receipts including a MyInvois QR; kill-and-resume mid-stage |
+| Assistant | Tool-call transcripts asserted; fact-check pass fed known-bad output |
+| UI | XCUITest smoke on all four platforms: log an entry, attach a document, see it sync |
+
+TDD throughout, per project convention: tests first.
+
+---
+
+## 13. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Rulebook goes stale after a Budget | `verifiedOn` surfaced in-app; loader behind a protocol so remote updates drop in without touching feature code |
+| CloudKit mirroring schema constraints discovered late | Model constraints enforced from commit one; a test asserts every property is defaulted |
+| On-device model too weak for useful advice | Every insight is computed deterministically first; model is a layer, removable |
+| iCloud Drive file lifecycle bugs | Three named failure modes handled explicitly; file-before-record ordering rule |
+| User treats estimates as tax advice | Disclaimer on every computed figure, per-relief LHDN source links, refusal instructions in the assistant |
+
+## 14. Open items
+
+1. LHDN publishes an English relief page as well as the BM one used here; confirm the
+   English URL after the July 2026 portal migration and cite whichever is stable.
+2. MyInvois QR payload format needs verification against a real Malaysian e-invoice before
+   stage 4 is implemented; until then it degrades to OCR.
+3. Whether YA2026 rules are published in time to ship as a fourth ruleset.
+
+---
+
+## 15. Build sequence
+
+Detailed plan to follow via the writing-plans skill. Rough order:
+
+1. `TaxKit` foundation — `Money`, `ReliefCode` generation, ruleset decoding, YA2023–2025 JSON
+2. Rules engine + bracket maths, golden-file tested
+3. SwiftData models, `TaxStore`, CloudKit mirroring, reconciliation sweep
+4. iOS shell — Home, Reliefs, entry CRUD
+5. Document pipeline + iCloud Drive file store + capture sources
+6. Requirement checks and the Compare screen
+7. Assistant, tools, fact-check pass, Opportunities fallback
+8. watchOS app, complications, widgets, App Intents
+9. macOS refinements — drag and drop, table, export
+10. Accessibility and performance pass
