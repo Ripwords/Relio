@@ -4180,7 +4180,7 @@ private func checkRequirements(rule: ReliefRule,
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `swift test --filter EvaluatorEligibilityTests`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 Run: `swift test`
 Expected: PASS, every suite.
