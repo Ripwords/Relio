@@ -51,4 +51,15 @@ public struct Money: Hashable, Codable, Sendable, Comparable {
 
     /// Charting only. Named to discourage use; never appears in a calculation path.
     public var lossyDoubleForCharting: Double { Double(sen) / 100 }
+
+    /// Multiplies by a rate expressed as a fraction — pass `0.19` for 19%.
+    ///
+    /// This is the only way to apply a percentage to money. There is no
+    /// `Money * Money`, because multiplying two amounts is never meaningful here.
+    public func applying(_ rate: Decimal, rounding: RoundingRule = .halfUp) -> Money {
+        var product = Decimal(sen) * rate
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &product, 0, rounding.nsMode)
+        return Money(sen: NSDecimalNumber(decimal: rounded).intValue)
+    }
 }

@@ -47,3 +47,42 @@ import Foundation
         #expect(try JSONDecoder().decode(Money.self, from: data) == original)
     }
 }
+
+@Suite("Money.applying") struct MoneyRateTests {
+
+    @Test("applies a fractional rate and rounds half-up by default")
+    func appliesRate() {
+        // RM 800.00 at 19% is RM 152.00 exactly.
+        #expect(Money(sen: 80_000).applying(Decimal(string: "0.19")!).sen == 15_200)
+    }
+
+    @Test("half-up is the default at an exact .5 sen boundary")
+    func halfUpAtBoundary() {
+        // 1 sen at 50% is 0.5 sen, which rounds up to 1.
+        #expect(Money(sen: 1).applying(Decimal(string: "0.5")!).sen == 1)
+        // 3 sen at 50% is 1.5 sen, which rounds up to 2.
+        #expect(Money(sen: 3).applying(Decimal(string: "0.5")!).sen == 2)
+    }
+
+    @Test("explicit rounding rules override the default")
+    func explicitRounding() {
+        let one = Money(sen: 1)
+        let half = Decimal(string: "0.5")!
+        #expect(one.applying(half, rounding: .down).sen == 0)
+        #expect(one.applying(half, rounding: .up).sen == 1)
+        #expect(one.applying(half, rounding: .bankers).sen == 0)   // ties to even
+        #expect(Money(sen: 3).applying(half, rounding: .bankers).sen == 2)
+    }
+
+    @Test("negative amounts round away from zero under half-up")
+    func negativeHalfUp() {
+        #expect(Money(sen: -1).applying(Decimal(string: "0.5")!).sen == -1)
+    }
+
+    @Test("a zero rate yields zero and a rate of one is the identity")
+    func degenerateRates() {
+        let m = Money(sen: 123_456)
+        #expect(m.applying(Decimal(0)) == .zero)
+        #expect(m.applying(Decimal(1)) == m)
+    }
+}
