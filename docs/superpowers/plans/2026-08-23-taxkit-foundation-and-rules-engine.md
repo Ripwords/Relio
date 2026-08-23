@@ -3618,16 +3618,7 @@ private func assess(rule: ReliefRule,
     // An automatic relief is granted in full once it is eligible — LHDN gives the
     // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
     // from the household, not from a receipt.
-    // A per-dependent cap has already excluded any dependent whose facts are
-    // incomplete, so an outstanding question about one child must not withhold the
-    // relief the household has already earned for another. Granting here cannot
-    // overstate: the ambiguous dependent contributed nothing to `cap`.
-    //
-    // This exemption is only safe for per-dependent caps. A fixed automatic relief is
-    // gated by its predicate as a whole — granting DISABLED_SELF while we still do not
-    // know whether the taxpayer is registered disabled would overstate relief outright.
-    let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
-    let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
+    let granted = rule.automatic && eligibility.isEligible
     let claimed = granted ? cap : claimedTotal
     // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
     // entry (SSPN's net deposit can be negative) would otherwise push headroom above
@@ -4124,7 +4115,16 @@ change Task 11's `ownClaimed` line to reuse it —
                                          capQuestions: resolved.missing)
     let requirements = checkRequirements(rule: rule, entries: ownEntries)
 
-    let granted = rule.automatic && eligibility.isEligible
+    // A per-dependent cap has already excluded any dependent whose facts are
+    // incomplete, so an outstanding question about one child must not withhold the
+    // relief the household has already earned for another. Granting here cannot
+    // overstate: the ambiguous dependent contributed nothing to `cap`.
+    //
+    // This exemption is only safe for per-dependent caps. A fixed automatic relief is
+    // gated by its predicate as a whole — granting DISABLED_SELF while we still do not
+    // know whether the taxpayer is registered disabled would overstate relief outright.
+    let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
+    let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
     let claimed = granted ? cap : claimedTotal
     let allowed = granted
         ? cap
