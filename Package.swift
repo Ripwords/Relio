@@ -13,6 +13,23 @@ let package = Package(
             resources: [.copy("Resources/Rules")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .executableTarget(
+            name: "ReliefCodeGenerator",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .plugin(
+            name: "GenerateReliefCodes",
+            capability: .command(
+                intent: .custom(
+                    verb: "generate-relief-codes",
+                    description: "Regenerate ReliefCode constants from the rulebook JSON"
+                ),
+                permissions: [
+                    .writeToPackageDirectory(reason: "Writes Sources/TaxKit/Rules/ReliefCode+Generated.swift")
+                ]
+            ),
+            dependencies: ["ReliefCodeGenerator"]
+        ),
         .testTarget(
             name: "TaxKitTests",
             dependencies: ["TaxKit"],
