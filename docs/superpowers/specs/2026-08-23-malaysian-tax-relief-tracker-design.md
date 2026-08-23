@@ -107,8 +107,11 @@ Rules:
    and the shared-pool allocation case, both of which naively lose sen.
 4. Bracket tax is table-driven from precomputed cumulative bases (section 8), not an
    accumulating loop.
-5. One formatter: `Money.formatted()`, `ms_MY` locale, `RM 2,500.00`. A lint rule bans
-   string interpolation of amounts.
+5. One formatter: `Money.formatted()`, explicit `RM ` prefix with `en_MY` digit grouping,
+   giving `RM 2,500.00`. The prefix is not locale-derived, because the currency style's
+   spacing and symbol placement drift between OS releases and would differ across iOS,
+   macOS and watchOS. Interpolating an amount into user-facing text anywhere else is a
+   defect.
 
 Property-based tests (swift-testing) assert: `split` always sums to the whole,
 `clamped` never exceeds cap, and `a + b - b == a` across the `Int` range.

@@ -1,0 +1,1237 @@
+{
+  "assessments" : [
+    {
+      "allowed" : {
+        "sen" : 900000
+      },
+      "cap" : {
+        "sen" : 900000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 900000
+      },
+      "code" : "SELF_AND_DEPENDENTS",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Individual and dependent relatives",
+      "notes" : "Granted to every resident individual without a claim.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 800000
+      },
+      "children" : [
+        {
+          "allowed" : {
+            "sen" : 0
+          },
+          "cap" : {
+            "sen" : 100000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 0
+          },
+          "code" : "PARENTS_CHECKUP",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 100000
+          },
+          "name" : "Parents — full medical check-up",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 19000
+          },
+          "unverified" : false
+        }
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "PARENTS_MEDICAL",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 800000
+      },
+      "name" : "Parents and grandparents — medical, dental, special needs, carer",
+      "notes" : "Health condition must be certified by a medical practitioner.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        },
+        {
+          "kind" : "medicalCertificate",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 152000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 600000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "DISABLED_EQUIPMENT",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 600000
+      },
+      "name" : "Basic supporting equipment for a disabled self, spouse, child or parent",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 114000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 700000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "DISABLED_SELF",
+      "eligibility" : {
+        "needsInfo" : {
+          "questions" : [
+            "disabilityStatus"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 700000
+      },
+      "name" : "Disabled individual",
+      "notes" : "Requires JKM registration. YA2024 was RM 6,000.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 133000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 700000
+      },
+      "children" : [
+        {
+          "allowed" : {
+            "sen" : 0
+          },
+          "cap" : {
+            "sen" : 200000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 0
+          },
+          "code" : "EDUCATION_UPSKILL",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 200000
+          },
+          "name" : "Upskilling and self-enhancement courses",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 38000
+          },
+          "unverified" : false
+        }
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "EDUCATION_SELF",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 700000
+      },
+      "name" : "Education fees (self)",
+      "notes" : "Law, accounting, Islamic finance, technical, vocational, industrial, scientific or technological at below master's level; any field at master's or doctoral level.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 133000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 740000
+      },
+      "cap" : {
+        "sen" : 1000000
+      },
+      "children" : [
+        {
+          "allowed" : {
+            "sen" : 0
+          },
+          "cap" : {
+            "sen" : 100000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 0
+          },
+          "code" : "MEDICAL_VACCINATION",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 100000
+          },
+          "name" : "Vaccination",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 19000
+          },
+          "unverified" : false
+        },
+        {
+          "allowed" : {
+            "sen" : 0
+          },
+          "cap" : {
+            "sen" : 100000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 0
+          },
+          "code" : "MEDICAL_DENTAL",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 100000
+          },
+          "name" : "Dental examination and treatment",
+          "notes" : "New in YA2024; absent from YA2023.",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 19000
+          },
+          "unverified" : false
+        },
+        {
+          "allowed" : {
+            "sen" : 90000
+          },
+          "cap" : {
+            "sen" : 100000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 90000
+          },
+          "code" : "MEDICAL_CHECKUP",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 10000
+          },
+          "name" : "Full check-up, COVID-19 test, mental health, self-test kit, disease-detection fee",
+          "notes" : "YA2025 broadens this to self health-check equipment and disease-detection test fees.",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 1900
+          },
+          "unverified" : false
+        },
+        {
+          "allowed" : {
+            "sen" : 0
+          },
+          "cap" : {
+            "sen" : 600000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 0
+          },
+          "code" : "MEDICAL_LEARNDIS",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 600000
+          },
+          "name" : "Learning disability diagnosis and early intervention, child 18 and under",
+          "notes" : "YA2024 sub-limit was RM 4,000.",
+          "requirements" : [
+            {
+              "kind" : "officialReceipt",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            },
+            {
+              "kind" : "medicalCertificate",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 114000
+          },
+          "unverified" : false
+        }
+      ],
+      "claimed" : {
+        "sen" : 740000
+      },
+      "code" : "MEDICAL_SERIOUS",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 260000
+      },
+      "name" : "Medical — serious illness, fertility treatment, vaccination, dental",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        },
+        {
+          "kind" : "medicalCertificate",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 49400
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 182000
+      },
+      "cap" : {
+        "sen" : 250000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 182000
+      },
+      "code" : "LIFESTYLE",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 68000
+      },
+      "name" : "Lifestyle — books, computer, smartphone, tablet, internet, courses",
+      "notes" : "Not for business use. Internet must be billed in the claimant's own name.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 12920
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 100000
+      },
+      "cap" : {
+        "sen" : 100000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 140000
+      },
+      "code" : "LIFESTYLE_SPORTS",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Lifestyle additional — sports equipment, facilities, competitions, gym",
+      "notes" : "Sports Development Act 1997. YA2025 extends this to parents.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 100000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "BREASTFEEDING",
+      "eligibility" : {
+        "ineligible" : {
+          "reasons" : [
+            "Dependent must be 2 years old or under"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 100000
+      },
+      "name" : "Breastfeeding equipment",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 300000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 240000
+      },
+      "code" : "CHILDCARE",
+      "eligibility" : {
+        "ineligible" : {
+          "reasons" : [
+            "Dependent must be 6 years old or under"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 300000
+      },
+      "name" : "Childcare centre or kindergarten fees",
+      "notes" : "Centre must be registered.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 300000
+      },
+      "cap" : {
+        "sen" : 800000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 300000
+      },
+      "code" : "SSPN",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 500000
+      },
+      "name" : "SSPN net deposit",
+      "notes" : "Deposits in the year minus withdrawals in the year.",
+      "requirements" : [
+        {
+          "kind" : "bankStatement",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 95000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 400000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "SPOUSE_ALIMONY",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 400000
+      },
+      "name" : "Spouse, or alimony to a former wife",
+      "notes" : "LHDN item 14 covers both spouse relief and alimony to a former wife. Not automatic: alimony must actually have been paid under a formal agreement, so the amount is entered rather than granted.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 76000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 600000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "DISABLED_SPOUSE",
+      "eligibility" : {
+        "needsInfo" : {
+          "questions" : [
+            "spouseDisabilityStatus"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 600000
+      },
+      "name" : "Disabled spouse",
+      "notes" : "Requires JKM registration. YA2024 was RM 5,000.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 114000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 300000
+      },
+      "cap" : {
+        "sen" : 300000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 300000
+      },
+      "code" : "CHILD_UNDER_18",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Child under 18",
+      "notes" : "Splittable 50\/50 between parents.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 0
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "CHILD_PRE_TERTIARY",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Child 18 and over in full-time A-Level, matriculation or pre-degree study",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 800000
+      },
+      "cap" : {
+        "sen" : 800000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 800000
+      },
+      "code" : "CHILD_TERTIARY",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Child 18 and over in full-time tertiary study",
+      "notes" : "Local diploma and above, or overseas degree and above, at a recognised institution. Excludes matriculation, pre-degree and A-Level.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 0
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "CHILD_DISABLED",
+      "eligibility" : {
+        "needsInfo" : {
+          "questions" : [
+            "dependentDetails"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Disabled child",
+      "notes" : "YA2024 was RM 6,000.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 0
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "CHILD_DISABLED_TERTIARY",
+      "eligibility" : {
+        "needsInfo" : {
+          "questions" : [
+            "dependentDetails"
+          ]
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Disabled child 18 and over in recognised tertiary study",
+      "notes" : "Claimed on top of CHILD_DISABLED.",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 610000
+      },
+      "cap" : {
+        "sen" : 700000
+      },
+      "children" : [
+        {
+          "allowed" : {
+            "sen" : 400000
+          },
+          "cap" : {
+            "sen" : 400000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 460000
+          },
+          "code" : "EPF_CONTRIBUTION",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 0
+          },
+          "name" : "Approved scheme or EPF contributions",
+          "notes" : "Excludes private retirement schemes.",
+          "requirements" : [
+            {
+              "kind" : "epfStatement",
+              "status" : {
+                "satisfied" : {
+
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 0
+          },
+          "unverified" : false
+        },
+        {
+          "allowed" : {
+            "sen" : 210000
+          },
+          "cap" : {
+            "sen" : 300000
+          },
+          "children" : [
+
+          ],
+          "claimed" : {
+            "sen" : 210000
+          },
+          "code" : "LIFE_INSURANCE",
+          "eligibility" : {
+            "eligible" : {
+
+            }
+          },
+          "headroom" : {
+            "sen" : 90000
+          },
+          "name" : "Life insurance premiums, family takaful, additional voluntary EPF",
+          "requirements" : [
+            {
+              "kind" : "insuranceStatement",
+              "status" : {
+                "missing" : {
+                  "entryIDs" : [
+                    "00000000-0000-0000-0000-000000000006"
+                  ]
+                }
+              }
+            }
+          ],
+          "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+          "taxSaved" : {
+            "sen" : 17100
+          },
+          "unverified" : false
+        }
+      ],
+      "claimed" : {
+        "sen" : 670000
+      },
+      "code" : "INSURANCE_LIFE_EPF",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 90000
+      },
+      "name" : "Life insurance and EPF",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 17100
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 300000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "PRS_ANNUITY",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 300000
+      },
+      "name" : "Private Retirement Scheme and deferred annuity",
+      "requirements" : [
+        {
+          "kind" : "insuranceStatement",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 57000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 400000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "INSURANCE_EDU_MEDICAL",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 400000
+      },
+      "name" : "Education and medical insurance",
+      "notes" : "YA2024 was RM 3,000.",
+      "requirements" : [
+        {
+          "kind" : "insuranceStatement",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 76000
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 35000
+      },
+      "cap" : {
+        "sen" : 35000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 35000
+      },
+      "code" : "SOCSO_EIS",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "SOCSO and EIS contributions",
+      "requirements" : [
+
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 0
+      },
+      "cap" : {
+        "sen" : 250000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 0
+      },
+      "code" : "EV_CHARGING",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 250000
+      },
+      "name" : "EV charging facilities and domestic food-waste composting machines",
+      "notes" : "Installation, rental, purchase, hire-purchase or subscription. Not for business use. YA2025 adds composting machines.",
+      "requirements" : [
+        {
+          "kind" : "officialReceipt",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 47500
+      },
+      "unverified" : false
+    },
+    {
+      "allowed" : {
+        "sen" : 700000
+      },
+      "cap" : {
+        "sen" : 700000
+      },
+      "children" : [
+
+      ],
+      "claimed" : {
+        "sen" : 910000
+      },
+      "code" : "HOUSING_LOAN_INTEREST",
+      "eligibility" : {
+        "eligible" : {
+
+        }
+      },
+      "headroom" : {
+        "sen" : 0
+      },
+      "name" : "Housing loan interest, first home",
+      "notes" : "New in YA2025. Sale and purchase agreement dated 1 January 2025 to 31 December 2027.",
+      "requirements" : [
+        {
+          "kind" : "bankStatement",
+          "status" : {
+            "satisfied" : {
+
+            }
+          }
+        }
+      ],
+      "sourceURL" : "https:\/\/www.hasil.gov.my\/individu\/pelepasan-cukai\/",
+      "taxSaved" : {
+        "sen" : 0
+      },
+      "unverified" : false
+    }
+  ],
+  "chargeableIncome" : {
+    "sen" : 8133000
+  },
+  "estimatedTax" : {
+    "sen" : 585270
+  },
+  "totalOpportunity" : {
+    "sen" : 556320
+  },
+  "unresolved" : [
+
+  ],
+  "yearOfAssessment" : 2025
+}

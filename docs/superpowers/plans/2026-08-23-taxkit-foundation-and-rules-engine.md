@@ -34,7 +34,7 @@ Sources/TaxKit/
     Money.swift                            value type, arithmetic, overflow traps
     RoundingRule.swift                     half-up / down / up / bankers
     Money+Split.swift                      largest-remainder allocation
-    Money+Formatting.swift                 the single ms_MY formatter
+    Money+Formatting.swift                 the single en_MY formatter
   Rules/
     ReliefCode.swift                       RawRepresentable wrapper (hand-written core)
     ReliefCode+Generated.swift             GENERATED — one constant per code
@@ -43,6 +43,7 @@ Sources/TaxKit/
     EligibilityPredicate.swift             closed Codable predicate tree + Facts
     ReliefRule.swift                       one relief, possibly with children
     RuleSet.swift                          one Year of Assessment
+    RuleBundle.swift                       the one accessor for TaxKit's own bundle
     RuleSetLoading.swift                   protocol + BundledRuleSetLoader
     RuleSetDiff.swift                      ReliefDelta and diff(_:_:)
   Engine/
@@ -968,9 +969,9 @@ git commit -m "feat: add ReliefCode with a command-plugin generator"
   - `DocumentKind` — `.officialReceipt`, `.taxInvoice`, `.eInvoice`, `.medicalCertificate`,
     `.referralLetter`, `.insuranceStatement`, `.epfStatement`, `.bankStatement`, `.other`.
   - `Cap` — `.fixed(Money)`, `.perDependent(Money)`,
-    `.tiered(on: TieredFact, tiers: [Tier])`, `.none`; plus `Tier`, `TieredFact`.
-  - `ReliefRule` — `code`, `name`, `cap`, `requiredDocuments`, `children`, `sourceURL`,
-    `unverified`, `notes`. Task 7 adds the `eligibility` property.
+    `.tiered(on: TieredFact, tiers: [Tier])`; plus `Tier`, `TieredFact`.
+  - `ReliefRule` — `code`, `name`, `cap`, `automatic`, `requiredDocuments`, `children`,
+    `sourceURL`, `unverified`, `notes`. Task 7 adds the `eligibility` property.
   - `RuleSet` — `yearOfAssessment`, `revision`, `verifiedOn`, `sourceURL`, `brackets`,
     `reliefs`, `retiredCodes`; plus `Retirement`.
   - `BracketTable` — `bands: [Band]`; `Band` — `lowerBound`, `upperBound`, `rate`,
@@ -1091,6 +1092,7 @@ import Foundation
         #expect(child.requiredDocuments.isEmpty)
         #expect(child.children.isEmpty)
         #expect(child.unverified == false)
+        #expect(child.automatic == false)
     }
 
     @Test("required documents decode as typed kinds")
@@ -1192,11 +1194,9 @@ public enum Cap: Codable, Hashable, Sendable {
     case perDependent(Money)
     /// A ceiling selected by a fact about the claim.
     case tiered(on: TieredFact, tiers: [Tier])
-    /// No ceiling. Reserved; no shipped relief uses it.
-    case none
 
     private enum CodingKeys: String, CodingKey { case kind, sen, on, tiers }
-    private enum Kind: String, Codable { case fixed, perDependent, tiered, none }
+    private enum Kind: String, Codable { case fixed, perDependent, tiered }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1208,8 +1208,6 @@ public enum Cap: Codable, Hashable, Sendable {
         case .tiered:
             self = .tiered(on: try c.decode(TieredFact.self, forKey: .on),
                            tiers: try c.decode([Tier].self, forKey: .tiers))
-        case .none:
-            self = .none
         }
     }
 
@@ -1226,8 +1224,6 @@ public enum Cap: Codable, Hashable, Sendable {
             try c.encode(Kind.tiered, forKey: .kind)
             try c.encode(fact, forKey: .on)
             try c.encode(tiers, forKey: .tiers)
-        case .none:
-            try c.encode(Kind.none, forKey: .kind)
         }
     }
 
@@ -1239,8 +1235,6 @@ public enum Cap: Codable, Hashable, Sendable {
             return amount
         case .tiered(_, let tiers):
             return tiers.map(\.amount).max() ?? .zero
-        case .none:
-            return Money(sen: .max)
         }
     }
 }
@@ -1319,6 +1313,10 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     public let code: ReliefCode
     public let name: String
     public let cap: Cap
+    /// Granted in full when eligible, with no entry and no receipt — LHDN gives every
+    /// resident the RM 9,000 individual relief, and child and spouse reliefs follow from
+    /// the household rather than from a purchase.
+    public let automatic: Bool
     public let requiredDocuments: [DocumentKind]
     /// Sub-limits. A child's claims also count against this relief's cap.
     public let children: [ReliefRule]
@@ -1329,7 +1327,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     public let notes: String?
 
     private enum CodingKeys: String, CodingKey {
-        case code, name, cap, requiredDocuments, children, sourceURL, unverified, notes
+        case code, name, cap, automatic, requiredDocuments, children, sourceURL, unverified, notes
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1337,6 +1335,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
         self.code = try c.decode(ReliefCode.self, forKey: .code)
         self.name = try c.decode(String.self, forKey: .name)
         self.cap = try c.decode(Cap.self, forKey: .cap)
+        self.automatic = try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false
         self.requiredDocuments = try c.decodeIfPresent([DocumentKind].self, forKey: .requiredDocuments) ?? []
         self.children = try c.decodeIfPresent([ReliefRule].self, forKey: .children) ?? []
         self.sourceURL = try c.decode(URL.self, forKey: .sourceURL)
@@ -1438,6 +1437,8 @@ git commit -m "feat: add rulebook data model with string-decoded rates"
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
 - Produces:
+  - Predicate cases include `selfIsDisabled(Bool)` and `spouseIsDisabled(Bool)`, which
+    gate the disabled-person reliefs so they are not offered to every household.
   - Fact enums: `MaritalStatus` (`.single .married .divorced .widowed`),
     `AssessmentType` (`.separate .joint .combinedUnderSpouse`),
     `EmploymentType` (`.privateSector .publicServantPensionable .selfEmployed`),
@@ -1544,6 +1545,28 @@ import Foundation
         }
     }
 
+    @Test("any: an unknown child outranks a failed sibling — the honest answer is ask, not no")
+    func anyPrefersUnknownOverFailed() {
+        let p = EligibilityPredicate.any([
+            .maritalStatus(in: [.married]),   // fails: the taxpayer is single
+            .spouseHasIncome(false)           // unknown: never asked
+        ])
+        // Collapsing this to .failed is the defect that silently costs RM 4,000.
+        #expect(p.evaluate(facts { $0.maritalStatus = .single })
+                == .unknown(missing: [.spouseHasIncome]))
+    }
+
+    @Test("all: a failed child outranks an unknown sibling accumulated before it")
+    func allPrefersFailedOverUnknown() {
+        let p = EligibilityPredicate.all([
+            .spouseHasIncome(false),          // unknown, seen first
+            .maritalStatus(in: [.married])    // fails: the taxpayer is single
+        ])
+        guard case .failed = p.evaluate(facts { $0.maritalStatus = .single }) else {
+            Issue.record("expected .failed to win over an earlier unknown"); return
+        }
+    }
+
     @Test("not inverts satisfied and failed but preserves unknown")
     func notInverts() {
         let known = facts { $0.maritalStatus = .married }
@@ -1596,6 +1619,34 @@ import Foundation
         ])
         let data = try JSONEncoder().encode(original)
         #expect(try JSONDecoder().decode(EligibilityPredicate.self, from: data) == original)
+    }
+
+    @Test("every predicate case survives a JSON round trip")
+    func everyCaseRoundTrips() throws {
+        let cases: [EligibilityPredicate] = [
+            .always,
+            .maritalStatus(in: [.single, .widowed]),
+            .spouseHasIncome(true),
+            .assessmentType(.combinedUnderSpouse),
+            .employmentType(in: [.selfEmployed, .publicServantPensionable]),
+            .gender(.female),
+            .selfIsDisabled(true),
+            .spouseIsDisabled(false),
+            .claimant(in: [.parent, .grandparent]),
+            .dependentAge(min: 0, max: 6),
+            .dependentEducation(in: [.tertiaryOverseas]),
+            .dependentIsDisabled(true),
+            .yaRange(from: nil, to: 2027),
+            .claimFrequency(everyNYears: 2),
+            .not(.always),
+            .all([.always]),
+            .any([.always])
+        ]
+        for original in cases {
+            let data = try JSONEncoder().encode(original)
+            #expect(try JSONDecoder().decode(EligibilityPredicate.self, from: data) == original,
+                    "round trip failed for \(original)")
+        }
     }
 
     @Test("decodes the wire format used in the rulebook JSON")
@@ -1671,6 +1722,8 @@ public enum ProfileQuestion: String, Codable, Hashable, Sendable, CaseIterable {
     case dependentDetails
     case lastClaimYear
     case propertyPrice
+    case disabilityStatus
+    case spouseDisabilityStatus
 }
 
 public struct DependentFacts: Hashable, Sendable {
@@ -1700,6 +1753,9 @@ public struct Facts: Hashable, Sendable {
     public var dependent: DependentFacts?
     public var claimHistory: ClaimHistory
     public var propertyPriceSen: Int?
+    /// Whether the taxpayer is a person with disabilities registered with JKM.
+    public var selfIsDisabled: Bool?
+    public var spouseIsDisabled: Bool?
 
     public init(yearOfAssessment: Int,
                 maritalStatus: MaritalStatus? = nil,
@@ -1710,7 +1766,9 @@ public struct Facts: Hashable, Sendable {
                 claimant: Claimant? = nil,
                 dependent: DependentFacts? = nil,
                 claimHistory: ClaimHistory = .unknown,
-                propertyPriceSen: Int? = nil) {
+                propertyPriceSen: Int? = nil,
+                selfIsDisabled: Bool? = nil,
+                spouseIsDisabled: Bool? = nil) {
         self.yearOfAssessment = yearOfAssessment
         self.maritalStatus = maritalStatus
         self.spouseHasIncome = spouseHasIncome
@@ -1721,6 +1779,8 @@ public struct Facts: Hashable, Sendable {
         self.dependent = dependent
         self.claimHistory = claimHistory
         self.propertyPriceSen = propertyPriceSen
+        self.selfIsDisabled = selfIsDisabled
+        self.spouseIsDisabled = spouseIsDisabled
     }
 }
 
@@ -1754,6 +1814,8 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
     case assessmentType(AssessmentType)
     case employmentType(in: [EmploymentType])
     case gender(Gender)
+    case selfIsDisabled(Bool)
+    case spouseIsDisabled(Bool)
     case claimant(in: [Claimant])
     case dependentAge(min: Int?, max: Int?)
     case dependentEducation(in: [EducationLevel])
@@ -1820,6 +1882,18 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
         case .gender(let required):
             return Self.check(facts.gender, in: [required],
                               asking: .gender, label: "Gender")
+
+        case .selfIsDisabled(let required):
+            return Self.check(facts.selfIsDisabled, equals: required,
+                              asking: .disabilityStatus,
+                              label: required ? "You must be a registered disabled person"
+                                              : "You must not be registered disabled")
+
+        case .spouseIsDisabled(let required):
+            return Self.check(facts.spouseIsDisabled, equals: required,
+                              asking: .spouseDisabilityStatus,
+                              label: required ? "Spouse must be a registered disabled person"
+                                              : "Spouse must not be registered disabled")
 
         case .claimant(let allowed):
             return Self.check(facts.claimant, in: allowed,
@@ -1900,6 +1974,7 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
     private enum Op: String, Codable {
         case always, all, any, not
         case maritalStatus, spouseHasIncome, assessmentType, employmentType, gender
+        case selfIsDisabled, spouseIsDisabled
         case claimant, dependentAge, dependentEducation, dependentIsDisabled
         case yaRange, claimFrequency
     }
@@ -1927,6 +2002,10 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
             self = .employmentType(in: try c.decode([EmploymentType].self, forKey: .in))
         case .gender:
             self = .gender(try c.decode(Gender.self, forKey: .is))
+        case .selfIsDisabled:
+            self = .selfIsDisabled(try c.decode(Bool.self, forKey: .is))
+        case .spouseIsDisabled:
+            self = .spouseIsDisabled(try c.decode(Bool.self, forKey: .is))
         case .claimant:
             self = .claimant(in: try c.decode([Claimant].self, forKey: .in))
         case .dependentAge:
@@ -1965,6 +2044,10 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
             try c.encode(Op.employmentType, forKey: .op); try c.encode(allowed, forKey: .in)
         case .gender(let value):
             try c.encode(Op.gender, forKey: .op); try c.encode(value, forKey: .is)
+        case .selfIsDisabled(let value):
+            try c.encode(Op.selfIsDisabled, forKey: .op); try c.encode(value, forKey: .is)
+        case .spouseIsDisabled(let value):
+            try c.encode(Op.spouseIsDisabled, forKey: .op); try c.encode(value, forKey: .is)
         case .claimant(let allowed):
             try c.encode(Op.claimant, forKey: .op); try c.encode(allowed, forKey: .in)
         case .dependentAge(let min, let max):
@@ -2004,7 +2087,7 @@ In `Sources/TaxKit/Rules/ReliefRule.swift`, add the stored property after
 add `eligibility` to `CodingKeys`:
 
 ```swift
-        case code, name, cap, requiredDocuments, eligibility, children, sourceURL, unverified, notes
+        case code, name, cap, automatic, requiredDocuments, eligibility, children, sourceURL, unverified, notes
 ```
 
 and decode it after `requiredDocuments`:
@@ -2035,8 +2118,32 @@ git commit -m "feat: add three-valued eligibility predicate language"
 
 **Files:**
 - Create: `Sources/TaxKit/Resources/Rules/ya-2025.json`
+- Create: `Sources/TaxKit/Rules/RuleBundle.swift`
 - Delete: `Sources/TaxKit/Resources/Rules/.keep.json`
 - Test: `Tests/TaxKitTests/RulebookIntegrityTests.swift`
+
+**Reaching the rulebook from a test.** `Bundle.module` written inside a *test* file resolves
+to the test target's own bundle, not TaxKit's — so the tests cannot see the shipped
+rulebook that way. Do **not** solve this by copying the resource into the test target as
+well: that makes the integrity suite validate a duplicate while the loader in Task 15
+reads the original, and the day those diverge the tests pass on data the app does not
+ship. Instead TaxKit exposes its own bundle internally, and the tests reach it through
+`@testable import`:
+
+```swift
+// Sources/TaxKit/Rules/RuleBundle.swift
+import Foundation
+
+/// TaxKit's own resource bundle.
+///
+/// `Bundle.module` is resolved per target, so the same expression written inside a test
+/// file names the test bundle instead. Everything that reads a shipped rulebook — the
+/// loader and the integrity tests alike — goes through this one accessor, so they can
+/// never end up reading different copies.
+enum RuleBundle {
+    static var current: Bundle { .module }
+}
+```
 
 **Interfaces:**
 - Consumes: `RuleSet` (Task 6), `EligibilityPredicate` (Task 7).
@@ -2055,6 +2162,15 @@ Two modelling notes:
   is why `Cap` has no separate shared-pool case.
 - **LHDN items 6, 7 and 8** are three rows that all draw on one RM 10,000 ceiling, so they
   are modelled as one parent (`MEDICAL_SERIOUS`) with four sub-limits.
+- **Eight reliefs are `automatic`**: the individual RM 9,000, the two disabled-person
+  reliefs, and the five child reliefs. Spouse/alimony is deliberately NOT automatic —
+  LHDN item 14 covers both spouse relief and alimony to a former wife, and alimony is only
+  claimable if actually paid under a formal agreement, so auto-granting RM 4,000 to every
+  eligible household would overstate relief for divorced claimants. LHDN grants these from the
+  household rather than from a purchase, so the engine allows the full cap when the
+  relief is eligible instead of waiting for an entry. The two disabled-person reliefs
+  carry `selfIsDisabled` / `spouseIsDisabled` predicates so they are not handed to every
+  household. `DISABLED_EQUIPMENT` stays entry-driven — it is an actual purchase.
 
 - [ ] **Step 1: Write the failing integrity test**
 
@@ -2072,8 +2188,8 @@ import Foundation
 
     static func load(_ year: Int) throws -> RuleSet {
         let url = try #require(
-            Bundle.module.url(forResource: "ya-\(year)", withExtension: "json",
-                              subdirectory: "Rules"),
+            RuleBundle.current.url(forResource: "ya-\(year)", withExtension: "json",
+                                   subdirectory: "Rules"),
             "ya-\(year).json is not in the bundle")
         return try JSONDecoder().decode(RuleSet.self, from: try Data(contentsOf: url))
     }
@@ -2151,6 +2267,65 @@ import Foundation
         }
     }
 
+    @Test("the whole band table is pinned to LHDN's published figures",
+          arguments: shippedYears)
+    func bandTableIsPinnedLiterally(year: Int) throws {
+        // Asserting the full table, not just internal consistency: a uniform shift of
+        // every cumulative base is self-consistent but wrong.
+        let expected: [(lower: Int, upper: Int?, rate: String, base: Int)] = [
+            (0,         500000,    "0",    0),
+            (500000,    2000000,   "0.01", 0),
+            (2000000,   3500000,   "0.03", 15000),
+            (3500000,   5000000,   "0.06", 60000),
+            (5000000,   7000000,   "0.11", 150000),
+            (7000000,   10000000,  "0.19", 370000),
+            (10000000,  40000000,  "0.25", 940000),
+            (40000000,  60000000,  "0.26", 8440000),
+            (60000000,  200000000, "0.28", 13640000),
+            (200000000, nil,       "0.30", 52840000)
+        ]
+        let bands = try Self.load(year).brackets.bands
+        #expect(bands.count == expected.count)
+        for (index, want) in expected.enumerated() {
+            let got = bands[index]
+            #expect(got.lowerBound == Money(sen: want.lower), "band \(index) lower bound")
+            #expect(got.upperBound == want.upper.map(Money.init(sen:)), "band \(index) upper bound")
+            #expect(got.rate == Decimal(string: want.rate)!, "band \(index) rate")
+            #expect(got.cumulativeBase == Money(sen: want.base), "band \(index) cumulative base")
+        }
+    }
+
+    @Test("every YA2025 cap is pinned to LHDN's published figure")
+    func everyCapIsPinned() throws {
+        // The spot test covered 6 of 32. The other 26 could have been silently wrong.
+        let expected: [String: Int] = [
+            "SELF_AND_DEPENDENTS": 900000, "PARENTS_MEDICAL": 800000,
+            "PARENTS_CHECKUP": 100000, "DISABLED_EQUIPMENT": 600000,
+            "DISABLED_SELF": 700000, "EDUCATION_SELF": 700000,
+            "EDUCATION_UPSKILL": 200000, "MEDICAL_SERIOUS": 1000000,
+            "MEDICAL_VACCINATION": 100000, "MEDICAL_DENTAL": 100000,
+            "MEDICAL_CHECKUP": 100000, "MEDICAL_LEARNDIS": 600000,
+            "LIFESTYLE": 250000, "LIFESTYLE_SPORTS": 100000,
+            "BREASTFEEDING": 100000, "CHILDCARE": 300000, "SSPN": 800000,
+            "SPOUSE_ALIMONY": 400000, "DISABLED_SPOUSE": 600000,
+            "CHILD_UNDER_18": 200000, "CHILD_PRE_TERTIARY": 200000,
+            "CHILD_TERTIARY": 800000, "CHILD_DISABLED": 800000,
+            "CHILD_DISABLED_TERTIARY": 800000, "INSURANCE_LIFE_EPF": 700000,
+            "EPF_CONTRIBUTION": 400000, "LIFE_INSURANCE": 300000,
+            "PRS_ANNUITY": 300000, "INSURANCE_EDU_MEDICAL": 400000,
+            "SOCSO_EIS": 35000, "EV_CHARGING": 250000,
+            "HOUSING_LOAN_INTEREST": 700000
+        ]
+        let reliefs = try Self.load(2025).allReliefs
+        #expect(reliefs.count == expected.count, "relief node count changed")
+        for relief in reliefs {
+            let want = try #require(expected[relief.code.rawValue],
+                                    "\(relief.code) is not in the pinned table")
+            #expect(relief.cap.nominalCeiling == Money(sen: want),
+                    "\(relief.code) cap is \(relief.cap.nominalCeiling.formatted())")
+        }
+    }
+
     @Test("YA2025 carries the reliefs LHDN publishes")
     func ya2025Spot() throws {
         let rules = try Self.load(2025)
@@ -2161,6 +2336,30 @@ import Foundation
         #expect(rules.relief(for: ReliefCode("MEDICAL_LEARNDIS"))?.cap == .fixed(Money(ringgit: 6000)))
         #expect(rules.relief(for: ReliefCode("SOCSO_EIS"))?.cap == .fixed(Money(ringgit: 350)))
         #expect(rules.relief(for: ReliefCode("HOUSING_LOAN_INTEREST")) != nil)
+    }
+
+    @Test("exactly the household-derived reliefs are automatic", arguments: shippedYears)
+    func automaticSet(year: Int) throws {
+        let automatic = Set(try Self.load(year).allReliefs
+            .filter(\.automatic).map(\.code.rawValue))
+        // The automatic set is identical in all three shipped years.
+        #expect(automatic == [
+            "SELF_AND_DEPENDENTS", "DISABLED_SELF", "DISABLED_SPOUSE",
+            "CHILD_UNDER_18", "CHILD_PRE_TERTIARY", "CHILD_TERTIARY",
+            "CHILD_DISABLED", "CHILD_DISABLED_TERTIARY"
+        ])
+    }
+
+    @Test("every automatic relief is gated or unconditional, never a free grant",
+          arguments: shippedYears)
+    func automaticRelievesAreGated(year: Int) throws {
+        for relief in try Self.load(year).allReliefs where relief.automatic {
+            let gated = relief.eligibility != nil
+            let perDependent = if case .perDependent = relief.cap { true } else { false }
+            let unconditional = relief.code == ReliefCode("SELF_AND_DEPENDENTS")
+            #expect(gated || perDependent || unconditional,
+                    "\(relief.code) is automatic with nothing gating it")
+        }
     }
 }
 ```
@@ -2199,7 +2398,8 @@ full URL at every occurrence; JSON has no variables.
   "reliefs": [
     { "code": "SELF_AND_DEPENDENTS", "name": "Individual and dependent relatives",
       "cap": { "kind": "fixed", "sen": 900000 },
-      "notes": "Granted automatically.",
+      "automatic": true,
+      "notes": "Granted to every resident individual without a claim.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "PARENTS_MEDICAL",
@@ -2224,7 +2424,9 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "DISABLED_SELF", "name": "Disabled individual",
       "cap": { "kind": "fixed", "sen": 700000 },
-      "notes": "YA2024 was RM 6,000.",
+      "automatic": true,
+      "eligibility": { "op": "selfIsDisabled", "is": true },
+      "notes": "Requires JKM registration. YA2024 was RM 6,000.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "EDUCATION_SELF", "name": "Education fees (self)",
@@ -2313,17 +2515,22 @@ full URL at every occurrence; JSON has no variables.
       "cap": { "kind": "fixed", "sen": 400000 },
       "eligibility": { "op": "any", "of": [
         { "op": "spouseHasIncome", "is": false },
-        { "op": "assessmentType", "is": "joint" }
+        { "op": "assessmentType", "is": "joint" },
+        { "op": "maritalStatus", "in": ["divorced"] }
       ] },
+      "notes": "LHDN item 14 covers both spouse relief and alimony to a former wife. Not automatic: alimony must actually have been paid under a formal agreement, so the amount is entered rather than granted.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "DISABLED_SPOUSE", "name": "Disabled spouse",
       "cap": { "kind": "fixed", "sen": 600000 },
-      "notes": "YA2024 was RM 5,000.",
+      "automatic": true,
+      "eligibility": { "op": "spouseIsDisabled", "is": true },
+      "notes": "Requires JKM registration. YA2024 was RM 5,000.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "CHILD_UNDER_18", "name": "Child under 18",
       "cap": { "kind": "perDependent", "sen": 200000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "max": 17 }
@@ -2334,6 +2541,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_PRE_TERTIARY",
       "name": "Child 18 and over in full-time A-Level, matriculation or pre-degree study",
       "cap": { "kind": "perDependent", "sen": 200000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "min": 18 },
@@ -2344,6 +2552,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_TERTIARY",
       "name": "Child 18 and over in full-time tertiary study",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "min": 18 },
@@ -2354,6 +2563,7 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "CHILD_DISABLED", "name": "Disabled child",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentIsDisabled", "is": true }
@@ -2364,6 +2574,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_DISABLED_TERTIARY",
       "name": "Disabled child 18 and over in recognised tertiary study",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentIsDisabled", "is": true },
@@ -2496,6 +2707,11 @@ read from the same LHDN page on 2026-08-23.
 | `PARENTS_MEDICAL.name` → `"Parents — medical treatment, special needs, carer"` (no dental) |
 | **Remove the `PARENTS_CHECKUP` child** — the RM 1,000 parents check-up sub-limit starts in YA2024 |
 | **Remove the `MEDICAL_DENTAL` child** — the dental sub-limit starts in YA2024 |
+| **`LIFESTYLE_SPORTS.cap.sen` → `50000`** — LHDN's YA2023 table reads `500 (Terhad)`; the RM 1,000 ceiling starts in YA2024 |
+| `LIFESTYLE_SPORTS.name` → `"Lifestyle additional — sports equipment, facilities, competitions"` (no gym) |
+| `LIFESTYLE_SPORTS.notes` → `"Sports Development Act 1997. Gymnasium membership sits under Lifestyle in YA2023 and moves here in YA2024."` |
+| `LIFESTYLE.name` → `"Lifestyle — books, computer, smartphone, tablet, sports equipment, gym, internet"` |
+| `LIFESTYLE.notes` → `"Not for business use. Internet must be billed in the claimant's own name. YA2023 includes sports equipment and gymnasium membership and excludes upskilling courses, both of which move in YA2024."` |
 | `SSPN.notes` → `"Deposits in 2023 minus withdrawals in 2023."` |
 
 Everything else, including all rate bands, is identical across the three years.
@@ -2565,6 +2781,19 @@ and append these tests to the suite:
         #expect(rules.relief(for: ReliefCode("PARENTS_CHECKUP")) == nil)
         #expect(rules.relief(for: ReliefCode("PARENTS_MEDICAL"))?.cap == .fixed(Money(ringgit: 8000)))
         #expect(rules.relief(for: .lifestyle)?.cap == .fixed(Money(ringgit: 2500)))
+        // LHDN's YA2023 table reads "500 (Terhad)"; RM 1,000 starts in YA2024.
+        #expect(rules.relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
+    }
+
+    @Test("sports relief rose from RM 500 to RM 1,000 in YA2024 and stayed there")
+    func sportsReliefTimeline() throws {
+        #expect(try Self.load(2023).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
+        #expect(try Self.load(2024).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
+        #expect(try Self.load(2025).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
     }
 
     @Test("caps that LHDN kept flat really are flat across all three years")
@@ -2572,7 +2801,7 @@ and append these tests to the suite:
         let stable: [ReliefCode] = [
             ReliefCode("SELF_AND_DEPENDENTS"), ReliefCode("PARENTS_MEDICAL"),
             ReliefCode("DISABLED_EQUIPMENT"), ReliefCode("EDUCATION_SELF"),
-            ReliefCode("MEDICAL_SERIOUS"), .lifestyle, ReliefCode("LIFESTYLE_SPORTS"),
+            ReliefCode("MEDICAL_SERIOUS"), .lifestyle,
             ReliefCode("BREASTFEEDING"), ReliefCode("CHILDCARE"), ReliefCode("SSPN"),
             ReliefCode("SPOUSE_ALIMONY"), ReliefCode("CHILD_UNDER_18"),
             ReliefCode("CHILD_PRE_TERTIARY"), ReliefCode("CHILD_TERTIARY"),
@@ -2766,6 +2995,14 @@ import Foundation
         let t = try Self.table()
         #expect(t.tax(on: Money(sen: -5_000)) == .zero)
     }
+
+    @Test("a negative relief saves nothing rather than adding tax")
+    func negativeReliefSavesNothing() throws {
+        let t = try Self.table()
+        // SSPN is a net deposit, so a withdrawal-heavy year really can be negative.
+        #expect(t.taxSaved(reducing: Money(ringgit: 92_400),
+                           by: Money(ringgit: -2_000)) == .zero)
+    }
 }
 ```
 
@@ -2816,7 +3053,11 @@ extension BracketTable {
     /// home screen, so the shortcut is not acceptable.
     public func taxSaved(reducing chargeable: Money, by relief: Money) -> Money {
         let before = max(chargeable, .zero)
-        let after = max(before - relief, .zero)
+        // A relief can legitimately arrive negative: SSPN is a *net* deposit, so a year
+        // with more withdrawals than deposits produces one. A negative relief saves
+        // nothing — it must never surface as a negative "saving" on the home screen.
+        let claimed = max(relief, .zero)
+        let after = max(before - claimed, .zero)
         return tax(on: before) - tax(on: after)
     }
 }
@@ -2997,14 +3238,67 @@ enum Fixture {
         return try JSONDecoder().decode(RuleSet.self, from: data)
     }
 
-    @Test("totals sum the allowed amounts, not the claimed ones")
+    @Test("totals count the allowed amounts, not the claimed ones")
     func totals() throws {
-        let result = evaluate(
-            ruleSet: try Fixture.rules(),
-            year: Fixture.year(),
+        let rules = try Fixture.rules()
+        // Measured as a delta against the no-entry baseline, so the automatic reliefs
+        // (which are granted with no entry) do not make this assertion brittle.
+        let baseline = evaluate(ruleSet: rules, year: Fixture.year(), entries: [])
+        let withEntries = evaluate(
+            ruleSet: rules, year: Fixture.year(),
             entries: [Fixture.entry(.lifestyle, 4000), Fixture.entry(ReliefCode("SSPN"), 1000)])
-        // 2,500 allowed for Lifestyle plus 1,000 for SSPN.
-        #expect(result.totalAllowed == Money(ringgit: 3500))
+        // Lifestyle is capped at 2,500 despite the 4,000 claim, plus 1,000 of SSPN.
+        #expect(withEntries.totalAllowed - baseline.totalAllowed == Money(ringgit: 3500))
+    }
+
+    @Test("a negative net claim yields zero allowed, never headroom above the cap")
+    func negativeClaimIsFloored() throws {
+        // SSPN is a net deposit: withdrawals can exceed deposits in a year.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("SSPN"), -1500)])
+        let sspn = try #require(result.assessment(for: ReliefCode("SSPN")))
+        #expect(sspn.allowed == .zero)
+        #expect(sspn.headroom == Money(ringgit: 8000))   // the cap, not more
+    }
+
+    @Test("a sub-limit's rejected excess cannot consume the parent's headroom")
+    func subLimitExcessDoesNotReachParent() throws {
+        // MEDICAL_CHECKUP is a RM 1,000 sub-limit inside MEDICAL_SERIOUS's RM 10,000.
+        // Claiming RM 1,500 against the sub-limit is RM 1,000 of relief, not RM 1,500.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 1500)])
+
+        let child = try #require(result.assessment(for: ReliefCode("MEDICAL_CHECKUP")))
+        #expect(child.claimed == Money(ringgit: 1500))   // what the user entered
+        #expect(child.allowed == Money(ringgit: 1000))   // what LHDN allows
+
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 1500))  // raw, for display
+        #expect(parent.allowed == Money(ringgit: 1000))  // NOT 1500
+        #expect(parent.headroom == Money(ringgit: 9000))
+    }
+
+    @Test("a parent's own claim and its children's allowed amounts share one ceiling")
+    func parentAndChildrenShareTheCeiling() throws {
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_SERIOUS"), 9500),
+                      Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 900)])
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 10400))
+        #expect(parent.allowed == Money(ringgit: 10000))   // the ceiling binds
+        #expect(parent.headroom == .zero)
+    }
+
+    @Test("an automatic relief is granted without any entry")
+    func automaticGrant() throws {
+        let individual = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: Fixture.year(), entries: [])
+                .assessment(for: ReliefCode("SELF_AND_DEPENDENTS")))
+        #expect(individual.allowed == Money(ringgit: 9000))
+        #expect(individual.headroom == .zero)
     }
 }
 ```
@@ -3071,6 +3365,9 @@ public struct TaxYearSnapshot: Hashable, Sendable {
     public var dependents: [DependentSnapshot]
     /// Purchase price of the first home, for tiered housing loan interest relief.
     public var propertyPriceSen: Int?
+    /// JKM-registered disability status, gating the two disabled-person reliefs.
+    public var selfIsDisabled: Bool?
+    public var spouseIsDisabled: Bool?
     /// The most recent YA in which a once-every-N-years relief was claimed.
     public var lastClaimedYear: [ReliefCode: Int]
 
@@ -3083,6 +3380,8 @@ public struct TaxYearSnapshot: Hashable, Sendable {
                 gender: Gender? = nil,
                 dependents: [DependentSnapshot] = [],
                 propertyPriceSen: Int? = nil,
+                selfIsDisabled: Bool? = nil,
+                spouseIsDisabled: Bool? = nil,
                 lastClaimedYear: [ReliefCode: Int] = [:]) {
         self.year = year
         self.grossIncome = grossIncome
@@ -3093,6 +3392,8 @@ public struct TaxYearSnapshot: Hashable, Sendable {
         self.gender = gender
         self.dependents = dependents
         self.propertyPriceSen = propertyPriceSen
+        self.selfIsDisabled = selfIsDisabled
+        self.spouseIsDisabled = spouseIsDisabled
         self.lastClaimedYear = lastClaimedYear
     }
 }
@@ -3210,6 +3511,9 @@ public struct EvaluationResult: Hashable, Sendable {
     public var estimatedTax: Money?
 
     /// Every assessment including nested sub-limits, depth-first.
+    ///
+    /// For lookup, not for totalling: a sub-limit's amount is already inside its
+    /// parent's, so reducing this over `allowed` double-counts. Use `totalAllowed`.
     public var allAssessments: [ReliefAssessment] {
         assessments.flatMap(\.selfAndDescendants)
     }
@@ -3294,12 +3598,34 @@ private func assess(rule: ReliefRule,
         assess(rule: $0, year: year, entriesByCode: entriesByCode)
     }
 
-    let ownClaimed = (entriesByCode[rule.code] ?? [])
-        .reduce(Money.zero) { $0 + $1.amount }
-    let claimed = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let ownEntries = entriesByCode[rule.code] ?? []
+    let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
+
+    // Two different totals, and the difference matters.
+    //
+    // `claimed` is what the user entered, raw, so the UI can show "you logged RM 1,500".
+    // `allowed` aggregates each child's *capped* amount, because a sub-limit binds
+    // before the parent ceiling does: RM 1,500 against the RM 1,000 medical check-up
+    // sub-limit is RM 1,000 of relief, not RM 1,500. Summing children's raw claims here
+    // would let the RM 500 a sub-limit already rejected go on to consume parent
+    // headroom, overstating relief and understating tax.
+    let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
 
     let cap = effectiveCap(rule.cap, year: year)
-    let allowed = claimed.clamped(to: cap)
+    let eligibility = Eligibility.eligible      // Task 13 computes this properly
+
+    // An automatic relief is granted in full once it is eligible — LHDN gives the
+    // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
+    // from the household, not from a receipt.
+    let granted = rule.automatic && eligibility.isEligible
+    let claimed = granted ? cap : claimedTotal
+    // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
+    // entry (SSPN's net deposit can be negative) would otherwise push headroom above
+    // the cap and inflate the opportunity figure.
+    let allowed = granted
+        ? cap
+        : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
     let headroom = max(cap - allowed, .zero)
 
     return ReliefAssessment(code: rule.code,
@@ -3308,7 +3634,7 @@ private func assess(rule: ReliefRule,
                             claimed: claimed,
                             allowed: allowed,
                             headroom: headroom,
-                            eligibility: .eligible,
+                            eligibility: eligibility,
                             requirements: [],
                             taxSaved: nil,
                             unverified: rule.unverified,
@@ -3327,8 +3653,6 @@ private func effectiveCap(_ cap: Cap, year: TaxYearSnapshot) -> Money {
         return amount
     case .tiered(_, let tiers):
         return tiers.map(\.amount).max() ?? .zero
-    case .none:
-        return Money(sen: .max)
     }
 }
 ```
@@ -3336,7 +3660,7 @@ private func effectiveCap(_ cap: Cap, year: TaxYearSnapshot) -> Money {
 - [ ] **Step 6: Run the test and confirm it passes**
 
 Run: `swift test --filter EvaluatorCapTests`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 7: Commit**
 
@@ -3485,9 +3809,6 @@ private func effectiveCap(_ cap: Cap,
     case .fixed(let amount):
         return (amount, [])
 
-    case .none:
-        return (Money(sen: .max), [])
-
     case .perDependent(let perChild):
         // Each dependent is tested against this rule's own predicate, so
         // CHILD_TERTIARY counts only tertiary students and CHILD_UNDER_18 only under-18s.
@@ -3541,7 +3862,9 @@ extension TaxYearSnapshot {
               assessmentType: assessmentType,
               employmentType: employmentType,
               gender: gender,
-              claimant: claimant)
+              claimant: claimant,
+              selfIsDisabled: selfIsDisabled,
+              spouseIsDisabled: spouseIsDisabled)
     }
 }
 ```
@@ -3572,10 +3895,35 @@ Expected: PASS, 8 tests.
 non-zero, the per-dependent branch is not applying the rule's predicate — check that
 `facts.dependent` is set before evaluating.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Pin the invariant that makes the automatic branch safe**
+
+The automatic branch sets `allowed = cap` and never consults `children`. That is correct
+only because no automatic relief has sub-limits — true in all three shipped years, but
+true by accident rather than by construction. Pin it, so a future rulebook edit that
+breaks the assumption fails a test instead of silently dropping a sub-limit's claim.
+
+Add to `RulebookIntegrityTests`:
+
+```swift
+    @Test("no automatic relief has sub-limits", arguments: shippedYears)
+    func automaticRelievesHaveNoChildren(year: Int) throws {
+        // The evaluator grants an automatic relief its full cap without consulting
+        // children. If one ever gained a sub-limit, that sub-limit's claims would be
+        // silently ignored.
+        for relief in try Self.load(year).allReliefs where relief.automatic {
+            #expect(relief.children.isEmpty,
+                    "\(relief.code) is automatic and has \(relief.children.count) children")
+        }
+    }
+```
+
+Run: `swift test --filter RulebookIntegrityTests`
+Expected: PASS — it should be green immediately against all three shipped years.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add Sources/TaxKit/Engine/Evaluator.swift Tests/TaxKitTests/EvaluatorCapKindTests.swift
+git add Sources/TaxKit/Engine/Evaluator.swift Tests/TaxKitTests/EvaluatorCapKindTests.swift Tests/TaxKitTests/RulebookIntegrityTests.swift
 git commit -m "feat: resolve per-dependent and tiered caps"
 ```
 
@@ -3632,6 +3980,7 @@ import Foundation
         var year = Fixture.year()
         year.spouseHasIncome = true
         year.assessmentType = .separate
+        year.maritalStatus = .married   // closes the alimony branch too
         let spouse = try #require(
             evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
                 .assessment(for: ReliefCode("SPOUSE_ALIMONY")))
@@ -3687,6 +4036,41 @@ import Foundation
         #expect(medical.requirements.allSatisfy(\.isSatisfied))
     }
 
+    @Test("one dependent's missing details do not withhold another's relief")
+    func partialDependentFactsStillGrant() throws {
+        // A parent records two children but has not entered a birth date for one.
+        let known = DependentSnapshot(name: "Aisyah", ageAtYearEnd: 7)
+        let vague = DependentSnapshot(name: "Unknown", ageAtYearEnd: nil)
+        let result = evaluate(ruleSet: try Fixture.rules(),
+                              year: Fixture.year(dependents: [known, vague]),
+                              entries: [])
+
+        let child = try #require(result.assessment(for: ReliefCode("CHILD_UNDER_18")))
+        // The RM 2,000 earned by the known child is granted...
+        #expect(child.cap == Money(ringgit: 2000))
+        #expect(child.allowed == Money(ringgit: 2000))
+        // ...and the app still asks about the other one.
+        guard case .needsInfo(let questions) = child.eligibility else {
+            Issue.record("expected .needsInfo alongside the grant, got \(child.eligibility)")
+            return
+        }
+        #expect(questions.contains(.dependentDetails))
+    }
+
+    @Test("a fixed automatic relief is NOT granted while its own question is open")
+    func fixedAutomaticWaitsForItsAnswer() throws {
+        // Contrast with the per-dependent case above: granting this without knowing
+        // whether the taxpayer is registered disabled would overstate relief.
+        let disabled = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: Fixture.year(), entries: [])
+                .assessment(for: ReliefCode("DISABLED_SELF")))
+        guard case .needsInfo = disabled.eligibility else {
+            Issue.record("expected .needsInfo, got \(disabled.eligibility)"); return
+        }
+        #expect(disabled.allowed == .zero)
+        #expect(disabled.headroom == Money(ringgit: 7000))
+    }
+
     @Test("cap questions and predicate questions merge into one needsInfo list")
     func questionsMerge() throws {
         let housing = try #require(
@@ -3715,16 +4099,42 @@ change Task 11's `ownClaimed` line to reuse it —
 
 ```swift
     let ownEntries = entriesByCode[rule.code] ?? []
+    let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
+    // See Task 11: `claimed` is raw for display, `allowed` aggregates children's capped
+    // amounts so a sub-limit's rejected excess cannot consume parent headroom.
+    let claimedTotal = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let allowedFromChildren = children.reduce(Money.zero) { $0 + $1.allowed }
+
     let resolved = effectiveCap(rule.cap, rule: rule, year: year)
     let cap = resolved.cap
-    let allowed = claimed.clamped(to: cap)
-    let headroom = max(cap - allowed, .zero)
 
+    // Eligibility must be settled before the grant decision: an automatic relief is
+    // granted only when it is actually eligible, never while a question is outstanding.
     let eligibility = resolveEligibility(rule: rule,
                                          year: year,
                                          capQuestions: resolved.missing)
     let requirements = checkRequirements(rule: rule, entries: ownEntries)
+
+    // A per-dependent cap has already excluded any dependent whose facts are
+    // incomplete, so an outstanding question about one child must not withhold the
+    // relief the household has already earned for another. Granting here cannot
+    // overstate: the ambiguous dependent contributed nothing to `cap`.
+    //
+    // This exemption is only safe for per-dependent caps. A fixed automatic relief is
+    // gated by its predicate as a whole — granting DISABLED_SELF while we still do not
+    // know whether the taxpayer is registered disabled would overstate relief outright.
+    let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
+    let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
+    let claimed = granted ? cap : claimedTotal
+    let allowed = granted
+        ? cap
+        : max((max(ownClaimed, .zero) + allowedFromChildren).clamped(to: cap), .zero)
+    let headroom = max(cap - allowed, .zero)
 ```
+
+Delete Task 11's now-superseded `ownEntries` / `ownClaimed` / `entered` / `granted` block
+and its `let eligibility = Eligibility.eligible` placeholder — the block above replaces
+all of it.
 
 and add these two functions to the file:
 
@@ -3770,7 +4180,7 @@ private func checkRequirements(rule: ReliefRule,
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `swift test --filter EvaluatorEligibilityTests`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 Run: `swift test`
 Expected: PASS, every suite.
@@ -3866,6 +4276,7 @@ import Foundation
         var year = Self.year()
         year.spouseHasIncome = true
         year.assessmentType = .separate
+        year.maritalStatus = .married   // closes the alimony branch too
         let spouse = try #require(
             evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
                 .assessment(for: ReliefCode("SPOUSE_ALIMONY")))
@@ -4095,6 +4506,39 @@ import Foundation
                      to: try loader.ruleSet(for: 2025)).isEmpty)
     }
 
+    @Test("lines with equal magnitude are ordered deterministically")
+    func tiesAreBrokenByCode() throws {
+        // DISABLED_SELF and DISABLED_SPOUSE both rose by exactly RM 1,000 in YA2025,
+        // so an OKU household produces two lines of identical magnitude.
+        var year = Fixture.year(2025, gross: Money(ringgit: 110_000))
+        year.selfIsDisabled = true
+        year.spouseIsDisabled = true
+        year.maritalStatus = .married
+
+        func order() throws -> [String] {
+            counterfactual(entries: [],
+                           year: year,
+                           under: try loader.ruleSet(for: 2025),
+                           versus: try loader.ruleSet(for: 2024))
+                .lines.map(\.code.rawValue)
+        }
+        let first = try order()
+        #expect(try order() == first, "ordering must be reproducible")
+
+        let tied = first.filter {
+            $0 == "DISABLED_SELF" || $0 == "DISABLED_SPOUSE"
+        }
+        #expect(tied == ["DISABLED_SELF", "DISABLED_SPOUSE"],
+                "equal magnitudes must fall back to code order")
+    }
+
+    @Test("an unshipped year throws the specific noRulesForYear case")
+    func unknownYearThrowsSpecificCase() {
+        #expect(throws: RuleSetLoadingError.noRulesForYear(1999)) {
+            try loader.ruleSet(for: 1999)
+        }
+    }
+
     @Test("the counterfactual prices this year's spending under last year's rules")
     func counterfactualPricesTheChange() throws {
         var year = Fixture.year(2025, gross: Money(ringgit: 110_000))
@@ -4164,9 +4608,9 @@ public struct BundledRuleSetLoader: RuleSetLoading {
 
     public func ruleSet(for year: Int) throws -> RuleSet {
         guard availableYears.contains(year),
-              let url = Bundle.module.url(forResource: "ya-\(year)",
-                                          withExtension: "json",
-                                          subdirectory: "Rules")
+              let url = RuleBundle.current.url(forResource: "ya-\(year)",
+                                               withExtension: "json",
+                                               subdirectory: "Rules")
         else { throw RuleSetLoadingError.noRulesForYear(year) }
 
         do {
@@ -4224,7 +4668,15 @@ public func diff(from earlier: RuleSet, to later: RuleSet) -> [ReliefDelta] {
                                       from: old.cap.nominalCeiling,
                                       to: new.cap.nominalCeiling))
         }
-        if old.eligibility != new.eligibility || old.requiredDocuments != new.requiredDocuments {
+        // A tiered cap can change without its ceiling moving — a Budget that adjusts the
+        // RM 500,000-to-750,000 housing band while leaving the top tier alone. Comparing
+        // only `nominalCeiling` would report no change at all, so the restructure is
+        // reported as a conditions change instead.
+        let capStructureChanged = old.cap != new.cap
+            && old.cap.nominalCeiling == new.cap.nominalCeiling
+        if capStructureChanged
+            || old.eligibility != new.eligibility
+            || old.requiredDocuments != new.requiredDocuments {
             deltas.append(.conditionsChanged(code, name: new.name,
                                              from: old.notes, to: new.notes))
         }
@@ -4264,7 +4716,9 @@ public struct CounterfactualResult: Hashable, Sendable {
     /// Only reliefs whose allowed amount actually differs, biggest difference first.
     public var lines: [CounterfactualLine]
     public var totalReliefDifference: Money
-    /// Difference in estimated tax. `nil` when income is unknown.
+    /// Difference in estimated tax, `comparison - baseline`. Positive means the
+    /// baseline year leaves the user better off — the same convention as `difference`
+    /// and `totalReliefDifference`. `nil` when income is unknown.
     public var taxDifference: Money?
 }
 
@@ -4308,7 +4762,15 @@ public func counterfactual(entries: [EntrySnapshot],
             difference: Money.zero - assessment.allowed))
     }
 
-    lines.sort { abs($0.difference.sen) > abs($1.difference.sen) }
+    // Swift's sort is not stable, and ties are reachable: DISABLED_SELF,
+    // DISABLED_SPOUSE and INSURANCE_EDU_MEDICAL all moved by exactly RM 1,000 between
+    // YA2024 and YA2025. Without a tie-break the Compare screen could reorder between
+    // launches, so equal magnitudes fall back to the code.
+    lines.sort {
+        abs($0.difference.sen) == abs($1.difference.sen)
+            ? $0.code.rawValue < $1.code.rawValue
+            : abs($0.difference.sen) > abs($1.difference.sen)
+    }
 
     var taxDifference: Money?
     if let baseTax = base.estimatedTax, let otherTax = other.estimatedTax {
