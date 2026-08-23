@@ -80,6 +80,9 @@ public struct EvaluationResult: Hashable, Sendable {
     public var estimatedTax: Money?
 
     /// Every assessment including nested sub-limits, depth-first.
+    ///
+    /// For lookup, not for totalling: a sub-limit's amount is already inside its
+    /// parent's, so reducing this over `allowed` double-counts. Use `totalAllowed`.
     public var allAssessments: [ReliefAssessment] {
         assessments.flatMap(\.selfAndDescendants)
     }

@@ -146,6 +146,36 @@ enum Fixture {
         #expect(sspn.headroom == Money(ringgit: 8000))   // the cap, not more
     }
 
+    @Test("a sub-limit's rejected excess cannot consume the parent's headroom")
+    func subLimitExcessDoesNotReachParent() throws {
+        // MEDICAL_CHECKUP is a RM 1,000 sub-limit inside MEDICAL_SERIOUS's RM 10,000.
+        // Claiming RM 1,500 against the sub-limit is RM 1,000 of relief, not RM 1,500.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 1500)])
+
+        let child = try #require(result.assessment(for: ReliefCode("MEDICAL_CHECKUP")))
+        #expect(child.claimed == Money(ringgit: 1500))   // what the user entered
+        #expect(child.allowed == Money(ringgit: 1000))   // what LHDN allows
+
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 1500))  // raw, for display
+        #expect(parent.allowed == Money(ringgit: 1000))  // NOT 1500
+        #expect(parent.headroom == Money(ringgit: 9000))
+    }
+
+    @Test("a parent's own claim and its children's allowed amounts share one ceiling")
+    func parentAndChildrenShareTheCeiling() throws {
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("MEDICAL_SERIOUS"), 9500),
+                      Fixture.entry(ReliefCode("MEDICAL_CHECKUP"), 900)])
+        let parent = try #require(result.assessment(for: ReliefCode("MEDICAL_SERIOUS")))
+        #expect(parent.claimed == Money(ringgit: 10400))
+        #expect(parent.allowed == Money(ringgit: 10000))   // the ceiling binds
+        #expect(parent.headroom == .zero)
+    }
+
     @Test("an automatic relief is granted without any entry")
     func automaticGrant() throws {
         let individual = try #require(
