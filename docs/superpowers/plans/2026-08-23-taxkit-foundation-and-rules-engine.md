@@ -2995,6 +2995,14 @@ import Foundation
         let t = try Self.table()
         #expect(t.tax(on: Money(sen: -5_000)) == .zero)
     }
+
+    @Test("a negative relief saves nothing rather than adding tax")
+    func negativeReliefSavesNothing() throws {
+        let t = try Self.table()
+        // SSPN is a net deposit, so a withdrawal-heavy year really can be negative.
+        #expect(t.taxSaved(reducing: Money(ringgit: 92_400),
+                           by: Money(ringgit: -2_000)) == .zero)
+    }
 }
 ```
 
@@ -3045,7 +3053,11 @@ extension BracketTable {
     /// home screen, so the shortcut is not acceptable.
     public func taxSaved(reducing chargeable: Money, by relief: Money) -> Money {
         let before = max(chargeable, .zero)
-        let after = max(before - relief, .zero)
+        // A relief can legitimately arrive negative: SSPN is a *net* deposit, so a year
+        // with more withdrawals than deposits produces one. A negative relief saves
+        // nothing — it must never surface as a negative "saving" on the home screen.
+        let claimed = max(relief, .zero)
+        let after = max(before - claimed, .zero)
         return tax(on: before) - tax(on: after)
     }
 }
@@ -3237,6 +3249,17 @@ enum Fixture {
             entries: [Fixture.entry(.lifestyle, 4000), Fixture.entry(ReliefCode("SSPN"), 1000)])
         // Lifestyle is capped at 2,500 despite the 4,000 claim, plus 1,000 of SSPN.
         #expect(withEntries.totalAllowed - baseline.totalAllowed == Money(ringgit: 3500))
+    }
+
+    @Test("a negative net claim yields zero allowed, never headroom above the cap")
+    func negativeClaimIsFloored() throws {
+        // SSPN is a net deposit: withdrawals can exceed deposits in a year.
+        let result = evaluate(
+            ruleSet: try Fixture.rules(), year: Fixture.year(),
+            entries: [Fixture.entry(ReliefCode("SSPN"), -1500)])
+        let sspn = try #require(result.assessment(for: ReliefCode("SSPN")))
+        #expect(sspn.allowed == .zero)
+        #expect(sspn.headroom == Money(ringgit: 8000))   // the cap, not more
     }
 
     @Test("an automatic relief is granted without any entry")
@@ -3554,7 +3577,10 @@ private func assess(rule: ReliefRule,
     // from the household, not from a receipt.
     let granted = rule.automatic && eligibility.isEligible
     let claimed = granted ? cap : entered
-    let allowed = granted ? cap : entered.clamped(to: cap)
+    // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
+    // entry (SSPN's net deposit can be negative) would otherwise push headroom above
+    // the cap and inflate the opportunity figure.
+    let allowed = granted ? cap : max(entered.clamped(to: cap), .zero)
     let headroom = max(cap - allowed, .zero)
 
     return ReliefAssessment(code: rule.code,
