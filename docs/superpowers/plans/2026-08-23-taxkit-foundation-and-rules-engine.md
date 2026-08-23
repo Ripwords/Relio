@@ -4276,6 +4276,7 @@ import Foundation
         var year = Self.year()
         year.spouseHasIncome = true
         year.assessmentType = .separate
+        year.maritalStatus = .married   // closes the alimony branch too
         let spouse = try #require(
             evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
                 .assessment(for: ReliefCode("SPOUSE_ALIMONY")))
