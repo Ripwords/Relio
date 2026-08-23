@@ -3895,10 +3895,35 @@ Expected: PASS, 8 tests.
 non-zero, the per-dependent branch is not applying the rule's predicate — check that
 `facts.dependent` is set before evaluating.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Pin the invariant that makes the automatic branch safe**
+
+The automatic branch sets `allowed = cap` and never consults `children`. That is correct
+only because no automatic relief has sub-limits — true in all three shipped years, but
+true by accident rather than by construction. Pin it, so a future rulebook edit that
+breaks the assumption fails a test instead of silently dropping a sub-limit's claim.
+
+Add to `RulebookIntegrityTests`:
+
+```swift
+    @Test("no automatic relief has sub-limits", arguments: shippedYears)
+    func automaticRelievesHaveNoChildren(year: Int) throws {
+        // The evaluator grants an automatic relief its full cap without consulting
+        // children. If one ever gained a sub-limit, that sub-limit's claims would be
+        // silently ignored.
+        for relief in try Self.load(year).allReliefs where relief.automatic {
+            #expect(relief.children.isEmpty,
+                    "\(relief.code) is automatic and has \(relief.children.count) children")
+        }
+    }
+```
+
+Run: `swift test --filter RulebookIntegrityTests`
+Expected: PASS — it should be green immediately against all three shipped years.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add Sources/TaxKit/Engine/Evaluator.swift Tests/TaxKitTests/EvaluatorCapKindTests.swift
+git add Sources/TaxKit/Engine/Evaluator.swift Tests/TaxKitTests/EvaluatorCapKindTests.swift Tests/TaxKitTests/RulebookIntegrityTests.swift
 git commit -m "feat: resolve per-dependent and tiered caps"
 ```
 
