@@ -969,8 +969,8 @@ git commit -m "feat: add ReliefCode with a command-plugin generator"
     `.referralLetter`, `.insuranceStatement`, `.epfStatement`, `.bankStatement`, `.other`.
   - `Cap` — `.fixed(Money)`, `.perDependent(Money)`,
     `.tiered(on: TieredFact, tiers: [Tier])`, `.none`; plus `Tier`, `TieredFact`.
-  - `ReliefRule` — `code`, `name`, `cap`, `requiredDocuments`, `children`, `sourceURL`,
-    `unverified`, `notes`. Task 7 adds the `eligibility` property.
+  - `ReliefRule` — `code`, `name`, `cap`, `automatic`, `requiredDocuments`, `children`,
+    `sourceURL`, `unverified`, `notes`. Task 7 adds the `eligibility` property.
   - `RuleSet` — `yearOfAssessment`, `revision`, `verifiedOn`, `sourceURL`, `brackets`,
     `reliefs`, `retiredCodes`; plus `Retirement`.
   - `BracketTable` — `bands: [Band]`; `Band` — `lowerBound`, `upperBound`, `rate`,
@@ -1027,6 +1027,7 @@ import Foundation
           "code": "CHILD_UNDER_18",
           "name": "Child under 18",
           "cap": { "kind": "perDependent", "sen": 200000 },
+      "automatic": true,
           "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/"
         },
         {
@@ -1091,6 +1092,7 @@ import Foundation
         #expect(child.requiredDocuments.isEmpty)
         #expect(child.children.isEmpty)
         #expect(child.unverified == false)
+        #expect(child.automatic == false)
     }
 
     @Test("required documents decode as typed kinds")
@@ -1319,6 +1321,10 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     public let code: ReliefCode
     public let name: String
     public let cap: Cap
+    /// Granted in full when eligible, with no entry and no receipt — LHDN gives every
+    /// resident the RM 9,000 individual relief, and child and spouse reliefs follow from
+    /// the household rather than from a purchase.
+    public let automatic: Bool
     public let requiredDocuments: [DocumentKind]
     /// Sub-limits. A child's claims also count against this relief's cap.
     public let children: [ReliefRule]
@@ -1329,7 +1335,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     public let notes: String?
 
     private enum CodingKeys: String, CodingKey {
-        case code, name, cap, requiredDocuments, children, sourceURL, unverified, notes
+        case code, name, cap, automatic, requiredDocuments, children, sourceURL, unverified, notes
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1337,6 +1343,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
         self.code = try c.decode(ReliefCode.self, forKey: .code)
         self.name = try c.decode(String.self, forKey: .name)
         self.cap = try c.decode(Cap.self, forKey: .cap)
+        self.automatic = try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false
         self.requiredDocuments = try c.decodeIfPresent([DocumentKind].self, forKey: .requiredDocuments) ?? []
         self.children = try c.decodeIfPresent([ReliefRule].self, forKey: .children) ?? []
         self.sourceURL = try c.decode(URL.self, forKey: .sourceURL)
@@ -1438,6 +1445,8 @@ git commit -m "feat: add rulebook data model with string-decoded rates"
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
 - Produces:
+  - Predicate cases include `selfIsDisabled(Bool)` and `spouseIsDisabled(Bool)`, which
+    gate the disabled-person reliefs so they are not offered to every household.
   - Fact enums: `MaritalStatus` (`.single .married .divorced .widowed`),
     `AssessmentType` (`.separate .joint .combinedUnderSpouse`),
     `EmploymentType` (`.privateSector .publicServantPensionable .selfEmployed`),
@@ -1671,6 +1680,8 @@ public enum ProfileQuestion: String, Codable, Hashable, Sendable, CaseIterable {
     case dependentDetails
     case lastClaimYear
     case propertyPrice
+    case disabilityStatus
+    case spouseDisabilityStatus
 }
 
 public struct DependentFacts: Hashable, Sendable {
@@ -1700,6 +1711,9 @@ public struct Facts: Hashable, Sendable {
     public var dependent: DependentFacts?
     public var claimHistory: ClaimHistory
     public var propertyPriceSen: Int?
+    /// Whether the taxpayer is a person with disabilities registered with JKM.
+    public var selfIsDisabled: Bool?
+    public var spouseIsDisabled: Bool?
 
     public init(yearOfAssessment: Int,
                 maritalStatus: MaritalStatus? = nil,
@@ -1710,7 +1724,9 @@ public struct Facts: Hashable, Sendable {
                 claimant: Claimant? = nil,
                 dependent: DependentFacts? = nil,
                 claimHistory: ClaimHistory = .unknown,
-                propertyPriceSen: Int? = nil) {
+                propertyPriceSen: Int? = nil,
+                selfIsDisabled: Bool? = nil,
+                spouseIsDisabled: Bool? = nil) {
         self.yearOfAssessment = yearOfAssessment
         self.maritalStatus = maritalStatus
         self.spouseHasIncome = spouseHasIncome
@@ -1721,6 +1737,8 @@ public struct Facts: Hashable, Sendable {
         self.dependent = dependent
         self.claimHistory = claimHistory
         self.propertyPriceSen = propertyPriceSen
+        self.selfIsDisabled = selfIsDisabled
+        self.spouseIsDisabled = spouseIsDisabled
     }
 }
 
@@ -1754,6 +1772,8 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
     case assessmentType(AssessmentType)
     case employmentType(in: [EmploymentType])
     case gender(Gender)
+    case selfIsDisabled(Bool)
+    case spouseIsDisabled(Bool)
     case claimant(in: [Claimant])
     case dependentAge(min: Int?, max: Int?)
     case dependentEducation(in: [EducationLevel])
@@ -1820,6 +1840,18 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
         case .gender(let required):
             return Self.check(facts.gender, in: [required],
                               asking: .gender, label: "Gender")
+
+        case .selfIsDisabled(let required):
+            return Self.check(facts.selfIsDisabled, equals: required,
+                              asking: .disabilityStatus,
+                              label: required ? "You must be a registered disabled person"
+                                              : "You must not be registered disabled")
+
+        case .spouseIsDisabled(let required):
+            return Self.check(facts.spouseIsDisabled, equals: required,
+                              asking: .spouseDisabilityStatus,
+                              label: required ? "Spouse must be a registered disabled person"
+                                              : "Spouse must not be registered disabled")
 
         case .claimant(let allowed):
             return Self.check(facts.claimant, in: allowed,
@@ -1900,6 +1932,7 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
     private enum Op: String, Codable {
         case always, all, any, not
         case maritalStatus, spouseHasIncome, assessmentType, employmentType, gender
+        case selfIsDisabled, spouseIsDisabled
         case claimant, dependentAge, dependentEducation, dependentIsDisabled
         case yaRange, claimFrequency
     }
@@ -1927,6 +1960,10 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
             self = .employmentType(in: try c.decode([EmploymentType].self, forKey: .in))
         case .gender:
             self = .gender(try c.decode(Gender.self, forKey: .is))
+        case .selfIsDisabled:
+            self = .selfIsDisabled(try c.decode(Bool.self, forKey: .is))
+        case .spouseIsDisabled:
+            self = .spouseIsDisabled(try c.decode(Bool.self, forKey: .is))
         case .claimant:
             self = .claimant(in: try c.decode([Claimant].self, forKey: .in))
         case .dependentAge:
@@ -1965,6 +2002,10 @@ public indirect enum EligibilityPredicate: Codable, Hashable, Sendable {
             try c.encode(Op.employmentType, forKey: .op); try c.encode(allowed, forKey: .in)
         case .gender(let value):
             try c.encode(Op.gender, forKey: .op); try c.encode(value, forKey: .is)
+        case .selfIsDisabled(let value):
+            try c.encode(Op.selfIsDisabled, forKey: .op); try c.encode(value, forKey: .is)
+        case .spouseIsDisabled(let value):
+            try c.encode(Op.spouseIsDisabled, forKey: .op); try c.encode(value, forKey: .is)
         case .claimant(let allowed):
             try c.encode(Op.claimant, forKey: .op); try c.encode(allowed, forKey: .in)
         case .dependentAge(let min, let max):
@@ -2055,6 +2096,12 @@ Two modelling notes:
   is why `Cap` has no separate shared-pool case.
 - **LHDN items 6, 7 and 8** are three rows that all draw on one RM 10,000 ceiling, so they
   are modelled as one parent (`MEDICAL_SERIOUS`) with four sub-limits.
+- **Nine reliefs are `automatic`**: the individual RM 9,000, spouse/alimony, the two
+  disabled-person reliefs, and the five child reliefs. LHDN grants these from the
+  household rather than from a purchase, so the engine allows the full cap when the
+  relief is eligible instead of waiting for an entry. The two disabled-person reliefs
+  carry `selfIsDisabled` / `spouseIsDisabled` predicates so they are not handed to every
+  household. `DISABLED_EQUIPMENT` stays entry-driven — it is an actual purchase.
 
 - [ ] **Step 1: Write the failing integrity test**
 
@@ -2162,6 +2209,30 @@ import Foundation
         #expect(rules.relief(for: ReliefCode("SOCSO_EIS"))?.cap == .fixed(Money(ringgit: 350)))
         #expect(rules.relief(for: ReliefCode("HOUSING_LOAN_INTEREST")) != nil)
     }
+
+    @Test("exactly the household-derived reliefs are automatic", arguments: shippedYears)
+    func automaticSet(year: Int) throws {
+        let automatic = Set(try Self.load(year).allReliefs
+            .filter(\.automatic).map(\.code.rawValue))
+        // The automatic set is identical in all three shipped years.
+        #expect(automatic == [
+            "SELF_AND_DEPENDENTS", "SPOUSE_ALIMONY", "DISABLED_SELF", "DISABLED_SPOUSE",
+            "CHILD_UNDER_18", "CHILD_PRE_TERTIARY", "CHILD_TERTIARY",
+            "CHILD_DISABLED", "CHILD_DISABLED_TERTIARY"
+        ])
+    }
+
+    @Test("every automatic relief is gated or unconditional, never a free grant",
+          arguments: shippedYears)
+    func automaticRelievesAreGated(year: Int) throws {
+        for relief in try Self.load(year).allReliefs where relief.automatic {
+            let gated = relief.eligibility != nil
+            let perDependent = if case .perDependent = relief.cap { true } else { false }
+            let unconditional = relief.code == ReliefCode("SELF_AND_DEPENDENTS")
+            #expect(gated || perDependent || unconditional,
+                    "\(relief.code) is automatic with nothing gating it")
+        }
+    }
 }
 ```
 
@@ -2199,7 +2270,8 @@ full URL at every occurrence; JSON has no variables.
   "reliefs": [
     { "code": "SELF_AND_DEPENDENTS", "name": "Individual and dependent relatives",
       "cap": { "kind": "fixed", "sen": 900000 },
-      "notes": "Granted automatically.",
+      "automatic": true,
+      "notes": "Granted to every resident individual without a claim.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "PARENTS_MEDICAL",
@@ -2224,7 +2296,9 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "DISABLED_SELF", "name": "Disabled individual",
       "cap": { "kind": "fixed", "sen": 700000 },
-      "notes": "YA2024 was RM 6,000.",
+      "automatic": true,
+      "eligibility": { "op": "selfIsDisabled", "is": true },
+      "notes": "Requires JKM registration. YA2024 was RM 6,000.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "EDUCATION_SELF", "name": "Education fees (self)",
@@ -2311,6 +2385,7 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "SPOUSE_ALIMONY", "name": "Spouse, or alimony to a former wife",
       "cap": { "kind": "fixed", "sen": 400000 },
+      "automatic": true,
       "eligibility": { "op": "any", "of": [
         { "op": "spouseHasIncome", "is": false },
         { "op": "assessmentType", "is": "joint" }
@@ -2319,7 +2394,9 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "DISABLED_SPOUSE", "name": "Disabled spouse",
       "cap": { "kind": "fixed", "sen": 600000 },
-      "notes": "YA2024 was RM 5,000.",
+      "automatic": true,
+      "eligibility": { "op": "spouseIsDisabled", "is": true },
+      "notes": "Requires JKM registration. YA2024 was RM 5,000.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "CHILD_UNDER_18", "name": "Child under 18",
@@ -2334,6 +2411,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_PRE_TERTIARY",
       "name": "Child 18 and over in full-time A-Level, matriculation or pre-degree study",
       "cap": { "kind": "perDependent", "sen": 200000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "min": 18 },
@@ -2344,6 +2422,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_TERTIARY",
       "name": "Child 18 and over in full-time tertiary study",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentAge", "min": 18 },
@@ -2354,6 +2433,7 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "CHILD_DISABLED", "name": "Disabled child",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentIsDisabled", "is": true }
@@ -2364,6 +2444,7 @@ full URL at every occurrence; JSON has no variables.
     { "code": "CHILD_DISABLED_TERTIARY",
       "name": "Disabled child 18 and over in recognised tertiary study",
       "cap": { "kind": "perDependent", "sen": 800000 },
+      "automatic": true,
       "eligibility": { "op": "all", "of": [
         { "op": "claimant", "in": ["child"] },
         { "op": "dependentIsDisabled", "is": true },
@@ -2997,14 +3078,26 @@ enum Fixture {
         return try JSONDecoder().decode(RuleSet.self, from: data)
     }
 
-    @Test("totals sum the allowed amounts, not the claimed ones")
+    @Test("totals count the allowed amounts, not the claimed ones")
     func totals() throws {
-        let result = evaluate(
-            ruleSet: try Fixture.rules(),
-            year: Fixture.year(),
+        let rules = try Fixture.rules()
+        // Measured as a delta against the no-entry baseline, so the automatic reliefs
+        // (which are granted with no entry) do not make this assertion brittle.
+        let baseline = evaluate(ruleSet: rules, year: Fixture.year(), entries: [])
+        let withEntries = evaluate(
+            ruleSet: rules, year: Fixture.year(),
             entries: [Fixture.entry(.lifestyle, 4000), Fixture.entry(ReliefCode("SSPN"), 1000)])
-        // 2,500 allowed for Lifestyle plus 1,000 for SSPN.
-        #expect(result.totalAllowed == Money(ringgit: 3500))
+        // Lifestyle is capped at 2,500 despite the 4,000 claim, plus 1,000 of SSPN.
+        #expect(withEntries.totalAllowed - baseline.totalAllowed == Money(ringgit: 3500))
+    }
+
+    @Test("an automatic relief is granted without any entry")
+    func automaticGrant() throws {
+        let individual = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: Fixture.year(), entries: [])
+                .assessment(for: ReliefCode("SELF_AND_DEPENDENTS")))
+        #expect(individual.allowed == Money(ringgit: 9000))
+        #expect(individual.headroom == .zero)
     }
 }
 ```
@@ -3071,6 +3164,9 @@ public struct TaxYearSnapshot: Hashable, Sendable {
     public var dependents: [DependentSnapshot]
     /// Purchase price of the first home, for tiered housing loan interest relief.
     public var propertyPriceSen: Int?
+    /// JKM-registered disability status, gating the two disabled-person reliefs.
+    public var selfIsDisabled: Bool?
+    public var spouseIsDisabled: Bool?
     /// The most recent YA in which a once-every-N-years relief was claimed.
     public var lastClaimedYear: [ReliefCode: Int]
 
@@ -3083,6 +3179,8 @@ public struct TaxYearSnapshot: Hashable, Sendable {
                 gender: Gender? = nil,
                 dependents: [DependentSnapshot] = [],
                 propertyPriceSen: Int? = nil,
+                selfIsDisabled: Bool? = nil,
+                spouseIsDisabled: Bool? = nil,
                 lastClaimedYear: [ReliefCode: Int] = [:]) {
         self.year = year
         self.grossIncome = grossIncome
@@ -3093,6 +3191,8 @@ public struct TaxYearSnapshot: Hashable, Sendable {
         self.gender = gender
         self.dependents = dependents
         self.propertyPriceSen = propertyPriceSen
+        self.selfIsDisabled = selfIsDisabled
+        self.spouseIsDisabled = spouseIsDisabled
         self.lastClaimedYear = lastClaimedYear
     }
 }
@@ -3294,12 +3394,19 @@ private func assess(rule: ReliefRule,
         assess(rule: $0, year: year, entriesByCode: entriesByCode)
     }
 
-    let ownClaimed = (entriesByCode[rule.code] ?? [])
-        .reduce(Money.zero) { $0 + $1.amount }
-    let claimed = children.reduce(ownClaimed) { $0 + $1.claimed }
+    let ownEntries = entriesByCode[rule.code] ?? []
+    let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
+    let entered = children.reduce(ownClaimed) { $0 + $1.claimed }
 
     let cap = effectiveCap(rule.cap, year: year)
-    let allowed = claimed.clamped(to: cap)
+    let eligibility = Eligibility.eligible      // Task 13 computes this properly
+
+    // An automatic relief is granted in full once it is eligible — LHDN gives the
+    // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
+    // from the household, not from a receipt.
+    let granted = rule.automatic && eligibility.isEligible
+    let claimed = granted ? cap : entered
+    let allowed = granted ? cap : entered.clamped(to: cap)
     let headroom = max(cap - allowed, .zero)
 
     return ReliefAssessment(code: rule.code,
@@ -3308,7 +3415,7 @@ private func assess(rule: ReliefRule,
                             claimed: claimed,
                             allowed: allowed,
                             headroom: headroom,
-                            eligibility: .eligible,
+                            eligibility: eligibility,
                             requirements: [],
                             taxSaved: nil,
                             unverified: rule.unverified,
@@ -3541,7 +3648,9 @@ extension TaxYearSnapshot {
               assessmentType: assessmentType,
               employmentType: employmentType,
               gender: gender,
-              claimant: claimant)
+              claimant: claimant,
+              selfIsDisabled: selfIsDisabled,
+              spouseIsDisabled: spouseIsDisabled)
     }
 }
 ```
@@ -3715,16 +3824,28 @@ change Task 11's `ownClaimed` line to reuse it —
 
 ```swift
     let ownEntries = entriesByCode[rule.code] ?? []
+    let ownClaimed = ownEntries.reduce(Money.zero) { $0 + $1.amount }
+    let entered = children.reduce(ownClaimed) { $0 + $1.claimed }
+
     let resolved = effectiveCap(rule.cap, rule: rule, year: year)
     let cap = resolved.cap
-    let allowed = claimed.clamped(to: cap)
-    let headroom = max(cap - allowed, .zero)
 
+    // Eligibility must be settled before the grant decision: an automatic relief is
+    // granted only when it is actually eligible, never while a question is outstanding.
     let eligibility = resolveEligibility(rule: rule,
                                          year: year,
                                          capQuestions: resolved.missing)
     let requirements = checkRequirements(rule: rule, entries: ownEntries)
+
+    let granted = rule.automatic && eligibility.isEligible
+    let claimed = granted ? cap : entered
+    let allowed = granted ? cap : entered.clamped(to: cap)
+    let headroom = max(cap - allowed, .zero)
 ```
+
+Delete Task 11's now-superseded `ownEntries` / `ownClaimed` / `entered` / `granted` block
+and its `let eligibility = Eligibility.eligible` placeholder — the block above replaces
+all of it.
 
 and add these two functions to the file:
 
