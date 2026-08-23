@@ -2707,6 +2707,11 @@ read from the same LHDN page on 2026-08-23.
 | `PARENTS_MEDICAL.name` → `"Parents — medical treatment, special needs, carer"` (no dental) |
 | **Remove the `PARENTS_CHECKUP` child** — the RM 1,000 parents check-up sub-limit starts in YA2024 |
 | **Remove the `MEDICAL_DENTAL` child** — the dental sub-limit starts in YA2024 |
+| **`LIFESTYLE_SPORTS.cap.sen` → `50000`** — LHDN's YA2023 table reads `500 (Terhad)`; the RM 1,000 ceiling starts in YA2024 |
+| `LIFESTYLE_SPORTS.name` → `"Lifestyle additional — sports equipment, facilities, competitions"` (no gym) |
+| `LIFESTYLE_SPORTS.notes` → `"Sports Development Act 1997. Gymnasium membership sits under Lifestyle in YA2023 and moves here in YA2024."` |
+| `LIFESTYLE.name` → `"Lifestyle — books, computer, smartphone, tablet, sports equipment, gym, internet"` |
+| `LIFESTYLE.notes` → `"Not for business use. Internet must be billed in the claimant's own name. YA2023 includes sports equipment and gymnasium membership and excludes upskilling courses, both of which move in YA2024."` |
 | `SSPN.notes` → `"Deposits in 2023 minus withdrawals in 2023."` |
 
 Everything else, including all rate bands, is identical across the three years.
@@ -2776,6 +2781,19 @@ and append these tests to the suite:
         #expect(rules.relief(for: ReliefCode("PARENTS_CHECKUP")) == nil)
         #expect(rules.relief(for: ReliefCode("PARENTS_MEDICAL"))?.cap == .fixed(Money(ringgit: 8000)))
         #expect(rules.relief(for: .lifestyle)?.cap == .fixed(Money(ringgit: 2500)))
+        // LHDN's YA2023 table reads "500 (Terhad)"; RM 1,000 starts in YA2024.
+        #expect(rules.relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
+    }
+
+    @Test("sports relief rose from RM 500 to RM 1,000 in YA2024 and stayed there")
+    func sportsReliefTimeline() throws {
+        #expect(try Self.load(2023).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
+        #expect(try Self.load(2024).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
+        #expect(try Self.load(2025).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
     }
 
     @Test("caps that LHDN kept flat really are flat across all three years")
@@ -2783,7 +2801,7 @@ and append these tests to the suite:
         let stable: [ReliefCode] = [
             ReliefCode("SELF_AND_DEPENDENTS"), ReliefCode("PARENTS_MEDICAL"),
             ReliefCode("DISABLED_EQUIPMENT"), ReliefCode("EDUCATION_SELF"),
-            ReliefCode("MEDICAL_SERIOUS"), .lifestyle, ReliefCode("LIFESTYLE_SPORTS"),
+            ReliefCode("MEDICAL_SERIOUS"), .lifestyle,
             ReliefCode("BREASTFEEDING"), ReliefCode("CHILDCARE"), ReliefCode("SSPN"),
             ReliefCode("SPOUSE_ALIMONY"), ReliefCode("CHILD_UNDER_18"),
             ReliefCode("CHILD_PRE_TERTIARY"), ReliefCode("CHILD_TERTIARY"),
