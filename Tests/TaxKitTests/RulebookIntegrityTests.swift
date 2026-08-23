@@ -238,6 +238,9 @@ import Foundation
         #expect(rules.relief(for: ReliefCode("PARENTS_CHECKUP")) == nil)
         #expect(rules.relief(for: ReliefCode("PARENTS_MEDICAL"))?.cap == .fixed(Money(ringgit: 8000)))
         #expect(rules.relief(for: .lifestyle)?.cap == .fixed(Money(ringgit: 2500)))
+        // LHDN's YA2023 table reads "500 (Terhad)"; RM 1,000 starts in YA2024.
+        #expect(rules.relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
     }
 
     @Test("caps that LHDN kept flat really are flat across all three years")
@@ -245,7 +248,7 @@ import Foundation
         let stable: [ReliefCode] = [
             ReliefCode("SELF_AND_DEPENDENTS"), ReliefCode("PARENTS_MEDICAL"),
             ReliefCode("DISABLED_EQUIPMENT"), ReliefCode("EDUCATION_SELF"),
-            ReliefCode("MEDICAL_SERIOUS"), .lifestyle, ReliefCode("LIFESTYLE_SPORTS"),
+            ReliefCode("MEDICAL_SERIOUS"), .lifestyle,
             ReliefCode("BREASTFEEDING"), ReliefCode("CHILDCARE"), ReliefCode("SSPN"),
             ReliefCode("SPOUSE_ALIMONY"), ReliefCode("CHILD_UNDER_18"),
             ReliefCode("CHILD_PRE_TERTIARY"), ReliefCode("CHILD_TERTIARY"),
@@ -264,5 +267,15 @@ import Foundation
     func bandsAreIdenticalAcrossYears() throws {
         let tables = try Self.shippedYears.map { try Self.load($0).brackets }
         #expect(Set(tables).count == 1)
+    }
+
+    @Test("sports relief rose from RM 500 to RM 1,000 in YA2024 and stayed there")
+    func sportsReliefTimeline() throws {
+        #expect(try Self.load(2023).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 500)))
+        #expect(try Self.load(2024).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
+        #expect(try Self.load(2025).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
+                == .fixed(Money(ringgit: 1000)))
     }
 }
