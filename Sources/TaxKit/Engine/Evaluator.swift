@@ -39,14 +39,47 @@ public func evaluate(ruleSet: RuleSet,
                                   assessments: assessments,
                                   unresolved: unresolved,
                                   chargeableIncome: nil,
-                                  estimatedTax: nil)
+                                  estimatedTax: nil,
+                                  totalOpportunity: nil)
 
-    if let gross = year.grossIncome {
-        let chargeable = max(gross - result.totalAllowed, .zero)
-        result.chargeableIncome = chargeable
-        result.estimatedTax = ruleSet.brackets.tax(on: chargeable)
+    guard let gross = year.grossIncome else { return result }
+
+    let chargeable = max(gross - result.totalAllowed, .zero)
+    result.chargeableIncome = chargeable
+    result.estimatedTax = ruleSet.brackets.tax(on: chargeable)
+
+    // Second pass: tax figures need the chargeable income the first pass produced.
+    result.assessments = result.assessments.map {
+        withTaxSaved($0, chargeable: chargeable, brackets: ruleSet.brackets)
     }
+    let combinedHeadroom = result.assessments
+        .filter { $0.taxSaved != nil }
+        .reduce(Money.zero) { $0 + $1.headroom }
+    result.totalOpportunity = ruleSet.brackets.taxSaved(reducing: chargeable,
+                                                        by: combinedHeadroom)
     return result
+}
+
+/// Fills `taxSaved` on an assessment and its descendants.
+///
+/// Sub-limits get a figure too, but their headroom is already inside the parent's, so
+/// only top-level assessments contribute to `totalOpportunity`.
+private func withTaxSaved(_ assessment: ReliefAssessment,
+                          chargeable: Money,
+                          brackets: BracketTable) -> ReliefAssessment {
+    var updated = assessment
+    updated.children = assessment.children.map {
+        withTaxSaved($0, chargeable: chargeable, brackets: brackets)
+    }
+
+    let claimable: Bool = switch assessment.eligibility {
+    case .eligible, .needsInfo: true      // needsInfo shows what answering is worth
+    case .ineligible: false
+    }
+    updated.taxSaved = (claimable && !assessment.unverified)
+        ? brackets.taxSaved(reducing: chargeable, by: assessment.headroom)
+        : nil
+    return updated
 }
 
 /// Assesses one rule and its sub-limits.

@@ -78,6 +78,10 @@ public struct EvaluationResult: Hashable, Sendable {
     public var chargeableIncome: Money?
     /// Estimated tax on `chargeableIncome`. `nil` when income is unknown.
     public var estimatedTax: Money?
+    /// The tax saved if every remaining headroom were used. Computed as one calculation
+    /// against the combined headroom, because summing the per-relief figures would
+    /// double-count the top band. `nil` when income is unknown.
+    public var totalOpportunity: Money?
 
     /// Every assessment including nested sub-limits, depth-first.
     ///
