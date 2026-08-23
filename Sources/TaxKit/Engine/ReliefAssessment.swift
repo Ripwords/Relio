@@ -2,7 +2,7 @@ import Foundation
 
 /// Three-valued, mirroring `PredicateOutcome`. `needsInfo` is the case that earns its
 /// keep: treating an unanswered question as ineligibility silently costs the user money.
-public enum Eligibility: Hashable, Sendable {
+public enum Eligibility: Hashable, Sendable, Codable {
     case eligible
     case ineligible(reasons: [String])
     case needsInfo(questions: [ProfileQuestion])
@@ -11,8 +11,8 @@ public enum Eligibility: Hashable, Sendable {
 }
 
 /// Whether a claim carries the documents LHDN asks for.
-public struct RequirementCheck: Hashable, Sendable {
-    public enum Status: Hashable, Sendable {
+public struct RequirementCheck: Hashable, Sendable, Codable {
+    public enum Status: Hashable, Sendable, Codable {
         case satisfied
         /// The entries that are missing this document kind.
         case missing(entryIDs: [UUID])
@@ -25,7 +25,7 @@ public struct RequirementCheck: Hashable, Sendable {
 }
 
 /// What the user can claim under one relief, and what it is worth.
-public struct ReliefAssessment: Hashable, Sendable, Identifiable {
+public struct ReliefAssessment: Hashable, Sendable, Identifiable, Codable {
     public var code: ReliefCode
     public var name: String
     /// The effective ceiling for this user, after tier selection and per-dependent
@@ -57,8 +57,8 @@ public struct ReliefAssessment: Hashable, Sendable, Identifiable {
 
 /// An entry whose code no rule in this year matches. Surfaced so the UI can show an
 /// actionable amber row instead of dropping the claim.
-public struct UnresolvedEntry: Hashable, Sendable {
-    public enum Reason: Hashable, Sendable {
+public struct UnresolvedEntry: Hashable, Sendable, Codable {
+    public enum Reason: Hashable, Sendable, Codable {
         case retired(supersededBy: ReliefCode?)
         case unknownInThisYear
     }
@@ -69,7 +69,7 @@ public struct UnresolvedEntry: Hashable, Sendable {
     public var reason: Reason
 }
 
-public struct EvaluationResult: Hashable, Sendable {
+public struct EvaluationResult: Hashable, Sendable, Codable {
     public var yearOfAssessment: Int
     /// Top-level reliefs; sub-limits hang off their parents' `children`.
     public var assessments: [ReliefAssessment]
