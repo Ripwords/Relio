@@ -4506,6 +4506,39 @@ import Foundation
                      to: try loader.ruleSet(for: 2025)).isEmpty)
     }
 
+    @Test("lines with equal magnitude are ordered deterministically")
+    func tiesAreBrokenByCode() throws {
+        // DISABLED_SELF and DISABLED_SPOUSE both rose by exactly RM 1,000 in YA2025,
+        // so an OKU household produces two lines of identical magnitude.
+        var year = Fixture.year(2025, gross: Money(ringgit: 110_000))
+        year.selfIsDisabled = true
+        year.spouseIsDisabled = true
+        year.maritalStatus = .married
+
+        func order() throws -> [String] {
+            counterfactual(entries: [],
+                           year: year,
+                           under: try loader.ruleSet(for: 2025),
+                           versus: try loader.ruleSet(for: 2024))
+                .lines.map(\.code.rawValue)
+        }
+        let first = try order()
+        #expect(try order() == first, "ordering must be reproducible")
+
+        let tied = first.filter {
+            $0 == "DISABLED_SELF" || $0 == "DISABLED_SPOUSE"
+        }
+        #expect(tied == ["DISABLED_SELF", "DISABLED_SPOUSE"],
+                "equal magnitudes must fall back to code order")
+    }
+
+    @Test("an unshipped year throws the specific noRulesForYear case")
+    func unknownYearThrowsSpecificCase() {
+        #expect(throws: RuleSetLoadingError.noRulesForYear(1999)) {
+            try loader.ruleSet(for: 1999)
+        }
+    }
+
     @Test("the counterfactual prices this year's spending under last year's rules")
     func counterfactualPricesTheChange() throws {
         var year = Fixture.year(2025, gross: Money(ringgit: 110_000))
@@ -4635,7 +4668,15 @@ public func diff(from earlier: RuleSet, to later: RuleSet) -> [ReliefDelta] {
                                       from: old.cap.nominalCeiling,
                                       to: new.cap.nominalCeiling))
         }
-        if old.eligibility != new.eligibility || old.requiredDocuments != new.requiredDocuments {
+        // A tiered cap can change without its ceiling moving — a Budget that adjusts the
+        // RM 500,000-to-750,000 housing band while leaving the top tier alone. Comparing
+        // only `nominalCeiling` would report no change at all, so the restructure is
+        // reported as a conditions change instead.
+        let capStructureChanged = old.cap != new.cap
+            && old.cap.nominalCeiling == new.cap.nominalCeiling
+        if capStructureChanged
+            || old.eligibility != new.eligibility
+            || old.requiredDocuments != new.requiredDocuments {
             deltas.append(.conditionsChanged(code, name: new.name,
                                              from: old.notes, to: new.notes))
         }
@@ -4675,7 +4716,9 @@ public struct CounterfactualResult: Hashable, Sendable {
     /// Only reliefs whose allowed amount actually differs, biggest difference first.
     public var lines: [CounterfactualLine]
     public var totalReliefDifference: Money
-    /// Difference in estimated tax. `nil` when income is unknown.
+    /// Difference in estimated tax, `comparison - baseline`. Positive means the
+    /// baseline year leaves the user better off — the same convention as `difference`
+    /// and `totalReliefDifference`. `nil` when income is unknown.
     public var taxDifference: Money?
 }
 
@@ -4719,7 +4762,15 @@ public func counterfactual(entries: [EntrySnapshot],
             difference: Money.zero - assessment.allowed))
     }
 
-    lines.sort { abs($0.difference.sen) > abs($1.difference.sen) }
+    // Swift's sort is not stable, and ties are reachable: DISABLED_SELF,
+    // DISABLED_SPOUSE and INSURANCE_EDU_MEDICAL all moved by exactly RM 1,000 between
+    // YA2024 and YA2025. Without a tie-break the Compare screen could reorder between
+    // launches, so equal magnitudes fall back to the code.
+    lines.sort {
+        abs($0.difference.sen) == abs($1.difference.sen)
+            ? $0.code.rawValue < $1.code.rawValue
+            : abs($0.difference.sen) > abs($1.difference.sen)
+    }
 
     var taxDifference: Money?
     if let baseTax = base.estimatedTax, let otherTax = other.estimatedTax {
