@@ -3615,7 +3615,7 @@ private func effectiveCap(_ cap: Cap, year: TaxYearSnapshot) -> Money {
 - [ ] **Step 6: Run the test and confirm it passes**
 
 Run: `swift test --filter EvaluatorCapTests`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 7: Commit**
 
