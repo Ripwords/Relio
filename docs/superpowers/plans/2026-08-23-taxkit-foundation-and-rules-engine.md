@@ -968,7 +968,7 @@ git commit -m "feat: add ReliefCode with a command-plugin generator"
   - `DocumentKind` — `.officialReceipt`, `.taxInvoice`, `.eInvoice`, `.medicalCertificate`,
     `.referralLetter`, `.insuranceStatement`, `.epfStatement`, `.bankStatement`, `.other`.
   - `Cap` — `.fixed(Money)`, `.perDependent(Money)`,
-    `.tiered(on: TieredFact, tiers: [Tier])`, `.none`; plus `Tier`, `TieredFact`.
+    `.tiered(on: TieredFact, tiers: [Tier])`; plus `Tier`, `TieredFact`.
   - `ReliefRule` — `code`, `name`, `cap`, `automatic`, `requiredDocuments`, `children`,
     `sourceURL`, `unverified`, `notes`. Task 7 adds the `eligibility` property.
   - `RuleSet` — `yearOfAssessment`, `revision`, `verifiedOn`, `sourceURL`, `brackets`,
@@ -1194,11 +1194,9 @@ public enum Cap: Codable, Hashable, Sendable {
     case perDependent(Money)
     /// A ceiling selected by a fact about the claim.
     case tiered(on: TieredFact, tiers: [Tier])
-    /// No ceiling. Reserved; no shipped relief uses it.
-    case none
 
     private enum CodingKeys: String, CodingKey { case kind, sen, on, tiers }
-    private enum Kind: String, Codable { case fixed, perDependent, tiered, none }
+    private enum Kind: String, Codable { case fixed, perDependent, tiered }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1210,8 +1208,6 @@ public enum Cap: Codable, Hashable, Sendable {
         case .tiered:
             self = .tiered(on: try c.decode(TieredFact.self, forKey: .on),
                            tiers: try c.decode([Tier].self, forKey: .tiers))
-        case .none:
-            self = .none
         }
     }
 
@@ -1228,8 +1224,6 @@ public enum Cap: Codable, Hashable, Sendable {
             try c.encode(Kind.tiered, forKey: .kind)
             try c.encode(fact, forKey: .on)
             try c.encode(tiers, forKey: .tiers)
-        case .none:
-            try c.encode(Kind.none, forKey: .kind)
         }
     }
 
@@ -1241,8 +1235,6 @@ public enum Cap: Codable, Hashable, Sendable {
             return amount
         case .tiered(_, let tiers):
             return tiers.map(\.amount).max() ?? .zero
-        case .none:
-            return Money(sen: .max)
         }
     }
 }
@@ -3434,8 +3426,6 @@ private func effectiveCap(_ cap: Cap, year: TaxYearSnapshot) -> Money {
         return amount
     case .tiered(_, let tiers):
         return tiers.map(\.amount).max() ?? .zero
-    case .none:
-        return Money(sen: .max)
     }
 }
 ```
@@ -3591,9 +3581,6 @@ private func effectiveCap(_ cap: Cap,
     switch cap {
     case .fixed(let amount):
         return (amount, [])
-
-    case .none:
-        return (Money(sen: .max), [])
 
     case .perDependent(let perChild):
         // Each dependent is tested against this rule's own predicate, so
