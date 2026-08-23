@@ -3618,7 +3618,16 @@ private func assess(rule: ReliefRule,
     // An automatic relief is granted in full once it is eligible — LHDN gives the
     // RM 9,000 individual relief to every resident, and child and spouse reliefs follow
     // from the household, not from a receipt.
-    let granted = rule.automatic && eligibility.isEligible
+    // A per-dependent cap has already excluded any dependent whose facts are
+    // incomplete, so an outstanding question about one child must not withhold the
+    // relief the household has already earned for another. Granting here cannot
+    // overstate: the ambiguous dependent contributed nothing to `cap`.
+    //
+    // This exemption is only safe for per-dependent caps. A fixed automatic relief is
+    // gated by its predicate as a whole — granting DISABLED_SELF while we still do not
+    // know whether the taxpayer is registered disabled would overstate relief outright.
+    let isPerDependentCap = if case .perDependent = rule.cap { true } else { false }
+    let granted = rule.automatic && (eligibility.isEligible || isPerDependentCap)
     let claimed = granted ? cap : claimedTotal
     // Floored as well as capped: `clamped(to:)` only bounds the top, and a negative
     // entry (SSPN's net deposit can be negative) would otherwise push headroom above
@@ -4034,6 +4043,41 @@ import Foundation
             evaluate(ruleSet: try Fixture.rules(), year: Fixture.year(), entries: [])
                 .assessment(for: ReliefCode("MEDICAL_SERIOUS")))
         #expect(medical.requirements.allSatisfy(\.isSatisfied))
+    }
+
+    @Test("one dependent's missing details do not withhold another's relief")
+    func partialDependentFactsStillGrant() throws {
+        // A parent records two children but has not entered a birth date for one.
+        let known = DependentSnapshot(name: "Aisyah", ageAtYearEnd: 7)
+        let vague = DependentSnapshot(name: "Unknown", ageAtYearEnd: nil)
+        let result = evaluate(ruleSet: try Fixture.rules(),
+                              year: Fixture.year(dependents: [known, vague]),
+                              entries: [])
+
+        let child = try #require(result.assessment(for: ReliefCode("CHILD_UNDER_18")))
+        // The RM 2,000 earned by the known child is granted...
+        #expect(child.cap == Money(ringgit: 2000))
+        #expect(child.allowed == Money(ringgit: 2000))
+        // ...and the app still asks about the other one.
+        guard case .needsInfo(let questions) = child.eligibility else {
+            Issue.record("expected .needsInfo alongside the grant, got \(child.eligibility)")
+            return
+        }
+        #expect(questions.contains(.dependentDetails))
+    }
+
+    @Test("a fixed automatic relief is NOT granted while its own question is open")
+    func fixedAutomaticWaitsForItsAnswer() throws {
+        // Contrast with the per-dependent case above: granting this without knowing
+        // whether the taxpayer is registered disabled would overstate relief.
+        let disabled = try #require(
+            evaluate(ruleSet: try Fixture.rules(), year: Fixture.year(), entries: [])
+                .assessment(for: ReliefCode("DISABLED_SELF")))
+        guard case .needsInfo = disabled.eligibility else {
+            Issue.record("expected .needsInfo, got \(disabled.eligibility)"); return
+        }
+        #expect(disabled.allowed == .zero)
+        #expect(disabled.headroom == Money(ringgit: 7000))
     }
 
     @Test("cap questions and predicate questions merge into one needsInfo list")
