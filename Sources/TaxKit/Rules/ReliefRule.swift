@@ -10,6 +10,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     /// the household rather than from a purchase.
     public let automatic: Bool
     public let requiredDocuments: [DocumentKind]
+    public let eligibility: EligibilityPredicate?
     /// Sub-limits. A child's claims also count against this relief's cap.
     public let children: [ReliefRule]
     public let sourceURL: URL
@@ -19,7 +20,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
     public let notes: String?
 
     private enum CodingKeys: String, CodingKey {
-        case code, name, cap, automatic, requiredDocuments, children, sourceURL, unverified, notes
+        case code, name, cap, automatic, requiredDocuments, eligibility, children, sourceURL, unverified, notes
     }
 
     public init(from decoder: any Decoder) throws {
@@ -29,6 +30,7 @@ public struct ReliefRule: Codable, Hashable, Sendable {
         self.cap = try c.decode(Cap.self, forKey: .cap)
         self.automatic = try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false
         self.requiredDocuments = try c.decodeIfPresent([DocumentKind].self, forKey: .requiredDocuments) ?? []
+        self.eligibility = try c.decodeIfPresent(EligibilityPredicate.self, forKey: .eligibility)
         self.children = try c.decodeIfPresent([ReliefRule].self, forKey: .children) ?? []
         self.sourceURL = try c.decode(URL.self, forKey: .sourceURL)
         self.unverified = try c.decodeIfPresent(Bool.self, forKey: .unverified) ?? false
