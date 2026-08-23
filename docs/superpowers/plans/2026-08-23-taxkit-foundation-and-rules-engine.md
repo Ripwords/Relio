@@ -2162,8 +2162,11 @@ Two modelling notes:
   is why `Cap` has no separate shared-pool case.
 - **LHDN items 6, 7 and 8** are three rows that all draw on one RM 10,000 ceiling, so they
   are modelled as one parent (`MEDICAL_SERIOUS`) with four sub-limits.
-- **Nine reliefs are `automatic`**: the individual RM 9,000, spouse/alimony, the two
-  disabled-person reliefs, and the five child reliefs. LHDN grants these from the
+- **Eight reliefs are `automatic`**: the individual RM 9,000, the two disabled-person
+  reliefs, and the five child reliefs. Spouse/alimony is deliberately NOT automatic —
+  LHDN item 14 covers both spouse relief and alimony to a former wife, and alimony is only
+  claimable if actually paid under a formal agreement, so auto-granting RM 4,000 to every
+  eligible household would overstate relief for divorced claimants. LHDN grants these from the
   household rather than from a purchase, so the engine allows the full cap when the
   relief is eligible instead of waiting for an entry. The two disabled-person reliefs
   carry `selfIsDisabled` / `spouseIsDisabled` predicates so they are not handed to every
@@ -2264,6 +2267,65 @@ import Foundation
         }
     }
 
+    @Test("the whole band table is pinned to LHDN's published figures",
+          arguments: shippedYears)
+    func bandTableIsPinnedLiterally(year: Int) throws {
+        // Asserting the full table, not just internal consistency: a uniform shift of
+        // every cumulative base is self-consistent but wrong.
+        let expected: [(lower: Int, upper: Int?, rate: String, base: Int)] = [
+            (0,         500000,    "0",    0),
+            (500000,    2000000,   "0.01", 0),
+            (2000000,   3500000,   "0.03", 15000),
+            (3500000,   5000000,   "0.06", 60000),
+            (5000000,   7000000,   "0.11", 150000),
+            (7000000,   10000000,  "0.19", 370000),
+            (10000000,  40000000,  "0.25", 940000),
+            (40000000,  60000000,  "0.26", 8440000),
+            (60000000,  200000000, "0.28", 13640000),
+            (200000000, nil,       "0.30", 52840000)
+        ]
+        let bands = try Self.load(year).brackets.bands
+        #expect(bands.count == expected.count)
+        for (index, want) in expected.enumerated() {
+            let got = bands[index]
+            #expect(got.lowerBound == Money(sen: want.lower), "band \(index) lower bound")
+            #expect(got.upperBound == want.upper.map(Money.init(sen:)), "band \(index) upper bound")
+            #expect(got.rate == Decimal(string: want.rate)!, "band \(index) rate")
+            #expect(got.cumulativeBase == Money(sen: want.base), "band \(index) cumulative base")
+        }
+    }
+
+    @Test("every YA2025 cap is pinned to LHDN's published figure")
+    func everyCapIsPinned() throws {
+        // The spot test covered 6 of 32. The other 26 could have been silently wrong.
+        let expected: [String: Int] = [
+            "SELF_AND_DEPENDENTS": 900000, "PARENTS_MEDICAL": 800000,
+            "PARENTS_CHECKUP": 100000, "DISABLED_EQUIPMENT": 600000,
+            "DISABLED_SELF": 700000, "EDUCATION_SELF": 700000,
+            "EDUCATION_UPSKILL": 200000, "MEDICAL_SERIOUS": 1000000,
+            "MEDICAL_VACCINATION": 100000, "MEDICAL_DENTAL": 100000,
+            "MEDICAL_CHECKUP": 100000, "MEDICAL_LEARNDIS": 600000,
+            "LIFESTYLE": 250000, "LIFESTYLE_SPORTS": 100000,
+            "BREASTFEEDING": 100000, "CHILDCARE": 300000, "SSPN": 800000,
+            "SPOUSE_ALIMONY": 400000, "DISABLED_SPOUSE": 600000,
+            "CHILD_UNDER_18": 200000, "CHILD_PRE_TERTIARY": 200000,
+            "CHILD_TERTIARY": 800000, "CHILD_DISABLED": 800000,
+            "CHILD_DISABLED_TERTIARY": 800000, "INSURANCE_LIFE_EPF": 700000,
+            "EPF_CONTRIBUTION": 400000, "LIFE_INSURANCE": 300000,
+            "PRS_ANNUITY": 300000, "INSURANCE_EDU_MEDICAL": 400000,
+            "SOCSO_EIS": 35000, "EV_CHARGING": 250000,
+            "HOUSING_LOAN_INTEREST": 700000
+        ]
+        let reliefs = try Self.load(2025).allReliefs
+        #expect(reliefs.count == expected.count, "relief node count changed")
+        for relief in reliefs {
+            let want = try #require(expected[relief.code.rawValue],
+                                    "\(relief.code) is not in the pinned table")
+            #expect(relief.cap.nominalCeiling == Money(sen: want),
+                    "\(relief.code) cap is \(relief.cap.nominalCeiling.formatted())")
+        }
+    }
+
     @Test("YA2025 carries the reliefs LHDN publishes")
     func ya2025Spot() throws {
         let rules = try Self.load(2025)
@@ -2282,7 +2344,7 @@ import Foundation
             .filter(\.automatic).map(\.code.rawValue))
         // The automatic set is identical in all three shipped years.
         #expect(automatic == [
-            "SELF_AND_DEPENDENTS", "SPOUSE_ALIMONY", "DISABLED_SELF", "DISABLED_SPOUSE",
+            "SELF_AND_DEPENDENTS", "DISABLED_SELF", "DISABLED_SPOUSE",
             "CHILD_UNDER_18", "CHILD_PRE_TERTIARY", "CHILD_TERTIARY",
             "CHILD_DISABLED", "CHILD_DISABLED_TERTIARY"
         ])
@@ -2451,11 +2513,12 @@ full URL at every occurrence; JSON has no variables.
 
     { "code": "SPOUSE_ALIMONY", "name": "Spouse, or alimony to a former wife",
       "cap": { "kind": "fixed", "sen": 400000 },
-      "automatic": true,
       "eligibility": { "op": "any", "of": [
         { "op": "spouseHasIncome", "is": false },
-        { "op": "assessmentType", "is": "joint" }
+        { "op": "assessmentType", "is": "joint" },
+        { "op": "maritalStatus", "in": ["divorced"] }
       ] },
+      "notes": "LHDN item 14 covers both spouse relief and alimony to a former wife. Not automatic: alimony must actually have been paid under a formal agreement, so the amount is entered rather than granted.",
       "sourceURL": "https://www.hasil.gov.my/individu/pelepasan-cukai/" },
 
     { "code": "DISABLED_SPOUSE", "name": "Disabled spouse",
@@ -3803,6 +3866,7 @@ import Foundation
         var year = Fixture.year()
         year.spouseHasIncome = true
         year.assessmentType = .separate
+        year.maritalStatus = .married   // closes the alimony branch too
         let spouse = try #require(
             evaluate(ruleSet: try Fixture.rules(), year: year, entries: [])
                 .assessment(for: ReliefCode("SPOUSE_ALIMONY")))
