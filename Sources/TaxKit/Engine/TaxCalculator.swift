@@ -35,7 +35,11 @@ extension BracketTable {
     /// home screen, so the shortcut is not acceptable.
     public func taxSaved(reducing chargeable: Money, by relief: Money) -> Money {
         let before = max(chargeable, .zero)
-        let after = max(before - relief, .zero)
+        // A relief can legitimately arrive negative: SSPN is a *net* deposit, so a year
+        // with more withdrawals than deposits produces one. A negative relief saves
+        // nothing — it must never surface as a negative "saving" on the home screen.
+        let claimed = max(relief, .zero)
+        let after = max(before - claimed, .zero)
         return tax(on: before) - tax(on: after)
     }
 }

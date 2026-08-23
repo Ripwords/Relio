@@ -90,4 +90,12 @@ import Foundation
         let t = try Self.table()
         #expect(t.tax(on: Money(sen: -5_000)) == .zero)
     }
+
+    @Test("a negative relief saves nothing rather than adding tax")
+    func negativeReliefSavesNothing() throws {
+        let t = try Self.table()
+        // SSPN is a net deposit, so a withdrawal-heavy year really can be negative.
+        #expect(t.taxSaved(reducing: Money(ringgit: 92_400),
+                           by: Money(ringgit: -2_000)) == .zero)
+    }
 }
