@@ -37,6 +37,11 @@ public final class TaxYear {
     public var updatedAt: Date = Date.distantPast
     public var deletedAt: Date?
 
+    /// Cascade so deleting a year's record takes its entries with it. Note that nothing
+    /// in the app hard-deletes a year; this is the safety net for a container reset.
+    @Relationship(deleteRule: .cascade, inverse: \ReliefEntry.taxYear)
+    public var entries: [ReliefEntry]?
+
     public init(year: Int = 0) {
         self.year = year
     }
@@ -80,4 +85,9 @@ extension TaxYear {
     }
 
     public var isLive: Bool { deletedAt == nil }
+
+    /// Entries that have not been soft-deleted or merged away.
+    public var liveEntries: [ReliefEntry] {
+        (entries ?? []).filter { $0.deletedAt == nil }
+    }
 }

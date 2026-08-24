@@ -36,7 +36,9 @@ enum SchemaInvariants {
 
     /// Every `@Model` type in the package. Task 2 and Task 3 append to this list; the
     /// single source of truth for it becomes `SchemaV1.models` in Task 3.
-    static let allModels: [any PersistentModel.Type] = [TaxYear.self, Dependent.self]
+    static let allModels: [any PersistentModel.Type] = [
+        TaxYear.self, Dependent.self, ReliefEntry.self, Document.self, DocumentFile.self
+    ]
 
     @Test("every model is CloudKit-mirroring-safe")
     func modelsAreMirroringSafe() {
