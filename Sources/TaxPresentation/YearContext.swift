@@ -74,6 +74,12 @@ public final class YearContext {
         await load()
     }
 
+    /// The rulebook entry behind a code, for the few decisions the evaluation result
+    /// does not carry — `automatic` chief among them.
+    public func rule(for code: ReliefCode) -> ReliefRule? {
+        (try? loader.ruleSet(for: year))?.relief(for: code)
+    }
+
     public func switchYear(to newYear: Int) async {
         // A no-op switch to the year already showing must not churn `updatedAt` on the
         // `UserPreferences` singleton — the same synced row the reconciliation sweep and
