@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 import TaxKit
-import TaxData
+@testable import TaxData
 @testable import TaxPresentation
 
 /// Builders shared by every presentation suite.
@@ -39,6 +39,18 @@ enum PresentationFixture {
     @MainActor
     static func context(_ store: TaxStore, year: Int = 2025) -> YearContext {
         YearContext(store: store, loader: BundledRuleSetLoader(), year: year)
+    }
+}
+
+/// Throws a fixed `RuleSetLoadingError` regardless of the year asked for, so a test can
+/// force `YearContext` down the `.malformed` or `.noRulesForYear` path on demand — the
+/// `RuleSetLoading` protocol exists precisely so a fake can be substituted here.
+private struct FailingRuleSetLoader: RuleSetLoading {
+    let availableYears: [Int]
+    let error: RuleSetLoadingError
+
+    func ruleSet(for year: Int) throws -> RuleSet {
+        throw error
     }
 }
 
@@ -127,5 +139,86 @@ enum PresentationFixture {
         await context.switchYear(to: 2024)
 
         #expect(try await store.preferences().lastViewedYear == 2024)
+    }
+
+    @Test("a malformed rulebook is reported differently from an unshipped year")
+    func malformedRulebookDiffersFromUnshippedYear() async throws {
+        let store = try await PresentationFixture.store()
+
+        let malformedLoader = FailingRuleSetLoader(
+            availableYears: [2025],
+            error: .malformed(year: 2025, underlying: "truncated JSON"))
+        let malformedContext = YearContext(store: store, loader: malformedLoader, year: 2025)
+        await malformedContext.load()
+
+        #expect(malformedContext.result == nil)
+        guard case .unavailable(let malformedMessage) = malformedContext.status else {
+            Issue.record("expected .unavailable, got \(malformedContext.status)")
+            return
+        }
+        #expect(malformedMessage.contains("2025"))
+
+        let unshippedLoader = FailingRuleSetLoader(
+            availableYears: [2025],
+            error: .noRulesForYear(2025))
+        let unshippedContext = YearContext(store: store, loader: unshippedLoader, year: 2025)
+        await unshippedContext.load()
+
+        guard case .unavailable(let unshippedMessage) = unshippedContext.status else {
+            Issue.record("expected .unavailable, got \(unshippedContext.status)")
+            return
+        }
+        #expect(unshippedMessage.contains("2025"))
+
+        // A corrupt rulebook must not read like a calm "not shipped yet" — the user
+        // would otherwise wait for a Budget that has already happened.
+        #expect(malformedMessage != unshippedMessage)
+    }
+
+    @Test("switching to an unavailable year and back leaves entries and figures intact")
+    func roundTripThroughUnavailableYear() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store)
+        await context.load()
+
+        let originalLifestyle = try #require(
+            context.result?.assessment(for: ReliefCode("LIFESTYLE"))?.claimed)
+        let originalMedical = try #require(
+            context.result?.assessment(for: ReliefCode("MEDICAL_CHECKUP"))?.claimed)
+        let originalSSPN = try #require(
+            context.result?.assessment(for: ReliefCode("SSPN"))?.claimed)
+
+        await context.switchYear(to: 2026)
+        #expect(context.result == nil)
+        guard case .unavailable = context.status else {
+            Issue.record("expected .unavailable, got \(context.status)")
+            return
+        }
+
+        await context.switchYear(to: 2025)
+        #expect(context.status == .ready)
+        #expect(context.result?.assessment(for: ReliefCode("LIFESTYLE"))?.claimed == originalLifestyle)
+        #expect(context.result?.assessment(for: ReliefCode("MEDICAL_CHECKUP"))?.claimed == originalMedical)
+        #expect(context.result?.assessment(for: ReliefCode("SSPN"))?.claimed == originalSSPN)
+    }
+
+    @Test("a no-op switch to the current ready year does not re-stamp preferences")
+    func noOpSwitchDoesNotStampPreferences() async throws {
+        let store = try await PresentationFixture.store()
+        let context = PresentationFixture.context(store)
+        await context.load()
+
+        await context.switchYear(to: 2024)
+        let stampAfterRealSwitch = try #require(
+            try await store.allPreferencesUpdatedAtForTesting().first)
+
+        // Advance the clock so a re-stamp, if it happened, would be observable.
+        await store.useClock { PresentationFixture.epoch.addingTimeInterval(3_600) }
+        await context.switchYear(to: 2024)
+        let stampAfterNoOp = try #require(
+            try await store.allPreferencesUpdatedAtForTesting().first)
+
+        #expect(stampAfterNoOp == stampAfterRealSwitch)
     }
 }
