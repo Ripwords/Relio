@@ -307,6 +307,51 @@ import Foundation
         }
     }
 
+    /// The claimant counterpart of `noNotOverDependentFacts`.
+    ///
+    /// A claimant predicate does not gate the household; it scopes WHO an entry may be
+    /// for, and the entry editor reads it directly to build the set of claimants it will
+    /// admit (`EntryEditorViewModel.admittedClaimantsByCode`, which walks the tree for
+    /// `.claimant(in:)` nodes and inherits them down to sub-limits). That walk collects
+    /// the listed claimants whatever encloses them, so a `.not` around one would invert
+    /// the meaning for the engine while the editor went on offering exactly the
+    /// claimants the rule now excludes — the user would be steered into the one choice
+    /// guaranteed to lose them the relief. Zero `not` ops exist over claimant predicates
+    /// in any shipped rulebook, so this guard costs nothing today and refuses the
+    /// construct until both sides agree on what it means.
+    @Test("no shipped rulebook wraps a claimant predicate in `not`", arguments: shippedYears)
+    func noNotOverClaimantPredicates(year: Int) throws {
+        for relief in try Self.load(year).allReliefs {
+            guard let predicate = relief.eligibility else { continue }
+            #expect(!Self.containsNotOverClaimant(predicate),
+                    "\(year) \(relief.code): `not` over a claimant predicate has undefined semantics")
+        }
+    }
+
+    /// True when any `.not` in the tree has a claimant predicate anywhere beneath it.
+    static func containsNotOverClaimant(_ predicate: EligibilityPredicate) -> Bool {
+        func mentionsClaimant(_ node: EligibilityPredicate) -> Bool {
+            switch node {
+            case .claimant:
+                return true
+            case .not(let inner):
+                return mentionsClaimant(inner)
+            case .all(let children), .any(let children):
+                return children.contains(where: mentionsClaimant)
+            default:
+                return false
+            }
+        }
+        switch predicate {
+        case .not(let inner):
+            return mentionsClaimant(inner)
+        case .all(let children), .any(let children):
+            return children.contains(where: containsNotOverClaimant)
+        default:
+            return false
+        }
+    }
+
     /// True when any `.not` in the tree has a dependent fact anywhere beneath it.
     static func containsNotOverDependentFact(_ predicate: EligibilityPredicate) -> Bool {
         func mentionsDependent(_ node: EligibilityPredicate) -> Bool {
