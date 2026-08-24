@@ -171,6 +171,12 @@ public actor TaxStore {
         row.note = draft.note
         row.taxYear = year
         row.deletedAt = nil
+        // Editing an entry must revive it exactly as `restoreEntry` does: a row Task 6's
+        // reconciliation sweep merged away still carries `mergedInto` pointing at the
+        // survivor it lost to, and if `save` left that in place the revived row would be
+        // live while still flagged as merged into something else. Both revival paths
+        // must agree.
+        row.mergedInto = nil
         row.updatedAt = stamp
         year.updatedAt = stamp
 
@@ -178,11 +184,15 @@ public actor TaxStore {
         return identifier
     }
 
-    /// Idempotent: deleting an id that is absent or already deleted is a no-op. The same
-    /// delete can arrive twice — an undo toast tapped as a sync lands — and the second
-    /// one must not crash a screen the user is looking at.
+    /// Idempotent: deleting an id that is absent or already deleted is a true no-op — it
+    /// does not re-stamp `updatedAt`. The same delete can arrive twice (an undo toast
+    /// tapped as a sync lands), and if the replay re-stamped the row, it would acquire a
+    /// *newer* `updatedAt` than a legitimate concurrent edit or restore on another
+    /// device and wrongly win newest-write-wins. Re-stamping only on the transition into
+    /// deletion is what keeps a delete-vs-edit race from resolving as silent data loss.
     public func softDeleteEntry(id: UUID) throws {
         guard let row = try entryRow(id) else { return }
+        guard row.deletedAt == nil else { return }
         row.deletedAt = now()
         row.updatedAt = now()
         try modelContext.save()
@@ -224,6 +234,10 @@ public actor TaxStore {
     public func softDeleteDependent(id: UUID) throws {
         let descriptor = FetchDescriptor<Dependent>(predicate: #Predicate { $0.id == id })
         guard let row = try modelContext.fetch(descriptor).first else { return }
+        // Same true-no-op guard as `softDeleteEntry`: a replayed delete on an
+        // already-deleted row must not re-stamp it, or it can outrace a concurrent edit
+        // or restore on another device.
+        guard row.deletedAt == nil else { return }
         row.deletedAt = now()
         row.updatedAt = now()
         try modelContext.save()
@@ -232,7 +246,10 @@ public actor TaxStore {
     // MARK: - Preferences
 
     public func savePreferences(_ snapshot: PreferencesSnapshot) throws {
-        let row = try resolvedPreferencesRow() ?? {
+        // `persistingChanges: false`: this method's own `modelContext.save()` below
+        // covers whatever `resolvedPreferencesRow` staged on the losing rows, so there
+        // is no need to force an extra save here.
+        let row = try resolvedPreferencesRow(persistingChanges: false) ?? {
             let fresh = UserPreferences()
             modelContext.insert(fresh)
             return fresh
@@ -249,10 +266,24 @@ public actor TaxStore {
 
     // MARK: - Internals
 
+    /// Total order two devices agree on when more than one live row could otherwise be
+    /// picked: newest `updatedAt` first, ties broken by the model's persistent identity.
+    /// `TaxYear` carries no `id: UUID` of its own (unlike `ReliefEntry`, `Dependent` and
+    /// `UserPreferences`), so `persistentModelID` — itself `Comparable` — stands in for
+    /// it here. Shared by the write path (`fetchOrCreateYear`) and the read path
+    /// (`TaxStore+Reads.yearFacts`) so they can never disagree about which duplicate
+    /// `TaxYear` row is "the" row for a year.
+    static func isNewer(_ lhs: TaxYear, _ rhs: TaxYear) -> Bool {
+        if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
+        return lhs.persistentModelID > rhs.persistentModelID
+    }
+
     private func fetchOrCreateYear(_ year: Int) throws -> TaxYear {
         let descriptor = FetchDescriptor<TaxYear>(
             predicate: #Predicate { $0.year == year && $0.deletedAt == nil })
-        if let existing = try modelContext.fetch(descriptor).first { return existing }
+        if let existing = try modelContext.fetch(descriptor).sorted(by: Self.isNewer).first {
+            return existing
+        }
         let fresh = TaxYear(year: year)
         fresh.updatedAt = now()
         modelContext.insert(fresh)
@@ -268,15 +299,32 @@ public actor TaxStore {
     /// CloudKit cannot enforce a singleton, so two devices first launching offline each
     /// create a preferences row. Keep the newest, soft-delete the rest — the same rule
     /// the reconciliation sweep applies to entries, so both converge the same way.
-    private func resolvedPreferencesRow() throws -> UserPreferences? {
+    ///
+    /// Shared by the write path (`savePreferences`) and the read path
+    /// (`TaxStore+Reads.preferences`) so they can never disagree about which row
+    /// survives — two copies of this ordering rule is exactly what let the loser's
+    /// `updatedAt` go unstamped in one path and not the other. `persistingChanges`
+    /// controls whether the loser edits are flushed immediately: the write path folds
+    /// them into its own subsequent `save()`, but the read path has no other save call
+    /// and must persist here or the loser's stamp never reaches disk.
+    func resolvedPreferencesRow(persistingChanges: Bool) throws -> UserPreferences? {
+        let stamp = now()
         let live = try modelContext
             .fetch(FetchDescriptor<UserPreferences>())
             .filter(\.isLive)
             .sorted { ($0.updatedAt, $0.id.uuidString) > ($1.updatedAt, $1.id.uuidString) }
         guard let survivor = live.first else { return nil }
-        // A losing preferences row carries no `mergedInto`: there is nothing to audit
-        // in a settings row, only a value to keep.
-        for loser in live.dropFirst() { loser.deletedAt = now() }
+        // A losing preferences row carries no `mergedInto`: there is nothing to audit in
+        // a settings row, only a value to keep. It still needs `updatedAt` stamped like
+        // every other write, or the soft delete syncs with a stale stamp and can lose to
+        // an older edit under newest-write-wins.
+        for loser in live.dropFirst() {
+            loser.deletedAt = stamp
+            loser.updatedAt = stamp
+        }
+        if persistingChanges && live.count > 1 {
+            try modelContext.save()
+        }
         return survivor
     }
 }

@@ -15,7 +15,12 @@ extension TaxStore {
     public func yearFacts(for year: Int) throws -> YearFacts {
         let descriptor = FetchDescriptor<TaxYear>(
             predicate: #Predicate { $0.year == year && $0.deletedAt == nil })
-        guard let row = try modelContext.fetch(descriptor).first else { return YearFacts() }
+        // Two devices first launching offline can each create a live `TaxYear` row for
+        // the same year; `TaxStore.isNewer` is the same total order `fetchOrCreateYear`
+        // uses, so the read and write paths agree on which row is "the" row.
+        guard let row = try modelContext.fetch(descriptor).sorted(by: TaxStore.isNewer).first else {
+            return YearFacts()
+        }
 
         var facts = YearFacts()
         facts.grossIncome = row.grossIncome
@@ -65,7 +70,12 @@ extension TaxStore {
     }
 
     public func preferences() throws -> PreferencesSnapshot {
-        guard let row = try resolvedPreferencesRowForReading() else { return PreferencesSnapshot() }
+        // `persistingChanges: true`: unlike `savePreferences`, this call has no
+        // subsequent `modelContext.save()`, so any loser rows the resolver stamped
+        // must be flushed here or the stamp never reaches disk.
+        guard let row = try resolvedPreferencesRow(persistingChanges: true) else {
+            return PreferencesSnapshot()
+        }
         return PreferencesSnapshot(accentName: row.accentName,
                                    assistantEnabled: row.assistantEnabled,
                                    captureQuality: row.captureQuality,
@@ -89,17 +99,6 @@ extension TaxStore {
         draft.documentKinds = row.documentKinds
         return draft
     }
-
-    private func resolvedPreferencesRowForReading() throws -> UserPreferences? {
-        let live = try modelContext
-            .fetch(FetchDescriptor<UserPreferences>())
-            .filter(\.isLive)
-            .sorted { ($0.updatedAt, $0.id.uuidString) > ($1.updatedAt, $1.id.uuidString) }
-        guard let survivor = live.first else { return nil }
-        for loser in live.dropFirst() { loser.deletedAt = now() }
-        if live.count > 1 { try modelContext.save() }
-        return survivor
-    }
 }
 
 // MARK: - Test-only seams
@@ -118,5 +117,68 @@ extension TaxStore {
 
     func livePreferenceRowCount() throws -> Int {
         try modelContext.fetch(FetchDescriptor<UserPreferences>()).filter(\.isLive).count
+    }
+
+    /// Every preferences row's `updatedAt`, live or soft-deleted, so tests can verify a
+    /// losing row in the CloudKit-singleton collision was stamped with the clock active
+    /// when it lost rather than left at its original value. Only the tests call this.
+    func allPreferencesUpdatedAtForTesting() throws -> [Date] {
+        try modelContext.fetch(FetchDescriptor<UserPreferences>()).map(\.updatedAt)
+    }
+
+    /// Reads a `ReliefEntry`'s stamp regardless of `deletedAt`, so tests can verify a
+    /// repeated soft delete did not re-stamp a row the public read API hides once it is
+    /// deleted. Only the tests call this.
+    func entryUpdatedAtForTesting(id: UUID) throws -> Date? {
+        try modelContext.fetch(
+            FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
+        ).first?.updatedAt
+    }
+
+    /// Sets `mergedInto` directly, simulating what Task 6's reconciliation sweep will do
+    /// to a losing row, so tests can verify a subsequent `save` clears it the same way
+    /// `restoreEntry` does. Only the tests call this.
+    func setMergedIntoForTesting(id: UUID, mergedInto: UUID) throws {
+        guard let row = try modelContext.fetch(
+            FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
+        ).first else { return }
+        row.mergedInto = mergedInto
+        try modelContext.save()
+    }
+
+    /// Reads `mergedInto` regardless of `deletedAt`. Only the tests call this.
+    func entryMergedIntoForTesting(id: UUID) throws -> UUID? {
+        try modelContext.fetch(
+            FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
+        ).first?.mergedInto
+    }
+
+    /// Reads a `Dependent`'s stamp regardless of `deletedAt`. Only the tests call this.
+    func dependentUpdatedAtForTesting(id: UUID) throws -> Date? {
+        try modelContext.fetch(
+            FetchDescriptor<Dependent>(predicate: #Predicate { $0.id == id })
+        ).first?.updatedAt
+    }
+
+    /// Creates the collision CloudKit can produce but a single device cannot: a second
+    /// live `TaxYear` row for the same year. Only the tests call this.
+    func insertDuplicateYearForTesting(year: Int, updatedAt: Date, grossIncome: Money?) throws {
+        let row = TaxYear(year: year)
+        row.updatedAt = updatedAt
+        row.grossIncome = grossIncome
+        modelContext.insert(row)
+        try modelContext.save()
+    }
+
+    /// Every live `TaxYear` row's `grossIncome` for a year, ordered by the same
+    /// `TaxStore.isNewer` rule the store applies, so tests can confirm the write and
+    /// read paths pick the same survivor and leave the loser row untouched (Task 4's
+    /// scope explicitly excludes merging duplicate `TaxYear` rows). Only the tests call
+    /// this.
+    func liveYearGrossIncomesForTesting(year: Int) throws -> [Money?] {
+        try modelContext
+            .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.year == year && $0.deletedAt == nil }))
+            .sorted(by: TaxStore.isNewer)
+            .map(\.grossIncome)
     }
 }
