@@ -1,6 +1,6 @@
-# Tax Tracker
+# Relio
 
-A native Apple-platform app that helps Malaysian individual taxpayers track their tax relief — capture receipts, see what each relief still has room for, check that every claim carries the documents LHDN asks for, and compare how the rules changed between years.
+Relio is a native Apple-platform app that helps Malaysian individual taxpayers track their tax relief — capture receipts, see what each relief still has room for, check that every claim carries the documents LHDN asks for, and compare how the rules changed between years.
 
 Account-less and server-less. Data lives on your own devices and in your own iCloud.
 
@@ -17,7 +17,7 @@ The calculation core is built and tested. **There is no user interface yet.**
 
 | | Status |
 |---|---|
-| **TaxKit** — the tax engine | ✅ Done, 136 tests |
+| **TaxKit** — the tax engine behind Relio | ✅ Done, 136 tests |
 | Persistence, iCloud sync, iOS app | Not started |
 | Receipt capture, OCR, MyInvois e-invoices | Not started |
 | On-device AI assistant | Not started |
