@@ -400,6 +400,11 @@ import TaxKit
 @Model
 public final class TaxYear {
 
+    /// Stable across devices, like every other model here. `persistentModelID` is a
+    /// local store identity and is not guaranteed equal on two devices for the same
+    /// logical row, so it cannot serve as the tie-break that makes duplicate resolution
+    /// converge.
+    public var id: UUID = UUID()
     public var year: Int = 0
 
     public var grossIncomeSen: Int?
