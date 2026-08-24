@@ -50,7 +50,17 @@ extension TaxStore {
         return DependentSnapshot(
             id: draft.id,
             name: draft.name,
-            ageAtYearEnd: draft.dateOfBirth.map { AgeCalculator.age(bornOn: $0, atEndOf: year) },
+            // A negative age (bad data entry, or a placeholder DOB after the year end)
+            // must not reach the engine: `dependentAge(max:)` tests `age > max`, and an
+            // unclamped negative would satisfy that check, silently granting an
+            // age-gated relief to a not-yet-born dependent. `ageAtYearEnd` is `Int?`, so
+            // clamping to nil here reaches the engine as an unanswered question — the
+            // relief prompts instead of being silently granted. AgeCalculator itself
+            // stays the honest primitive and returns the real signed difference; this
+            // is the one place the contract is enforced.
+            ageAtYearEnd: draft.dateOfBirth
+                .map { AgeCalculator.age(bornOn: $0, atEndOf: year) }
+                .flatMap { $0 >= 0 ? $0 : nil },
             // nil, not `.none`: an unrecorded education level is an unanswered question,
             // and the engine renders it as a prompt rather than as ineligibility.
             educationLevel: status?.educationLevel,

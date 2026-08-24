@@ -32,11 +32,14 @@ import TaxKit
         #expect(AgeCalculator.age(bornOn: newYearsEve, atEndOf: 2025) == 15)
     }
 
-    @Test("a child born after the year end has no age yet")
-    func unbornIsNegativeFree() {
+    @Test("age is negative before birth")
+    func ageIsNegativeBeforeBirth() {
         let born2027 = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
-        // Rather than a negative age reaching the engine's dependentAge predicate, where
-        // min/max comparisons would produce nonsense, an unborn dependent projects as nil.
+        // AgeCalculator itself is the honest primitive: it returns the real signed
+        // difference and does not clamp. Clamping a negative age to nil is the
+        // projection's contract, not this type's — see
+        // ProjectionTests.unbornDependentProjectsNilAge, which asserts it through
+        // store.project(year:).
         #expect(AgeCalculator.age(bornOn: born2027, atEndOf: 2025) < 0)
     }
 }
@@ -103,6 +106,26 @@ import TaxKit
         _ = try await store.save(DependentDraft(name: "Unknown"))
         let projected = try await store.project(year: 2025)
         #expect(projected.snapshot.dependents.first?.ageAtYearEnd == nil)
+    }
+
+    @Test("an unborn dependent projects a nil age, not a negative one")
+    func unbornDependentProjectsNilAge() async throws {
+        // Regression for the Critical: AgeCalculator.age(bornOn:atEndOf:) returns a
+        // negative number for a birth date after the assessed year's end, and the
+        // engine's dependentAge(max:) predicate tests `age > max` — so an unclamped
+        // negative age (e.g. -1 > 18) reads as `.satisfied` and would silently grant
+        // child relief to a not-yet-born dependent. This must go through
+        // store.project(year:), not just AgeCalculator, because the clamp lives at the
+        // projection seam.
+        let store = try await StoreFixture.store()
+        var unborn = DependentDraft(name: "Unborn")
+        unborn.dateOfBirth = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
+        _ = try await store.save(unborn)
+
+        let projected = try await store.project(year: 2025)
+        let dependent = try #require(projected.snapshot.dependents.first)
+        #expect(dependent.ageAtYearEnd == nil,
+                "a negative age must not reach the engine, where `age > max` would silently satisfy an age-gated relief")
     }
 
     @Test("entries project with their code, amount, claimant and document kinds")
@@ -172,6 +195,18 @@ import TaxKit
         }
         let first = try await store.project(year: 2025).entries.map(\.id)
         let second = try await store.project(year: 2025).entries.map(\.id)
+        #expect(first == second)
+        #expect(first == first.sorted { $0.uuidString < $1.uuidString })
+    }
+
+    @Test("dependent projection is ordered deterministically")
+    func dependentProjectionIsOrdered() async throws {
+        let store = try await StoreFixture.store()
+        for name in ["Farah", "Danish", "Aisyah"] {
+            _ = try await store.save(DependentDraft(name: name))
+        }
+        let first = try await store.project(year: 2025).snapshot.dependents.map(\.id)
+        let second = try await store.project(year: 2025).snapshot.dependents.map(\.id)
         #expect(first == second)
         #expect(first == first.sorted { $0.uuidString < $1.uuidString })
     }
