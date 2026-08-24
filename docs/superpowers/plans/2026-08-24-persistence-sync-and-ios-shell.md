@@ -2070,9 +2070,21 @@ git commit -m "feat: add TaxStore as the only write path, with value types at th
 
 **Why the key is computed, not chosen.** CloudKit forbids unique constraints, so
 duplicates cannot be prevented — spec §6 makes them *detectable and collapsible* instead.
-The key is SHA-256 over `(reliefCode, amount.sen, day, normalised vendor)`. Every
-component must be canonical or two devices produce different keys for the same receipt
-and the sweep in Task 6 never converges:
+The key is SHA-256 over `(reliefCode, year, amount.sen, day, normalised vendor, claimant,
+dependentID)`.
+
+**The key must carry everything that distinguishes one claim from another, not merely what
+distinguishes one receipt from another.** Spec §6.1 lists four components; four is not
+enough, and Task 6's review found why. `Normalisation.day(nil)` is `""` and `spentOn`
+defaults to `nil`, so an undated recurring claim — SSPN, LIFE_INSURANCE, a LIFESTYLE entry
+typed without a receipt date — logged in YA2024 and again in YA2025 would hash identically,
+and the sweep would soft-delete the earlier year's row. A whole year's claim would vanish
+from the user's records. Year, claimant and `dependentID` are therefore part of the key: a
+receipt belongs to exactly one year, one claimant and at most one dependent. Without
+`dependentID`, two children's identical claims in one year collapse into one.
+
+Every component must also be canonical, or two devices produce different keys for the same
+receipt and the sweep in Task 6 never converges:
 
 - **Vendor** is folded for case and diacritics, then reduced to alphanumeric words joined
   by single spaces. `"Guardian Health–KL"`, `"guardian  health kl"` and `"GUARDIAN
@@ -2156,12 +2168,61 @@ import TaxKit
 
     @Test("a different relief code produces a different key")
     func codeChangesKey() {
-        let day = "2025-02-20"
-        let a = DedupeKey.entry(code: ReliefCode("LIFESTYLE"), amountSen: 182_000,
-                                day: day, vendor: "popular")
-        let b = DedupeKey.entry(code: ReliefCode("LIFESTYLE_SPORTS"), amountSen: 182_000,
-                                day: day, vendor: "popular")
+        let a = Self.key(code: "LIFESTYLE")
+        let b = Self.key(code: "LIFESTYLE_SPORTS")
         #expect(a != b)
+    }
+
+    /// One builder so each test varies exactly one component.
+    static func key(code: String = "LIFESTYLE",
+                    year: Int = 2025,
+                    amountSen: Int = 182_000,
+                    day: String = "2025-02-20",
+                    vendor: String = "popular",
+                    claimant: Claimant = .individual,
+                    dependentID: UUID? = nil) -> String {
+        DedupeKey.entry(code: ReliefCode(code), year: year, amountSen: amountSen,
+                        day: day, vendor: vendor, claimant: claimant,
+                        dependentID: dependentID)
+    }
+
+    @Test("the same undated claim in two years is two claims, not one")
+    func yearSeparatesKeys() {
+        // The regression test for a Critical found in Task 6's review. day("") for an
+        // undated entry plus a recurring claim like SSPN meant YA2024 and YA2025 hashed
+        // identically, and the sweep soft-deleted the earlier year's row — a whole year's
+        // claim gone from the user's records.
+        #expect(Self.key(year: 2024, day: "") != Self.key(year: 2025, day: ""))
+    }
+
+    @Test("two dependents' identical claims are two claims")
+    func dependentSeparatesKeys() {
+        let farah = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let danish = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
+        #expect(Self.key(dependentID: farah) != Self.key(dependentID: danish))
+        #expect(Self.key(dependentID: nil) != Self.key(dependentID: farah))
+    }
+
+    @Test("the same spend claimed for a different person is a different claim")
+    func claimantSeparatesKeys() {
+        #expect(Self.key(claimant: .individual) != Self.key(claimant: .spouse))
+    }
+
+    @Test("an undated recurring claim in two years survives the sweep")
+    func recurringClaimAcrossYearsIsNotCollapsed() async throws {
+        let store = try await StoreFixture.store()
+        for year in [2024, 2025] {
+            var draft = StoreFixture.entry("SSPN", 3_000, year: year, spentOn: nil)
+            draft.id = UUID()
+            draft.vendor = ""
+            _ = try await store.save(draft)
+        }
+
+        #expect(try await store.reconcile().isEmpty)
+        // Row counts, not key inequality: this is the assertion that would have caught
+        // the Critical.
+        #expect(try await store.entryDrafts(forYear: 2024).count == 1)
+        #expect(try await store.entryDrafts(forYear: 2025).count == 1)
     }
 
     @Test("components cannot be smuggled across the encoding")
@@ -2294,10 +2355,19 @@ public enum DedupeKey {
     /// record from a future or corrupted build could carry a `|` and defeat exactly the
     /// guarantee this type exists to provide.
     public static func entry(code: ReliefCode,
+                             year: Int,
                              amountSen: Int,
                              day: String,
-                             vendor: String) -> String {
-        hex(of: encode([code.rawValue, String(amountSen), day, vendor]))
+                             vendor: String,
+                             claimant: Claimant,
+                             dependentID: UUID?) -> String {
+        hex(of: encode([code.rawValue,
+                        String(year),
+                        String(amountSen),
+                        day,
+                        vendor,
+                        claimant.rawValue,
+                        dependentID?.uuidString ?? ""]))
     }
 
     /// `["ab", "c"]` becomes `"2:ab|1:c"`. The byte count preceding each component makes
@@ -2351,9 +2421,12 @@ Add to the internals section:
     /// stale, and a flag `#Predicate` needs because it cannot call the engine.
     private func refreshDerivedFields(on row: ReliefEntry) {
         row.dedupeKey = DedupeKey.entry(code: row.reliefCode,
+                                        year: row.taxYear?.year ?? 0,
                                         amountSen: row.amountSen,
                                         day: Normalisation.day(row.spentOn),
-                                        vendor: Normalisation.vendor(row.vendor))
+                                        vendor: Normalisation.vendor(row.vendor),
+                                        claimant: row.claimant,
+                                        dependentID: row.dependentID)
         row.needsDocument = missingRequiredDocument(for: row)
     }
 
@@ -2730,8 +2803,8 @@ extension TaxStore {
     /// change to every other device.
     @discardableResult
     public func reconcile() throws -> [MergeReport] {
-        // Years first: an entry re-pointed at the surviving year must be visible to the
-        // entry pass in the same sweep, or a duplicate could hide behind a duplicate.
+        // Years first: the entry key includes the year, so an entry re-pointed at the
+        // surviving year must be re-keyed before the entry pass groups on it.
         try reconcileYears()
 
         let live = try modelContext.fetch(
@@ -2768,6 +2841,10 @@ extension TaxStore {
             // Dropping a loser's documents would turn a complete claim into one failing
             // its requirement check. The merge must never destroy evidence.
             survivor.documents = documents.sorted { $0.id.uuidString < $1.id.uuidString }
+            // The union changed this entry's attached document kinds, and `needsDocument`
+            // caches exactly that. Without this the survivor keeps reporting a missing
+            // document while holding the certificate it just inherited.
+            refreshDerivedFields(on: survivor)
             survivor.updatedAt = stamp
 
             reports.append(MergeReport(dedupeKey: key,
@@ -2780,12 +2857,19 @@ extension TaxStore {
     }
 
     /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
+    ///
+    /// **Known limitation:** the restored row is a duplicate again, so the next
+    /// `reconcile()` re-merges it. Resolving that needs a "the user decided these are
+    /// different" marker, which belongs with the merge UI in a later plan.
+    ///
+    /// `updatedAt` is deliberately NOT stamped. Stamping it would make the restored loser
+    /// newer than the survivor, so the next sweep would not merely re-merge — it would
+    /// INVERT which row survives, and the user would watch a different entry disappear.
     public func unmerge(entryID: UUID) throws {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
         guard let row = try modelContext.fetch(descriptor).first, row.mergedInto != nil else { return }
         row.mergedInto = nil
         row.deletedAt = nil
-        row.updatedAt = now()
         try modelContext.save()
     }
 
@@ -2814,17 +2898,20 @@ extension TaxStore {
         let stamp = now()
 
         for (_, group) in Dictionary(grouping: live, by: \.year) where group.count > 1 {
-            let ordered = group.sorted { left, right in
-                if left.updatedAt != right.updatedAt { return left.updatedAt > right.updatedAt }
-                return left.id.uuidString > right.id.uuidString
-            }
+            // `TaxStore.isNewer` is the one home for the TaxYear ordering, shared with
+            // `fetchOrCreateYear` and `yearFacts`. If a second copy drifted, this sweep
+            // would soft-delete the row those two consider authoritative.
+            let ordered = group.sorted(by: TaxStore.isNewer)
             guard let survivor = ordered.first else { continue }
 
             for loser in ordered.dropFirst() {
                 Self.fillGaps(on: survivor, from: loser)
                 // Re-point rather than orphan: an entry left hanging off a soft-deleted
                 // year would vanish from the user's own records.
-                for entry in loser.entries ?? [] {
+                // Snapshot first: reassigning `entry.taxYear` mutates the inverse of
+                // the very collection being walked, and a skipped element would orphan
+                // an entry on a soft-deleted year.
+                for entry in Array(loser.entries ?? []) {
                     entry.taxYear = survivor
                     entry.updatedAt = stamp
                 }
