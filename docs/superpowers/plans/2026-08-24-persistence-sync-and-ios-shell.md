@@ -7251,9 +7251,14 @@ one knows to pick it up:
    bundle contents, so adding a rulebook means editing two places. Deferred from Plan 1.
 4. **A missing bundle resource reports `.noRulesForYear`**, indistinguishable from an
    unshipped year. Only reachable via a build defect. Deferred from Plan 1.
-5. **`Document`, `DocumentFile` and `ChatMessage` are models with no producer.** They are
+5. **`recomputeAllDedupeKeys()` has no caller.** The dedupe key's shape changed twice
+   during this plan's execution, so any row persisted under an earlier shape would keep a
+   stale key and be unmatchable against new ones — which silently breaks the sweep.
+   Harmless today because nothing has shipped, but the migration hook must be wired to run
+   once on launch after a key-format change before first release.
+6. **`Document`, `DocumentFile` and `ChatMessage` are models with no producer.** They are
    in schema V1 because the schema must be complete on the first commit; the pipelines
    that fill them are the Documents and Assistant plans.
-6. **Documents tab and Ask tab are placeholders.** Spec §15 items 5 and 7.
-7. **The Compare screen is not built**, though `counterfactual` and `diff` have shipped
+7. **Documents tab and Ask tab are placeholders.** Spec §15 items 5 and 7.
+8. **The Compare screen is not built**, though `counterfactual` and `diff` have shipped
    and are tested since Plan 1. Spec §15 item 6.
