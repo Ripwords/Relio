@@ -16,11 +16,24 @@ public enum DedupeKey {
     /// `("A|1", 23, "D", "V")` and `("A", 1, "23", "D|V")` flatten to the identical
     /// string; `componentsCannotBeSmuggledAcrossTheEncoding` in `DedupeTests` pins
     /// exactly that collision.
-    public static func entry(code: ReliefCode,
+    ///
+    /// `year`, `claimant` and `dependentID` are part of the tuple, not incidental to it:
+    /// a receipt belongs to exactly one Year of Assessment, one claimant and at most one
+    /// dependent. Without them an undated recurring claim — SSPN, LIFE_INSURANCE, a
+    /// LIFESTYLE entry typed with no receipt date, since `Normalisation.day(nil)` is
+    /// `""` and `EntryDraft.spentOn` defaults to `nil` — logged in two different years
+    /// hashes identically, and the sweep would silently soft-delete a whole year's claim.
+    /// The same gap let two children's identical claims in one year collapse into one.
+    /// `dependentID` renders as its `uuidString`, or `""` when the claimant has none.
+    public static func entry(year: Int,
+                             code: ReliefCode,
                              amountSen: Int,
                              day: String,
-                             vendor: String) -> String {
-        hex(of: encode([code.rawValue, String(amountSen), day, vendor]))
+                             vendor: String,
+                             claimant: Claimant,
+                             dependentID: UUID?) -> String {
+        hex(of: encode([String(year), code.rawValue, String(amountSen), day, vendor,
+                        claimant.rawValue, dependentID?.uuidString ?? ""]))
     }
 
     /// SHA-256 of a file's bytes — catches the same photo imported on two devices with

@@ -25,8 +25,10 @@ extension TaxStore {
     /// change to every other device.
     @discardableResult
     public func reconcile() throws -> [MergeReport] {
-        // Years first: an entry re-pointed at the surviving year must be visible to the
-        // entry pass in the same sweep, or a duplicate could hide behind a duplicate.
+        // Years first: now that `year` is part of the dedupe key, an entry re-pointed at
+        // the surviving year must be settled before the entry pass computes any key that
+        // would depend on it, or the two passes could disagree about which year an entry
+        // belongs to within the same sweep.
         try reconcileYears()
 
         let live = try modelContext.fetch(
@@ -64,6 +66,11 @@ extension TaxStore {
             // its requirement check. The merge must never destroy evidence.
             survivor.documents = documents.sorted { $0.id.uuidString < $1.id.uuidString }
             survivor.updatedAt = stamp
+            // needsDocument is cached and only recomputed on a write to the row; without
+            // this the exact case the union exists for — the loser carried the required
+            // document, the survivor did not — would leave the survivor still flagged as
+            // missing it until the user next edits the entry by hand.
+            refreshDerivedFields(on: survivor)
 
             reports.append(MergeReport(dedupeKey: key,
                                        survivorID: survivor.id,
@@ -75,12 +82,25 @@ extension TaxStore {
     }
 
     /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
+    ///
+    /// Known limitation: restoring a loser this way does not change its `dedupeKey`, so
+    /// its group is a duplicate again and the next `reconcile()` will re-merge it.
+    /// Resolving that needs a "the user decided these are different" marker, which
+    /// belongs with the merge UI in a later plan (there is no merge screen yet). Until
+    /// then, `unmerge` is only safe to call when the sweep will not run again before the
+    /// user edits one of the two rows.
+    ///
+    /// Deliberately does NOT stamp `updatedAt`: doing so would make the restored row
+    /// newer than the survivor it lost to, so the next sweep would not merely re-merge
+    /// it — it would invert which row survives, and the user would watch a *different*
+    /// entry disappear each time. Leaving the original stamp in place means a re-merge
+    /// resolves the same way it did before, which is the stable (if still imperfect)
+    /// limitation documented above rather than a destructive surprise.
     public func unmerge(entryID: UUID) throws {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
         guard let row = try modelContext.fetch(descriptor).first, row.mergedInto != nil else { return }
         row.mergedInto = nil
         row.deletedAt = nil
-        row.updatedAt = now()
         try modelContext.save()
     }
 
@@ -109,17 +129,20 @@ extension TaxStore {
         let stamp = now()
 
         for (_, group) in Dictionary(grouping: live, by: \.year) where group.count > 1 {
-            let ordered = group.sorted { left, right in
-                if left.updatedAt != right.updatedAt { return left.updatedAt > right.updatedAt }
-                return left.id.uuidString > right.id.uuidString
-            }
+            // The same total order `fetchOrCreateYear` and `yearFacts` use, not a second
+            // copy of it: if this drifted from `TaxStore.isNewer` the sweep could
+            // soft-delete the row the rest of the store still considers authoritative.
+            let ordered = group.sorted(by: TaxStore.isNewer)
             guard let survivor = ordered.first else { continue }
 
             for loser in ordered.dropFirst() {
                 Self.fillGaps(on: survivor, from: loser)
                 // Re-point rather than orphan: an entry left hanging off a soft-deleted
-                // year would vanish from the user's own records.
-                for entry in loser.entries ?? [] {
+                // year would vanish from the user's own records. Snapshotted into an
+                // array first: `entry.taxYear = survivor` mutates the inverse side of the
+                // relationship we are iterating, and mutating a collection while walking
+                // it is undefined.
+                for entry in Array(loser.entries ?? []) {
                     entry.taxYear = survivor
                     entry.updatedAt = stamp
                 }

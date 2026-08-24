@@ -309,11 +309,18 @@ public actor TaxStore {
 
     /// The two fields the store owns rather than the caller: a key that must never go
     /// stale, and a flag `#Predicate` needs because it cannot call the engine.
-    private func refreshDerivedFields(on row: ReliefEntry) {
-        row.dedupeKey = DedupeKey.entry(code: row.reliefCode,
+    ///
+    /// Not `private`: the reconciliation sweep (`Reconciliation.swift`) calls this on a
+    /// survivor after unioning in a loser's documents, so `needsDocument` reflects what
+    /// the survivor now has rather than going stale until the user next edits the row.
+    func refreshDerivedFields(on row: ReliefEntry) {
+        row.dedupeKey = DedupeKey.entry(year: row.taxYear?.year ?? 0,
+                                        code: row.reliefCode,
                                         amountSen: row.amountSen,
                                         day: Normalisation.day(row.spentOn),
-                                        vendor: Normalisation.vendor(row.vendor))
+                                        vendor: Normalisation.vendor(row.vendor),
+                                        claimant: row.claimant,
+                                        dependentID: row.dependentID)
         row.needsDocument = missingRequiredDocument(for: row)
     }
 
