@@ -1,0 +1,64 @@
+name: TaxTracker
+
+options:
+  bundleIdPrefix: my.relio
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+configs:
+  Debug: debug
+  Release: release
+
+# The local Swift package holds ~70% of the code. The app target is views only.
+packages:
+  TaxKit:
+    path: .
+
+fileGroups:
+  - project.yml
+  - Config/Signing.example.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CLANG_ENABLE_MODULES: YES
+
+targets:
+  TaxTracker:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/TaxTracker
+    dependencies:
+      - package: TaxKit
+        product: TaxKit
+      - package: TaxKit
+        product: TaxData
+      - package: TaxKit
+        product: TaxPresentation
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: my.relio.TaxTracker
+        PRODUCT_NAME: Relio
+        INFOPLIST_FILE: App/TaxTracker/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        # Empty in the committed template, so the app signs with no entitlement and
+        # runs local-only. Filling it in switches CloudKit on.
+        CODE_SIGN_ENTITLEMENTS: $(TAXTRACKER_ENTITLEMENTS)
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+
+schemes:
+  TaxTracker:
+    build:
+      targets:
+        TaxTracker: all
+    run:
+      config: Debug
