@@ -4121,24 +4121,65 @@ import TaxData
     }
 
     @Test("an ineligible relief never appears, however large its headroom")
-    func ineligibleIsExcluded() async throws {
-        let store = try await PresentationFixture.store()
-        try await PresentationFixture.seedTypicalHousehold(store)
-        let model = await Self.model(store)
-
-        let result = try #require(model.context.result)
-        let ineligible = result.assessments.filter {
-            if case .ineligible = $0.eligibility { return true }
-            return false
-        }
-        #expect(!ineligible.isEmpty, "the fixture must contain one, or this proves nothing")
-
+    func ineligibleIsExcluded() {
+        // Tested directly against the ranking function rather than through a seeded
+        // household. Verified during pre-flight: YA2025 yields 19 eligible, 5 needsInfo
+        // and ZERO ineligible reliefs for a plain household, so a fixture-driven version
+        // of this test could only ever pass by accident of what a Budget happens to say.
+        //
         // An ineligible relief reports headroom equal to its cap while `allowed` is zero.
         // Ranking on headroom alone would put reliefs the user cannot claim at the top of
         // the one screen that exists to tell them what to do next.
-        for assessment in ineligible {
-            #expect(!model.opportunities.contains { $0.code == assessment.code })
+        let ranked = HomeViewModel.rankedCandidates(in: Self.syntheticResult)
+        #expect(ranked.map(\.code) == [ReliefCode("RICH"), ReliefCode("ASK")])
+        #expect(!ranked.contains { $0.code == ReliefCode("REFUSED") })
+    }
+
+    @Test("a needsInfo relief stays in the ranking, rendered as a question")
+    func needsInfoStaysRanked() {
+        // Plan 1 settled this: a .needsInfo relief is money the user may recover by
+        // answering one question, so excluding it would make the headline understate the
+        // upside and bury the prompt.
+        let ranked = HomeViewModel.rankedCandidates(in: Self.syntheticResult)
+        let asked = try? #require(ranked.first { $0.code == ReliefCode("ASK") })
+        #expect(asked??.needsAnswer == true)
+    }
+
+    /// Three reliefs with identical headroom and differing eligibility, so the filter and
+    /// the ordering are both observable without depending on any shipped rulebook.
+    static var syntheticResult: EvaluationResult {
+        func assessment(_ code: String,
+                        eligibility: Eligibility,
+                        taxSaved: Money?) -> ReliefAssessment {
+            ReliefAssessment(code: ReliefCode(code),
+                             name: code.capitalized,
+                             cap: Money(ringgit: 10_000),
+                             claimed: .zero,
+                             allowed: .zero,
+                             headroom: Money(ringgit: 10_000),
+                             eligibility: eligibility,
+                             requirements: [],
+                             taxSaved: taxSaved,
+                             unverified: false,
+                             sourceURL: URL(string: "https://www.hasil.gov.my/")!,
+                             notes: nil,
+                             children: [])
         }
+
+        return EvaluationResult(
+            yearOfAssessment: 2025,
+            assessments: [
+                assessment("REFUSED", eligibility: .ineligible(reasons: ["Not you"]),
+                           taxSaved: Money(ringgit: 9_999)),
+                assessment("ASK", eligibility: .needsInfo(questions: []),
+                           taxSaved: Money(ringgit: 100)),
+                assessment("RICH", eligibility: .eligible,
+                           taxSaved: Money(ringgit: 500))
+            ],
+            unresolved: [],
+            chargeableIncome: Money(ringgit: 100_000),
+            estimatedTax: Money(ringgit: 10_000),
+            totalOpportunity: Money(ringgit: 600))
     }
 
     @Test("ordering is stable across identical evaluations")
@@ -4367,13 +4408,12 @@ public final class HomeViewModel {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter HomeViewModel`
-Expected: PASS — 10 tests.
+Expected: PASS — 11 tests.
 
-**If `ineligibleIsExcluded` fails its own precondition** ("the fixture must contain one"),
-the seeded household is eligible for everything in YA2025. Add a fact that makes one
-relief definitively ineligible — for example set `maritalStatus = .single`, which refuses
-the spouse relief — rather than deleting the assertion. A test that cannot observe the
-thing it guards is decoration.
+**`EvaluationResult` and `ReliefAssessment` use memberwise initialisers.** If the
+synthetic fixture will not compile because a property order or label differs, read
+`Sources/TaxKit/Engine/ReliefAssessment.swift` and match the real signatures — do not
+change the assertions to fit a broken fixture.
 
 - [ ] **Step 5: Commit**
 
@@ -5290,12 +5330,9 @@ struct ReliefDetailView: View {
     }
 }
 
-/// Navigation value for one entry, distinct from `ReliefCode` so the stack can tell
-/// "show this relief" from "edit this entry".
-struct EntryRoute: Hashable {
-    let entryID: UUID
-}
 ```
+
+`EntryRoute` is referenced here but declared in `Support/Routes.swift` (Step 3).
 
 `model.yearOfAssessment` does not exist yet — add it to `ReliefDetailViewModel`:
 
@@ -5303,7 +5340,8 @@ struct EntryRoute: Hashable {
     public var yearOfAssessment: Int { context.year }
 ```
 
-and widen `context` from `private let` to `let` so the property can read it.
+`context` stays `private let`: the computed property is declared on the same type, where
+private is already visible.
 
 - [ ] **Step 3: Wire navigation into the shell**
 
@@ -5329,12 +5367,18 @@ and make each opportunity row tappable:
                 }
 ```
 
-Add to `App/TaxTracker/Support/MoneyText.swift` or a new `Routes.swift`:
+Create `App/TaxTracker/Support/Routes.swift`, and move `EntryRoute` here out of
+`ReliefDetailView.swift` so both navigation values have one home:
 
 ```swift
+import Foundation
+
 /// Navigation value for the full reliefs list.
 struct ReliefsRoute: Hashable {}
+
 ```
+
+`EntryRoute` is referenced here but declared in `Support/Routes.swift` (Step 3).
 
 In `RootView`, attach the destinations to the Home `NavigationStack`:
 
@@ -5400,6 +5444,22 @@ teaching the engine to report a discard, the editor does not let the entry be cr
 those codes are filtered out of `availableCodes`, and an entry that somehow already
 exists against one opens read-only with an explanation. The user is directed to the
 household facts, which is where that relief is actually controlled.
+
+**A claim's claimant comes from the rulebook, not from a default.** Four manually-loggable
+YA2025 reliefs carry a `.claimant(in:)` predicate: PARENTS_MEDICAL (parent, grandparent),
+MEDICAL_SERIOUS (child, spouse), LIFESTYLE (child, spouse) and LIFESTYLE_SPORTS (child,
+parent, spouse). **PARENTS_MEDICAL does not admit `.individual` at all**, so an entry saved
+with the default claimant is refused outright by the engine — a silent RM 8,000 loss on a
+claim the user entered correctly. The editor therefore offers a claimant picker populated
+from the rule's admitted set, and refuses to save when the rule excludes the current
+choice.
+
+**There is no per-dependent relief to require a dependent for.** Every `.perDependent`
+relief in every shipped year is also `automatic: true` (the five CHILD_* codes), and
+automatic reliefs are filtered out of the picker, so a cap-kind-derived "requires a
+dependent" flag would be unreachable code. The dependent field is an *optional annotation*
+instead, offered for reliefs that admit a child, parent or grandparent claimant. The engine
+ignores `dependentID` for a fixed cap; this is for the user's own record.
 
 **A same-session duplicate warns at entry time.** Spec §6.5 catches duplicates here, one
 layer before the reconciliation sweep. It warns rather than blocks: two identical receipts
@@ -5573,22 +5633,79 @@ import TaxData
         #expect(!model.canSave)
     }
 
-    @Test("a per-dependent relief requires a dependent")
-    func dependentIsRequiredWhereItMatters() async throws {
+    @Test("a relief that excludes the taxpayer forces a claimant choice")
+    func claimantIsRequiredWhereTheRuleExcludesSelf() async throws {
+        let store = try await PresentationFixture.store()
+        var mother = DependentDraft(id: UUID(), name: "Mother")
+        mother.kind = .parent
+        _ = try await store.save(mother)
+
+        let model = await Self.editor(store)
+        model.selectedCode = ReliefCode("PARENTS_MEDICAL")
+        model.amountText = "1200"
+
+        // PARENTS_MEDICAL admits only .parent and .grandparent. Saved with the default
+        // .individual it is refused by the engine and the user loses the claim with no
+        // explanation, so the editor refuses first and says why.
+        #expect(model.admittedClaimants == [.parent, .grandparent])
+        #expect(model.claimant == .individual)
+        #expect(!model.canSave)
+        #expect(model.validationError != nil)
+
+        model.claimant = .parent
+        #expect(model.canSave)
+    }
+
+    @Test("a relief that admits the taxpayer saves without touching the claimant")
+    func claimantDefaultsWhereTheRuleAdmitsSelf() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = ReliefCode("LIFESTYLE")
+        model.amountText = "320"
+        // LIFESTYLE admits self, spouse and child. The default is already valid, so the
+        // picker must not become a speed bump on the commonest entry in the app.
+        #expect(model.admittedClaimants.contains(.individual))
+        #expect(model.canSave)
+    }
+
+    @Test("a dependent may be named but is never required")
+    func dependentIsOptionalAnnotation() async throws {
         let store = try await PresentationFixture.store()
         var farah = DependentDraft(id: UUID(), name: "Farah")
         farah.dateOfBirth = Date(timeIntervalSince1970: 1_253_491_200)
         _ = try await store.save(farah)
 
         let model = await Self.editor(store)
-        model.selectedCode = ReliefCode("CHILDCARE")
-        model.amountText = "1200"
+        model.selectedCode = ReliefCode("LIFESTYLE")
+        model.amountText = "320"
+        model.claimant = .child
 
-        #expect(model.requiresDependent)
-        #expect(!model.canSave, "a childcare claim with no child named is not a claim")
-        model.dependentID = farah.id
-        #expect(model.canSave)
+        // Every per-dependent relief is automatic and therefore not offerable, so no
+        // entry the user can create needs a dependent for the engine's sake. Naming one
+        // is for their own record.
+        #expect(model.allowsDependent)
+        #expect(model.canSave, "no dependent named, and that is fine")
         #expect(model.availableDependents.contains { $0.id == farah.id })
+
+        model.dependentID = farah.id
+        #expect(await model.save())
+        let saved = try await store.entryDrafts(forYear: 2025).first { $0.dependentID == farah.id }
+        #expect(saved?.claimant == .child)
+    }
+
+    @Test("no offerable relief has a per-dependent cap")
+    func noOfferableReliefIsPerDependent() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        let ruleSet = try BundledRuleSetLoader().ruleSet(for: 2025)
+        // Pins the fact this design rests on. If a future Budget ships a manually-logged
+        // per-dependent relief, this fails and the dependent field must become required
+        // for it.
+        for option in model.availableCodes {
+            if case .perDependent = ruleSet.relief(for: option.code)?.cap {
+                Issue.record("\(option.code) is offerable and per-dependent")
+            }
+        }
     }
 
     @Test("a same-session duplicate warns but does not block")
@@ -5715,7 +5832,9 @@ import TaxData
 public struct ReliefOption: Hashable, Sendable, Identifiable {
     public var code: ReliefCode
     public var name: String
-    public var requiresDependent: Bool
+    /// Claimants the rulebook admits for this relief. Empty means it places no
+    /// restriction, so the taxpayer's own claim is fine.
+    public var admittedClaimants: [Claimant]
     public var id: ReliefCode { code }
 }
 
@@ -5763,12 +5882,10 @@ public final class EntryEditorViewModel {
             availableCodes = result.allAssessments
                 .filter { !Self.isAutomatic($0.code, in: context) }
                 .map { assessment in
-                    // `ReliefAssessment.cap` is a resolved `Money`, not the `Cap` enum,
-                    // so the cap *kind* has to come from the rulebook.
                     ReliefOption(code: assessment.code,
                                  name: assessment.name,
-                                 requiresDependent: Self.needsDependent(
-                                     context.rule(for: assessment.code)?.cap))
+                                 admittedClaimants: Self.admittedClaimants(
+                                     context.rule(for: assessment.code)))
                 }
                 .sorted { $0.name < $1.name }
         }
@@ -5791,9 +5908,17 @@ public final class EntryEditorViewModel {
         }
     }
 
-    public var requiresDependent: Bool {
-        guard let selectedCode else { return false }
-        return availableCodes.first { $0.code == selectedCode }?.requiresDependent ?? false
+    /// Claimants the selected relief admits. Empty means no restriction.
+    public var admittedClaimants: [Claimant] {
+        guard let selectedCode else { return [] }
+        return availableCodes.first { $0.code == selectedCode }?.admittedClaimants ?? []
+    }
+
+    /// Whether naming a dependent is meaningful for this relief. Never required — no
+    /// offerable relief has a per-dependent cap, so the engine ignores `dependentID`.
+    public var allowsDependent: Bool {
+        !admittedClaimants.isEmpty
+            && !Set(admittedClaimants).isDisjoint(with: [.child, .parent, .grandparent])
     }
 
     public var validationError: String? {
@@ -5802,7 +5927,13 @@ public final class EntryEditorViewModel {
             return amountText.isEmpty ? "Enter an amount." : "That is not an amount."
         }
         if amount <= .zero { return "The amount must be more than RM 0.00." }
-        if requiresDependent && dependentID == nil { return "Choose who this is for." }
+        let admitted = admittedClaimants
+        if !admitted.isEmpty && !admitted.contains(claimant) {
+            // PARENTS_MEDICAL admits only .parent and .grandparent. Left at the default
+            // .individual it is refused by the engine, and the user loses the claim with
+            // no explanation. Refusing here, with a reason, is the whole point.
+            return "Choose who this claim is for."
+        }
         return nil
     }
 
@@ -5847,7 +5978,7 @@ public final class EntryEditorViewModel {
                                code: code,
                                amount: amount,
                                claimant: claimant,
-                               dependentID: requiresDependent ? dependentID : nil,
+                               dependentID: allowsDependent ? dependentID : nil,
                                vendor: vendor.trimmingCharacters(in: .whitespaces),
                                spentOn: spentOn,
                                note: note)
@@ -5877,10 +6008,24 @@ public final class EntryEditorViewModel {
         await context.reload()
     }
 
-    static func needsDependent(_ cap: Cap?) -> Bool {
-        guard let cap else { return false }
-        if case .perDependent = cap { return true }
-        return false
+    /// Walks a rule's eligibility predicate for the claimants it admits.
+    ///
+    /// The rulebook is the authority on who a relief may be claimed for, and the closed
+    /// predicate language makes this a total function over the tree rather than a guess.
+    static func admittedClaimants(_ rule: ReliefRule?) -> [Claimant] {
+        guard let predicate = rule?.eligibility else { return [] }
+
+        func walk(_ node: EligibilityPredicate) -> [Claimant] {
+            switch node {
+            case .claimant(let admitted): return admitted
+            case .all(let children), .any(let children): return children.flatMap(walk)
+            case .not(let inner): return walk(inner)
+            default: return []
+            }
+        }
+        // Order preserved from the rulebook so the picker is stable between launches.
+        var seen: Set<Claimant> = []
+        return walk(predicate).filter { seen.insert($0).inserted }
     }
 
     static func isAutomatic(_ code: ReliefCode, in context: YearContext) -> Bool {
@@ -5912,9 +6057,9 @@ extension Money {
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `swift test --filter "EntryEditor|MoneyParsing"`
-Expected: PASS — 14 tests in 2 suites.
+Expected: PASS — 17 tests in 2 suites.
 
-`Cap` as shipped has exactly three cases — `.fixed(Money)`, `.perDependent(Money)` and
+Note that `.claimant(in:)` is the only predicate case consulted here. `Cap` as shipped has exactly three cases — `.fixed(Money)`, `.perDependent(Money)` and
 `.tiered(on:tiers:)`. There is no `sharedPool` or `none`; a shared pool is modelled as a
 parent relief with children, and an uncapped relief does not exist in any shipped year.
 
@@ -6033,9 +6178,17 @@ struct EntryEditorView: View {
                             .monospacedDigit()
                     }
 
-                    if model.requiresDependent {
-                        Picker("For", selection: $model.dependentID) {
-                            Text("Choose…").tag(UUID?.none)
+                    if !model.admittedClaimants.isEmpty {
+                        Picker("Claimed for", selection: $model.claimant) {
+                            ForEach(model.admittedClaimants, id: \.self) { who in
+                                Text(who.rawValue.capitalized).tag(who)
+                            }
+                        }
+                    }
+
+                    if model.allowsDependent, !model.availableDependents.isEmpty {
+                        Picker("Which person", selection: $model.dependentID) {
+                            Text("Not specified").tag(UUID?.none)
                             ForEach(model.availableDependents) { dependent in
                                 Text(dependent.name).tag(UUID?.some(dependent.id))
                             }
@@ -6662,7 +6815,12 @@ import TaxKit
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
-                guard text.contains("\"RM") || text.contains("RM \\(") else { continue }
+                // Flags a display string built by hand: the prefix immediately followed
+                // by an interpolation, or the prefix with its trailing space. A bare
+                // "RM" with no space is stripping, not building — MoneyParsing does
+                // exactly that — so `replacingOccurrences` lines are skipped.
+                guard text.contains("RM \\(") || text.contains("\"RM ") else { continue }
+                guard !text.contains("replacingOccurrences") else { continue }
                 #expect(text.contains("//"),
                         "\(file.lastPathComponent):\(number + 1) builds an RM string by hand — use Money.formatted()")
             }
