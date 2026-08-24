@@ -10,6 +10,27 @@ public struct MergeReport: Hashable, Sendable {
     public var mergedIDs: [UUID]
 }
 
+/// Everything one sweep changed.
+///
+/// Both halves are reported because either can be non-empty on its own: a year collapse
+/// writes to disk (rows soft-deleted, entries re-pointed) while producing no
+/// `MergeReport` at all. A caller reading the entry reports alone and treating an empty
+/// array as "nothing changed" would skip a refresh after exactly the sweep that moved
+/// the user's entries between year rows.
+public struct ReconciliationOutcome: Hashable, Sendable {
+    /// Duplicate `TaxYear` rows merged away.
+    public var yearsMerged: Int
+    /// One report per collapsed group of duplicate entries.
+    public var entryMerges: [MergeReport]
+
+    public var changedAnything: Bool { yearsMerged > 0 || !entryMerges.isEmpty }
+
+    public init(yearsMerged: Int, entryMerges: [MergeReport]) {
+        self.yearsMerged = yearsMerged
+        self.entryMerges = entryMerges
+    }
+}
+
 extension TaxStore {
 
     /// Collapses duplicate entries. Runs on every sync-complete event.
@@ -24,12 +45,16 @@ extension TaxStore {
     /// nothing. It has to be, or every sync would churn `updatedAt` and look like a
     /// change to every other device.
     @discardableResult
-    public func reconcile() throws -> [MergeReport] {
+    public func reconcile() throws -> ReconciliationOutcome {
         // Years first: now that `year` is part of the dedupe key, an entry re-pointed at
         // the surviving year must be settled before the entry pass computes any key that
         // would depend on it, or the two passes could disagree about which year an entry
         // belongs to within the same sweep.
-        try reconcileYears()
+        //
+        // The count is returned rather than discarded: a year collapse writes to disk
+        // without producing a single `MergeReport`, so a caller reading only the reports
+        // would conclude the sweep changed nothing.
+        let yearsMerged = try reconcileYears()
 
         let live = try modelContext.fetch(
             FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.deletedAt == nil }))
@@ -78,7 +103,7 @@ extension TaxStore {
         }
 
         if !reports.isEmpty { try modelContext.save() }
-        return reports
+        return ReconciliationOutcome(yearsMerged: yearsMerged, entryMerges: reports)
     }
 
     /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
@@ -135,22 +160,32 @@ extension TaxStore {
             let ordered = group.sorted(by: TaxStore.isNewer)
             guard let survivor = ordered.first else { continue }
 
+            var survivorGainedAFact = false
             for loser in ordered.dropFirst() {
-                Self.fillGaps(on: survivor, from: loser)
+                survivorGainedAFact = Self.fillGaps(on: survivor, from: loser) || survivorGainedAFact
                 // Re-point rather than orphan: an entry left hanging off a soft-deleted
                 // year would vanish from the user's own records. Snapshotted into an
                 // array first: `entry.taxYear = survivor` mutates the inverse side of the
                 // relationship we are iterating, and mutating a collection while walking
                 // it is undefined.
+                //
+                // Deliberately NOT stamped: re-pointing changes no field any resolver
+                // keys off — not the dedupe key, not a fact, not the amount — so the
+                // stamp would say "this device edited this entry" about housekeeping
+                // that edited nothing. Under newest-write-wins that lets a sweep on an
+                // idle phone outrank a genuine edit made on another device, which is the
+                // exact failure `softDeleteEntry`'s no-op guard was hardened against.
                 for entry in Array(loser.entries ?? []) {
                     entry.taxYear = survivor
-                    entry.updatedAt = stamp
                 }
                 loser.deletedAt = stamp
                 loser.updatedAt = stamp
                 merged += 1
             }
-            survivor.updatedAt = stamp
+            // Same rule for the survivor: stamped only when it actually adopted a fact.
+            // A survivor that already answered everything the loser knew is unchanged,
+            // and a re-stamp there would beat a real answer typed on another device.
+            if survivorGainedAFact { survivor.updatedAt = stamp }
         }
 
         if merged > 0 { try modelContext.save() }
@@ -158,18 +193,31 @@ extension TaxStore {
     }
 
     /// Copies every fact the survivor has not answered from the loser. Never overwrites.
-    private static func fillGaps(on survivor: TaxYear, from loser: TaxYear) {
-        if survivor.grossIncomeSen == nil { survivor.grossIncomeSen = loser.grossIncomeSen }
-        if survivor.epfSen == nil { survivor.epfSen = loser.epfSen }
-        if survivor.socsoSen == nil { survivor.socsoSen = loser.socsoSen }
-        if survivor.maritalStatusRaw == nil { survivor.maritalStatusRaw = loser.maritalStatusRaw }
-        if survivor.spouseHasIncome == nil { survivor.spouseHasIncome = loser.spouseHasIncome }
-        if survivor.assessmentTypeRaw == nil { survivor.assessmentTypeRaw = loser.assessmentTypeRaw }
-        if survivor.employmentTypeRaw == nil { survivor.employmentTypeRaw = loser.employmentTypeRaw }
-        if survivor.genderRaw == nil { survivor.genderRaw = loser.genderRaw }
-        if survivor.propertyPriceSen == nil { survivor.propertyPriceSen = loser.propertyPriceSen }
-        if survivor.selfIsDisabled == nil { survivor.selfIsDisabled = loser.selfIsDisabled }
-        if survivor.spouseIsDisabled == nil { survivor.spouseIsDisabled = loser.spouseIsDisabled }
+    ///
+    /// Returns whether it actually copied anything, so the caller can stamp the survivor
+    /// only when the survivor really changed. A gap the loser cannot fill either — both
+    /// `nil` — is not a change, so it does not count.
+    @discardableResult
+    private static func fillGaps(on survivor: TaxYear, from loser: TaxYear) -> Bool {
+        var copied = false
+        func fill<Value>(_ keyPath: ReferenceWritableKeyPath<TaxYear, Value?>) {
+            guard survivor[keyPath: keyPath] == nil,
+                  let value = loser[keyPath: keyPath] else { return }
+            survivor[keyPath: keyPath] = value
+            copied = true
+        }
+        fill(\.grossIncomeSen)
+        fill(\.epfSen)
+        fill(\.socsoSen)
+        fill(\.maritalStatusRaw)
+        fill(\.spouseHasIncome)
+        fill(\.assessmentTypeRaw)
+        fill(\.employmentTypeRaw)
+        fill(\.genderRaw)
+        fill(\.propertyPriceSen)
+        fill(\.selfIsDisabled)
+        fill(\.spouseIsDisabled)
+        return copied
     }
 }
 
@@ -185,6 +233,16 @@ extension TaxStore {
         row.updatedAt = now()
         modelContext.insert(row)
         try modelContext.save()
+    }
+
+    /// Every `TaxYear` row's `updatedAt` for a year, live or soft-deleted, keyed by id —
+    /// so a test can prove the sweep left a row it did not change untouched. Only the
+    /// tests call this.
+    func yearUpdatedAtsForTesting(year: Int) throws -> [UUID: Date] {
+        let rows = try modelContext
+            .fetch(FetchDescriptor<TaxYear>())
+            .filter { $0.year == year }
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.updatedAt) })
     }
 
     func liveYearRowCount(_ year: Int) throws -> Int {

@@ -4,7 +4,18 @@ import TaxKit
 
 extension TaxStore {
 
-    /// Years that have any live row, ascending. Drives the year switcher.
+    /// Years that have a live `TaxYear` row, ascending, de-duplicated.
+    ///
+    /// This is what the *store* knows about, which is not the same list as the years the
+    /// app can evaluate: a `TaxYear` row exists for any year the user has entries or
+    /// facts in, whether or not a rulebook for it shipped. Nothing calls this yet.
+    ///
+    /// When the year switcher is built it should show the union of this and
+    /// `RuleSetLoading.availableYears`, not either alone — the loader's list alone hides
+    /// a year the user has entries in but no rulebook for (every January until the
+    /// Budget ships), and this list alone hides a shipped year they have not touched.
+    /// `YearContext` already renders the no-rulebook case as `.unavailable`, so such a
+    /// year is safe to offer.
     public func liveYears() throws -> [Int] {
         let years = try modelContext
             .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))

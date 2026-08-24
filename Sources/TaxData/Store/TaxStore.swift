@@ -201,8 +201,12 @@ public actor TaxStore {
     public func softDeleteEntry(id: UUID) throws {
         guard let row = try entryRow(id) else { return }
         guard row.deletedAt == nil else { return }
-        row.deletedAt = now()
-        row.updatedAt = now()
+        // One reading of the clock, as everywhere else in this file: two calls leave
+        // `deletedAt` and `updatedAt` microseconds apart, so a row's own two stamps
+        // disagree about when the delete happened.
+        let stamp = now()
+        row.deletedAt = stamp
+        row.updatedAt = stamp
         try modelContext.save()
     }
 
@@ -246,8 +250,9 @@ public actor TaxStore {
         // already-deleted row must not re-stamp it, or it can outrace a concurrent edit
         // or restore on another device.
         guard row.deletedAt == nil else { return }
-        row.deletedAt = now()
-        row.updatedAt = now()
+        let stamp = now()
+        row.deletedAt = stamp
+        row.updatedAt = stamp
         try modelContext.save()
     }
 

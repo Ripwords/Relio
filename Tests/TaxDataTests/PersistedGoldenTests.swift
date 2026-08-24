@@ -121,7 +121,7 @@ import TaxKit
         try await Self.seed(store)
         let before = try await Self.evaluatePersisted(store)
 
-        #expect(try await store.reconcile().isEmpty, "the persona contains no duplicates")
+        #expect(try await store.reconcile().entryMerges.isEmpty, "the persona contains no duplicates")
         let after = try await Self.evaluatePersisted(store)
         #expect(after == before)
     }
@@ -146,8 +146,9 @@ import TaxKit
                 != golden.assessment(for: ReliefCode("LIFESTYLE"))?.claimed,
                 "the duplicate must actually be visible to the engine, or this proves nothing")
 
-        let reports = try await store.reconcile()
-        #expect(reports.count == 1)
+        let outcome = try await store.reconcile()
+        #expect(outcome.entryMerges.count == 1)
+        #expect(outcome.changedAnything)
         let repaired = try await Self.evaluatePersisted(store)
         #expect(repaired.assessment(for: ReliefCode("LIFESTYLE"))?.claimed
                 == golden.assessment(for: ReliefCode("LIFESTYLE"))?.claimed)

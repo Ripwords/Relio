@@ -112,6 +112,87 @@ import TaxKit
         #expect(try await store.reconcileYears() == 0)
         #expect(try await store.liveYears() == [2024, 2025])
     }
+
+    @Test("the sweep does not stamp rows it did not actually change")
+    func sweepDoesNotStampUnchangedRows() async throws {
+        let store = try await StoreFixture.store()
+        // The loser carries the entries and answers no fact at all, so there is nothing
+        // for the survivor to adopt — the sweep re-points three entries and deletes one
+        // row, and touches no field on anything else.
+        let entryIDs = [
+            try await store.save(StoreFixture.entry("LIFESTYLE", 1_820, vendor: "Popular Bookstore")),
+            try await store.save(StoreFixture.entry("SSPN", 3_000, vendor: "SSPN")),
+            try await store.save(StoreFixture.entry("MEDICAL_SERIOUS", 6_500, vendor: "Hospital"))
+        ]
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+
+        let entryStampsBefore = try await Self.entryStamps(store, entryIDs)
+        let survivorID = try #require(try await store.liveYearIdsForTesting(year: 2025).first)
+        let yearStampsBefore = try await store.yearUpdatedAtsForTesting(year: 2025)
+
+        // Advance the clock far enough that any re-stamp is unmistakable. With a frozen
+        // clock this test could not fail however hard the sweep churned.
+        let sweepInstant = StoreFixture.epoch.addingTimeInterval(3_600)
+        await store.useClock { sweepInstant }
+        #expect(try await store.reconcileYears() == 1)
+
+        // Re-pointing an entry at the surviving year row changes no field any resolver
+        // keys off. Stamping it anyway makes housekeeping on an idle phone outrank a
+        // genuine edit made on another device under newest-write-wins — the exact rule
+        // `softDeleteEntry`'s no-op guard exists to protect.
+        #expect(try await Self.entryStamps(store, entryIDs) == entryStampsBefore)
+        // The survivor answered everything the loser knew (which was nothing), so it is
+        // unchanged too.
+        let yearStampsAfter = try await store.yearUpdatedAtsForTesting(year: 2025)
+        #expect(yearStampsAfter[survivorID] == yearStampsBefore[survivorID])
+        // ...while the row that really was soft-deleted is stamped, because that IS a
+        // change other devices must see.
+        let loserID = try #require(yearStampsBefore.keys.first { $0 != survivorID })
+        #expect(yearStampsAfter[loserID] == sweepInstant)
+
+        // And the entries survived the re-point, which is what the sweep was for.
+        #expect(try await store.entryDrafts(forYear: 2025).count == 3)
+
+        // A second sweep over already-merged data changes nothing at all.
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(7_200) }
+        #expect(try await store.reconcileYears() == 0)
+        #expect(try await Self.entryStamps(store, entryIDs) == entryStampsBefore)
+        #expect(try await store.yearUpdatedAtsForTesting(year: 2025) == yearStampsAfter)
+    }
+
+    @Test("the survivor is stamped when it does adopt a fact")
+    func survivorIsStampedWhenItAdoptsAFact() async throws {
+        let store = try await StoreFixture.store()
+        var older = YearFacts()
+        older.grossIncome = Money(ringgit: 100_000)
+        older.maritalStatus = .married          // the newer row will not have this
+        try await store.saveYearFacts(older, for: 2025)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        let survivorID = try #require(try await store.liveYearIdsForTesting(year: 2025).first)
+
+        let sweepInstant = StoreFixture.epoch.addingTimeInterval(3_600)
+        await store.useClock { sweepInstant }
+        #expect(try await store.reconcileYears() == 1)
+
+        // The counterpart to `sweepDoesNotStampUnchangedRows`: adopting the marital
+        // status is a real change to the survivor's own fields, so it must be stamped or
+        // other devices would never learn of it. Without this the "don't stamp" rule
+        // could be satisfied by never stamping at all.
+        #expect(try await store.yearUpdatedAtsForTesting(year: 2025)[survivorID] == sweepInstant)
+        #expect(try await store.yearFacts(for: 2025).maritalStatus == .married)
+    }
+
+    static func entryStamps(_ store: TaxStore, _ ids: [UUID]) async throws -> [UUID: Date] {
+        var stamps: [UUID: Date] = [:]
+        for id in ids {
+            stamps[id] = try await store.entryUpdatedAtForTesting(id: id)
+        }
+        return stamps
+    }
 }
 
 @Suite("Reconciliation") struct ReconciliationTests {
@@ -135,7 +216,7 @@ import TaxKit
         _ = try await Self.save(store, older, at: Self.t0)
         _ = try await Self.save(store, newer, at: Self.t1)
 
-        let reports = try await store.reconcile()
+        let reports = try await store.reconcile().entryMerges
         #expect(reports.count == 1)
         #expect(reports.first?.survivorID == newer.id)
         #expect(reports.first?.mergedIDs == [older.id])
@@ -194,8 +275,8 @@ import TaxKit
         _ = try await Self.save(deviceTwo, b, at: Self.t0)
         _ = try await Self.save(deviceTwo, a, at: Self.t0)
 
-        let one = try await deviceOne.reconcile()
-        let two = try await deviceTwo.reconcile()
+        let one = try await deviceOne.reconcile().entryMerges
+        let two = try await deviceTwo.reconcile().entryMerges
 
         // Identical stamps, so the tie-break is doing the work. Without it the two
         // devices pick different survivors, then resurrect each other's soft-deleted
@@ -212,7 +293,7 @@ import TaxKit
             draft.id = UUID(uuidString: "00000000-0000-0000-0000-00000000000\(index)")!
             _ = try await Self.save(store, draft, at: instant)
         }
-        let reports = try await store.reconcile()
+        let reports = try await store.reconcile().entryMerges
         #expect(reports.count == 1)
         #expect(reports.first?.mergedIDs.count == 2)
         #expect(try await store.entryDrafts(forYear: 2025).count == 1)
@@ -228,11 +309,11 @@ import TaxKit
         _ = try await Self.save(store, older, at: Self.t0)
         _ = try await Self.save(store, newer, at: Self.t1)
 
-        #expect(try await store.reconcile().count == 1)
+        #expect(try await store.reconcile().entryMerges.count == 1)
         // The sweep runs on every sync-complete event. If it were not idempotent it
         // would churn updatedAt on every sync, which would in turn look like a change
         // to every other device — an infinite sync loop.
-        #expect(try await store.reconcile().isEmpty)
+        #expect(try await store.reconcile().entryMerges.isEmpty)
         #expect(try await store.entryDrafts(forYear: 2025).count == 1)
     }
 
@@ -245,8 +326,29 @@ import TaxKit
         a.id = UUID(); b.id = UUID(); c.id = UUID()
         for draft in [a, b, c] { _ = try await Self.save(store, draft, at: Self.t0) }
 
-        #expect(try await store.reconcile().isEmpty)
+        #expect(try await store.reconcile().entryMerges.isEmpty)
         #expect(try await store.entryDrafts(forYear: 2025).count == 3)
+    }
+
+    @Test("a year collapse is reported even when no entries merged")
+    func yearCollapseIsReportedWithoutEntryMerges() async throws {
+        let store = try await StoreFixture.store()
+        _ = try await Self.save(store, StoreFixture.entry("LIFESTYLE", 1_820), at: Self.t0)
+
+        await store.useClock { Self.t1 }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+
+        let outcome = try await store.reconcile()
+        // The sweep soft-deleted a row and re-pointed an entry — it wrote to disk. A
+        // caller reading only the entry reports would see an empty array and conclude
+        // nothing happened, then skip the refresh that shows the user their own entries.
+        #expect(outcome.entryMerges.isEmpty)
+        #expect(outcome.yearsMerged == 1)
+        #expect(outcome.changedAnything)
+        #expect(try await store.entryDrafts(forYear: 2025).count == 1)
+
+        // And a sweep that really changed nothing says so.
+        #expect(try await store.reconcile().changedAnything == false)
     }
 
     @Test("a merge can be undone")
