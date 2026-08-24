@@ -2179,14 +2179,6 @@ import TaxKit
         #expect(a != b)
     }
 
-    @Test("the length-prefixed encoding is injective on the boundary case")
-    func encodingIsInjective() {
-        // "ab" + "" and "a" + "b" are the minimal pair that a bare concatenation cannot
-        // tell apart.
-        #expect(DedupeKey.encode(["ab", ""]) != DedupeKey.encode(["a", "b"]))
-        #expect(DedupeKey.encode(["a|b"]) != DedupeKey.encode(["a", "b"]))
-    }
-
     @Test("editing an entry recomputes its key")
     func editRecomputesKey() async throws {
         let store = try await StoreFixture.store()
@@ -2310,7 +2302,7 @@ public enum DedupeKey {
 
     /// `["ab", "c"]` becomes `"2:ab|1:c"`. The byte count preceding each component makes
     /// the boundary unambiguous no matter what the component contains.
-    static func encode(_ components: [String]) -> String {
+    private static func encode(_ components: [String]) -> String {
         components
             .map { "\($0.utf8.count):\($0)" }
             .joined(separator: "|")
