@@ -67,13 +67,18 @@ import TaxKit
         #expect(a != b)
     }
 
-    @Test("fields cannot be smuggled across the separator")
-    func separatorIsUnambiguous() {
-        // Without a separator that cannot appear in a component, ("AB", 1) and ("A", "B1")
-        // would hash identically. Vendor normalisation strips everything but alphanumerics
-        // and spaces, so "|" is safe — this test pins that it stays safe.
-        let a = DedupeKey.entry(code: ReliefCode("AB"), amountSen: 1, day: "", vendor: "x")
-        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "", vendor: "Bx")
+    @Test("components cannot be smuggled across the encoding")
+    func componentsCannotBeSmuggledAcrossTheEncoding() {
+        // ReliefCode performs no character validation, and `ReliefEntry.reliefCodeRaw`
+        // is a plain stored String that CloudKit sync writes into directly — a "|"
+        // arriving in a code is reachable from a synced or corrupted record, not
+        // hypothetical. Under a naive "|"-joined scheme (no length prefixes), these two
+        // entirely different entries flatten to the identical string "A|1|23|D|V":
+        //   ("A|1", amount: 23, day: "D",  vendor: "V")    -> "A|1" + "|23|D|V"
+        //   ("A",   amount: 1,  day: "23", vendor: "D|V")  -> "A|1|23" + "|D|V"
+        // A length-prefixed encoding must keep them apart.
+        let a = DedupeKey.entry(code: ReliefCode("A|1"), amountSen: 23, day: "D", vendor: "V")
+        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "23", vendor: "D|V")
         #expect(a != b)
     }
 
