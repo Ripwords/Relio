@@ -1,0 +1,138 @@
+import Foundation
+import Observation
+import TaxKit
+import TaxData
+
+/// What the headline number means. The label changes with it, because a relief figure
+/// shown under a "tax saved" heading is a lie about money.
+public enum HeadlineKind: Hashable, Sendable {
+    case taxSaved
+    case relief
+}
+
+public struct OpportunityRow: Hashable, Sendable, Identifiable {
+    public var code: ReliefCode
+    public var name: String
+    public var headroom: Money
+    /// `nil` when income is unknown.
+    public var taxSaved: Money?
+    /// 0...100, integer arithmetic — the package bans `Double` outside charting.
+    public var usedPercent: Int
+    /// True for a `.needsInfo` relief, which renders as a question rather than a figure.
+    public var needsAnswer: Bool
+
+    public var id: ReliefCode { code }
+}
+
+public struct HomePrompts: Hashable, Sendable {
+    public var unansweredQuestionCount: Int
+    /// Relief that would become claimable if those questions were answered favourably.
+    public var unlockableRelief: Money
+    public var claimsMissingDocuments: Int
+
+    public static let none = HomePrompts(unansweredQuestionCount: 0,
+                                         unlockableRelief: .zero,
+                                         claimsMissingDocuments: 0)
+}
+
+/// Spec §11: Home answers one question — how much is being left on the table.
+@MainActor
+@Observable
+public final class HomeViewModel {
+
+    public let context: YearContext
+    public private(set) var headline: Money = .zero
+    public private(set) var headlineKind: HeadlineKind = .relief
+    public private(set) var opportunities: [OpportunityRow] = []
+    public private(set) var remainingOpportunityCount: Int = 0
+    public private(set) var prompts: HomePrompts = .none
+
+    private let store: TaxStore
+
+    public init(context: YearContext, store: TaxStore) {
+        self.context = context
+        self.store = store
+    }
+
+    public func refresh() async {
+        guard let result = context.result else {
+            headline = .zero
+            headlineKind = .relief
+            opportunities = []
+            remainingOpportunityCount = 0
+            prompts = .none
+            return
+        }
+
+        let candidates = Self.rankedCandidates(in: result)
+
+        if let total = result.totalOpportunity {
+            headline = total
+            headlineKind = .taxSaved
+        } else {
+            // No income, so no tax figure exists. Fall back to the relief still
+            // available and let the view relabel.
+            headline = candidates.reduce(Money.zero) { $0 + $1.headroom }
+            headlineKind = .relief
+        }
+
+        opportunities = Array(candidates.prefix(3))
+        remainingOpportunityCount = max(0, candidates.count - opportunities.count)
+        prompts = await makePrompts(result)
+    }
+
+    /// Eligible-or-unanswered reliefs with room left, best first.
+    ///
+    /// The eligibility filter comes first and is not negotiable: an `.ineligible` relief
+    /// still reports `headroom` equal to its cap while `allowed` is zero, so a list built
+    /// on headroom alone advertises reliefs the user cannot claim.
+    static func rankedCandidates(in result: EvaluationResult) -> [OpportunityRow] {
+        result.assessments
+            .filter { assessment in
+                if case .ineligible = assessment.eligibility { return false }
+                return assessment.headroom > .zero
+            }
+            .map { assessment in
+                var needsAnswer = false
+                if case .needsInfo = assessment.eligibility { needsAnswer = true }
+                return OpportunityRow(code: assessment.code,
+                                      name: assessment.name,
+                                      headroom: assessment.headroom,
+                                      taxSaved: assessment.taxSaved,
+                                      usedPercent: Self.percentUsed(assessment),
+                                      needsAnswer: needsAnswer)
+            }
+            .sorted { left, right in
+                // Ties break on code. Plan 1 shipped a bug where equal-valued rows
+                // reordered between launches; the fix is a total order, not a sort key.
+                let leftValue = left.taxSaved ?? left.headroom
+                let rightValue = right.taxSaved ?? right.headroom
+                if leftValue != rightValue { return leftValue > rightValue }
+                return left.code.rawValue < right.code.rawValue
+            }
+    }
+
+    static func percentUsed(_ assessment: ReliefAssessment) -> Int {
+        guard assessment.cap.sen > 0 else { return 0 }
+        let percent = assessment.allowed.sen * 100 / assessment.cap.sen
+        return min(100, max(0, percent))
+    }
+
+    private func makePrompts(_ result: EvaluationResult) async -> HomePrompts {
+        var questions = 0
+        var unlockable = Money.zero
+        for assessment in result.assessments {
+            if case .needsInfo(let asked) = assessment.eligibility {
+                questions += asked.count
+                unlockable = unlockable + assessment.headroom
+            }
+        }
+
+        let missing = (try? await store.entryDrafts(forYear: context.year)
+            .filter(\.needsDocument).count) ?? 0
+
+        return HomePrompts(unansweredQuestionCount: questions,
+                           unlockableRelief: unlockable,
+                           claimsMissingDocuments: missing)
+    }
+}
