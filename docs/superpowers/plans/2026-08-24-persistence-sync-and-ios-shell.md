@@ -2396,6 +2396,23 @@ git commit -m "feat: compute dedupe keys, content hashes and the needs-document 
   - `struct MergeReport: Hashable, Sendable` — `dedupeKey`, `survivorID`, `mergedIDs`.
   - `TaxStore.reconcile() throws -> [MergeReport]`.
   - `TaxStore.unmerge(entryID:) throws` — reverses one merge.
+  - `TaxStore.reconcileYears() throws -> Int` — collapses duplicate `TaxYear` rows,
+    returning how many were merged away. Called by `reconcile()` before entries.
+
+**Added to this task's scope by a Task 4 ruling.** Task 4's review found that two devices
+first launching offline produce two live `TaxYear` rows for the same year, and that
+`yearFacts` picked one arbitrarily. Task 4 made the *selection* deterministic, which stops
+the nondeterministic-income bug; collapsing the duplicate belongs here, with the rest of
+duplicate handling.
+
+`reconcileYears()` keeps the newest row (ties on `id.uuidString`, the same total order as
+everything else here), re-points every loser's entries at the survivor, and soft-deletes
+the losers. **Facts merge by filling gaps, never by overwriting:** for each optional fact,
+the survivor keeps its own value and adopts the loser's only where its own is `nil`. A
+`nil` means "not answered yet" throughout this app, so filling a gap cannot lose an
+answer, and refusing to overwrite means a newer device's answer always wins. Discarding
+the loser's facts outright would silently throw away income the user entered on their
+other phone.
 
 **The sweep must be deterministic, and that is the whole design.** Spec §6.4 says every
 device runs it independently and they all converge. Nothing coordinates them, so the
@@ -2417,7 +2434,91 @@ would merge unrelated entries. Skipping is the safe direction.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TaxDataTests/ReconciliationTests.swift`:
+Create `Tests/TaxDataTests/ReconciliationTests.swift`.
+
+Include this suite alongside the entry suite below:
+
+```swift
+@Suite("Year reconciliation") struct YearReconciliationTests {
+
+    @Test("two TaxYear rows for one year collapse, keeping the newest")
+    func duplicateYearsCollapse() async throws {
+        let store = try await StoreFixture.store()
+        // The collision CloudKit can produce but one device cannot: two live TaxYear
+        // rows for 2025, created offline on two devices before the first sync.
+        var older = YearFacts()
+        older.grossIncome = Money(ringgit: 100_000)
+        try await store.saveYearFacts(older, for: 2025)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+
+        #expect(try await store.liveYearRowCount(2025) == 2)
+        #expect(try await store.reconcileYears() == 1)
+        #expect(try await store.liveYearRowCount(2025) == 1)
+        #expect(try await store.yearFacts(for: 2025).grossIncome == Money(ringgit: 128_000))
+    }
+
+    @Test("the survivor adopts facts it does not have, and never overwrites its own")
+    func factsMergeByFillingGaps() async throws {
+        let store = try await StoreFixture.store()
+        var older = YearFacts()
+        older.grossIncome = Money(ringgit: 100_000)
+        older.maritalStatus = .married          // the newer row will not have this
+        try await store.saveYearFacts(older, for: 2025)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        _ = try await store.reconcileYears()
+
+        let facts = try await store.yearFacts(for: 2025)
+        // Newer answer wins where both answered...
+        #expect(facts.grossIncome == Money(ringgit: 128_000))
+        // ...and an answer the user gave on their other phone is adopted, not discarded.
+        // nil means "not answered yet" everywhere in this app, so filling a gap cannot
+        // lose an answer.
+        #expect(facts.maritalStatus == .married)
+    }
+
+    @Test("entries on a losing row are re-pointed, not orphaned")
+    func entriesFollowTheSurvivor() async throws {
+        let store = try await StoreFixture.store()
+        _ = try await store.save(StoreFixture.entry("LIFESTYLE", 1_820))
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+        _ = try await store.reconcileYears()
+
+        // The entry was attached to the row that lost. If it were not re-pointed it would
+        // hang off a soft-deleted year and vanish from the user's own records.
+        let drafts = try await store.entryDrafts(forYear: 2025)
+        #expect(drafts.count == 1)
+        #expect(drafts.first?.code == ReliefCode("LIFESTYLE"))
+    }
+
+    @Test("running year reconciliation twice changes nothing the second time")
+    func yearSweepIsIdempotent() async throws {
+        let store = try await StoreFixture.store()
+        try await store.saveYearFacts(YearFacts(), for: 2025)
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+
+        #expect(try await store.reconcileYears() == 1)
+        #expect(try await store.reconcileYears() == 0)
+    }
+
+    @Test("distinct years are left alone")
+    func distinctYearsSurvive() async throws {
+        let store = try await StoreFixture.store()
+        try await store.saveYearFacts(YearFacts(), for: 2024)
+        try await store.saveYearFacts(YearFacts(), for: 2025)
+        #expect(try await store.reconcileYears() == 0)
+        #expect(try await store.liveYears() == [2024, 2025])
+    }
+}
+```
+
+Then the entry-level suite:
 
 ```swift
 import Testing
@@ -2608,6 +2709,10 @@ extension TaxStore {
     /// change to every other device.
     @discardableResult
     public func reconcile() throws -> [MergeReport] {
+        // Years first: an entry re-pointed at the surviving year must be visible to the
+        // entry pass in the same sweep, or a duplicate could hide behind a duplicate.
+        try reconcileYears()
+
         let live = try modelContext.fetch(
             FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.deletedAt == nil }))
 
@@ -2667,6 +2772,66 @@ extension TaxStore {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
         return try modelContext.fetch(descriptor).first?.mergedInto
     }
+
+    /// Collapses duplicate `TaxYear` rows, returning how many were merged away.
+    ///
+    /// Two devices first launching offline each create their own row for the same year.
+    /// Task 4 made the *selection* deterministic so both devices at least agree; this
+    /// removes the duplicate.
+    ///
+    /// Facts merge by filling gaps and never by overwriting: `nil` means "not answered
+    /// yet" everywhere in this app, so adopting a loser's value where the survivor has
+    /// none cannot lose an answer, while refusing to overwrite means the newer device's
+    /// answer always wins. Discarding the loser's facts would silently throw away income
+    /// the user entered on their other phone.
+    @discardableResult
+    public func reconcileYears() throws -> Int {
+        let live = try modelContext.fetch(
+            FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+
+        var merged = 0
+        let stamp = now()
+
+        for (_, group) in Dictionary(grouping: live, by: \.year) where group.count > 1 {
+            let ordered = group.sorted { left, right in
+                if left.updatedAt != right.updatedAt { return left.updatedAt > right.updatedAt }
+                return left.id.uuidString > right.id.uuidString
+            }
+            guard let survivor = ordered.first else { continue }
+
+            for loser in ordered.dropFirst() {
+                Self.fillGaps(on: survivor, from: loser)
+                // Re-point rather than orphan: an entry left hanging off a soft-deleted
+                // year would vanish from the user's own records.
+                for entry in loser.entries ?? [] {
+                    entry.taxYear = survivor
+                    entry.updatedAt = stamp
+                }
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                merged += 1
+            }
+            survivor.updatedAt = stamp
+        }
+
+        if merged > 0 { try modelContext.save() }
+        return merged
+    }
+
+    /// Copies every fact the survivor has not answered from the loser. Never overwrites.
+    private static func fillGaps(on survivor: TaxYear, from loser: TaxYear) {
+        if survivor.grossIncomeSen == nil { survivor.grossIncomeSen = loser.grossIncomeSen }
+        if survivor.epfSen == nil { survivor.epfSen = loser.epfSen }
+        if survivor.socsoSen == nil { survivor.socsoSen = loser.socsoSen }
+        if survivor.maritalStatusRaw == nil { survivor.maritalStatusRaw = loser.maritalStatusRaw }
+        if survivor.spouseHasIncome == nil { survivor.spouseHasIncome = loser.spouseHasIncome }
+        if survivor.assessmentTypeRaw == nil { survivor.assessmentTypeRaw = loser.assessmentTypeRaw }
+        if survivor.employmentTypeRaw == nil { survivor.employmentTypeRaw = loser.employmentTypeRaw }
+        if survivor.genderRaw == nil { survivor.genderRaw = loser.genderRaw }
+        if survivor.propertyPriceSen == nil { survivor.propertyPriceSen = loser.propertyPriceSen }
+        if survivor.selfIsDisabled == nil { survivor.selfIsDisabled = loser.selfIsDisabled }
+        if survivor.spouseIsDisabled == nil { survivor.spouseIsDisabled = loser.spouseIsDisabled }
+    }
 }
 
 // MARK: - Test-only seams
@@ -2675,6 +2840,23 @@ extension TaxStore {
 
     /// Attaches a bare document of a given kind. The real pipeline is a later plan; the
     /// sweep only needs the links to exist.
+    /// Creates the second live `TaxYear` row for a year that only two devices syncing
+    /// can otherwise produce.
+    func insertDuplicateYearForTesting(_ year: Int, grossIncome: Money?) throws {
+        let row = TaxYear(year: year)
+        row.grossIncome = grossIncome
+        row.updatedAt = now()
+        modelContext.insert(row)
+        try modelContext.save()
+    }
+
+    func liveYearRowCount(_ year: Int) throws -> Int {
+        try modelContext
+            .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.year == year }
+            .count
+    }
+
     func attachDocumentForTesting(kind: DocumentKind, toEntry id: UUID) throws {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
         guard let row = try modelContext.fetch(descriptor).first else { return }
@@ -2701,7 +2883,7 @@ merge UI must add the marker at the same time.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter Reconciliation`
-Expected: PASS — 7 tests.
+Expected: PASS — 12 tests in 2 suites.
 
 The order-independence test must be observed failing for the right reason before you
 trust it. Temporarily delete the `id.uuidString` tie-break line, re-run, and confirm the
