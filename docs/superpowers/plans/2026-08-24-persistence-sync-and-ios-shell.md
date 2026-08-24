@@ -3080,11 +3080,12 @@ import TaxKit
         #expect(AgeCalculator.age(bornOn: newYearsEve, atEndOf: 2025) == 15)
     }
 
-    @Test("a child born after the year end has no age yet")
-    func unbornIsNegativeFree() {
+    @Test("age is negative before birth")
+    func ageIsNegativeBeforeBirth() {
         let born2027 = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
-        // Rather than a negative age reaching the engine's dependentAge predicate, where
-        // min/max comparisons would produce nonsense, an unborn dependent projects as nil.
+        // AgeCalculator is the honest primitive and reports the real signed difference.
+        // Turning that into "unknown" is the projection's job, not this one's — see
+        // `unbornDependentHasNoAge` in the projection suite.
         #expect(AgeCalculator.age(bornOn: born2027, atEndOf: 2025) < 0)
     }
 }
@@ -3210,6 +3211,32 @@ import TaxKit
         #expect(projected.snapshot.lastClaimedYear[ReliefCode("LIFESTYLE_PC")] == nil)
     }
 
+    @Test("a dependent born after the year end has no age, not a negative one")
+    func unbornDependentHasNoAge() async throws {
+        let store = try await StoreFixture.store()
+        var unborn = DependentDraft(name: "Not yet")
+        unborn.dateOfBirth = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
+        _ = try await store.save(unborn)
+
+        let projected = try await store.project(year: 2025)
+        // The engine's dependentAge(max:) tests `age > max`, so a negative age passes an
+        // "under 18" check and the household would be granted RM 2,000 of child relief
+        // for a dependent who does not exist yet.
+        #expect(projected.snapshot.dependents.first?.ageAtYearEnd == nil)
+    }
+
+    @Test("dependents project in a stable order")
+    func dependentsAreOrdered() async throws {
+        let store = try await StoreFixture.store()
+        for name in ["Farah", "Aisyah", "Danish"] {
+            _ = try await store.save(DependentDraft(id: UUID(), name: name))
+        }
+        let first = try await store.project(year: 2025).snapshot.dependents.map(\.id)
+        let second = try await store.project(year: 2025).snapshot.dependents.map(\.id)
+        #expect(first == second)
+        #expect(first == first.sorted { $0.uuidString < $1.uuidString })
+    }
+
     @Test("projection is ordered deterministically")
     func projectionIsOrdered() async throws {
         let store = try await StoreFixture.store()
@@ -3325,7 +3352,14 @@ extension TaxStore {
         return DependentSnapshot(
             id: draft.id,
             name: draft.name,
-            ageAtYearEnd: draft.dateOfBirth.map { AgeCalculator.age(bornOn: $0, atEndOf: year) },
+            // A negative age means the recorded birth date is after the year end — bad
+            // data, or a placeholder. It must not reach the engine: `dependentAge(max:)`
+            // tests `age > max`, so -1 passes a "under 18" check and a not-yet-born
+            // dependent would be granted child relief. nil reaches the engine as an
+            // unanswered question, so the relief prompts instead of being granted.
+            ageAtYearEnd: draft.dateOfBirth
+                .map { AgeCalculator.age(bornOn: $0, atEndOf: year) }
+                .flatMap { $0 >= 0 ? $0 : nil },
             // nil, not `.none`: an unrecorded education level is an unanswered question,
             // and the engine renders it as a prompt rather than as ineligibility.
             educationLevel: status?.educationLevel,
