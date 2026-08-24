@@ -20,9 +20,14 @@ public enum MoneyParsing {
         // becomes RM 5.00 and `"1-2.5"` becomes RM 1.00 — a typo that produces a wrong
         // amount, which is worse than one that produces no amount. Validation already
         // refuses zero and negative amounts, so nothing downstream needed "-" anyway.
+        // `isASCII` as well as `isNumber`: `Character.isNumber` is true for every digit
+        // Unicode knows — Arabic-Indic "٣", circled "③", the vulgar fraction "½" — and
+        // `Decimal(string:)` parses none of them, so it stops at the first one exactly
+        // as it does at a "-". "12٣4" would otherwise become RM 12.00 and "1½" RM 1.00:
+        // the same silent truncation as the "5-3" case above, from the same cause.
         guard !cleaned.isEmpty,
               cleaned.filter({ $0 == "." }).count <= 1,
-              cleaned.allSatisfy({ $0.isNumber || $0 == "." }),
+              cleaned.allSatisfy({ ($0.isASCII && $0.isNumber) || $0 == "." }),
               let decimal = Decimal(string: cleaned, locale: Locale(identifier: "en_US_POSIX")),
               // `Money(ringgit:)` traps via `precondition` outside `Int`'s range — a
               // typed amount is the one place that precondition can be reached with

@@ -155,6 +155,32 @@ import TaxData
         #expect(model.prompts.claimsMissingDocuments >= 1)
     }
 
+    @Test("an entry against a code this year does not know is counted, not dropped")
+    func unresolvedEntriesAreSurfaced() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+
+        // A retired code, or one from a rulebook that never shipped this year. The
+        // evaluator deliberately reports these separately instead of discarding them,
+        // and until a view model owns that list the user's RM 500 is invisible on every
+        // screen in the app — their claim looks like it was never made.
+        var orphan = EntryDraft(id: UUID(), year: 2025,
+                                code: ReliefCode("NOT_A_REAL_CODE"),
+                                amount: Money(ringgit: 500))
+        orphan.vendor = "Imported from an older rulebook"
+        _ = try await store.save(orphan)
+
+        let model = await Self.model(store)
+        #expect(model.context.result?.unresolved.count == 1, "the engine must see it as unresolved")
+        #expect(model.prompts.unresolvedEntryCount == 1)
+
+        // And a household with nothing unresolved reports zero, so the prompt is not
+        // permanently lit.
+        let clean = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(clean)
+        #expect(await Self.model(clean).prompts.unresolvedEntryCount == 0)
+    }
+
     @Test("percent used is integer arithmetic and never divides by zero")
     func usedPercent() async throws {
         let store = try await PresentationFixture.store()

@@ -143,15 +143,74 @@ import TaxData
         #expect(!model.subLimits.isEmpty, "MEDICAL_SERIOUS has sub-limits in YA2025")
     }
 
-    @Test("an unknown code yields an empty screen rather than a crash")
+    @Test("a code the year does not know clears the screen it had already filled")
     func unknownCode() async throws {
         let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+
+        // A fresh model pointed at a bad code proves nothing on its own: every field is
+        // already empty, so "the guard clears state" and "the guard never runs" look
+        // identical. Each case below fills the screen first, then takes the code away.
+
+        // 1. The code is real, but not in the year the user switched to.
+        //    HOUSING_LOAN_INTEREST is new in YA2025 and absent from YA2023, while the
+        //    2023 evaluation itself succeeds — so this is genuinely "this rulebook has
+        //    never heard of that code", not "there is no rulebook".
+        var loanInterest = EntryDraft(id: UUID(), year: 2025,
+                                      code: ReliefCode("HOUSING_LOAN_INTEREST"),
+                                      amount: Money(ringgit: 5_000))
+        loanInterest.vendor = "Maybank"
+        _ = try await store.save(loanInterest)
+
         let context = PresentationFixture.context(store)
         await context.load()
         let model = ReliefDetailViewModel(context: context, store: store,
-                                          code: ReliefCode("NOT_A_REAL_CODE"))
+                                          code: ReliefCode("HOUSING_LOAN_INTEREST"))
+        await model.refresh()
+        #expect(model.assessment != nil)
+        #expect(!model.entries.isEmpty)
+        #expect(model.sourceURL != nil)
+        #expect(model.notes != nil, "HOUSING_LOAN_INTEREST carries a note in YA2025")
+
+        await context.switchYear(to: 2023)
+        #expect(context.result != nil, "2023 still evaluates; only the code is unknown there")
         await model.refresh()
         #expect(model.assessment == nil)
         #expect(model.entries.isEmpty)
+        #expect(model.subLimits.isEmpty)
+        #expect(model.requirements.isEmpty)
+        #expect(model.sourceURL == nil)
+        #expect(model.notes == nil)
+
+        // 2. The whole year is unavailable. Same guard, and MEDICAL_SERIOUS fills the
+        //    two fields HOUSING_LOAN_INTEREST cannot: sub-limits and requirements.
+        let medicalContext = PresentationFixture.context(store)
+        await medicalContext.load()
+        let medical = ReliefDetailViewModel(context: medicalContext, store: store,
+                                            code: ReliefCode("MEDICAL_SERIOUS"))
+        _ = try await store.save(EntryDraft(id: UUID(), year: 2025,
+                                            code: ReliefCode("MEDICAL_SERIOUS"),
+                                            amount: Money(ringgit: 6_500)))
+        await medicalContext.reload()
+        await medical.refresh()
+        #expect(!medical.subLimits.isEmpty)
+        #expect(!medical.requirements.isEmpty)
+        #expect(!medical.entries.isEmpty)
+
+        await medicalContext.switchYear(to: 2026)
+        await medical.refresh()
+        #expect(medical.assessment == nil)
+        #expect(medical.entries.isEmpty)
+        #expect(medical.subLimits.isEmpty)
+        #expect(medical.requirements.isEmpty)
+        #expect(medical.sourceURL == nil)
+        #expect(medical.notes == nil)
+
+        // 3. And a code no year has ever shipped still yields an empty screen, not a crash.
+        let nonsense = ReliefDetailViewModel(context: medicalContext, store: store,
+                                             code: ReliefCode("NOT_A_REAL_CODE"))
+        await nonsense.refresh()
+        #expect(nonsense.assessment == nil)
+        #expect(nonsense.entries.isEmpty)
     }
 }

@@ -244,6 +244,56 @@ private final class CallCountingLoader: RuleSetLoading, Sendable {
         #expect(context.result?.assessment(for: ReliefCode("SSPN"))?.claimed == originalSSPN)
     }
 
+    @Test("a superseded load never writes its year's figures under another year's label")
+    func overlappingSwitchesResolveToTheCurrentYear() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+
+        // The two switches genuinely interleave, and deterministically so: 2024 has a
+        // shipped rulebook, so its load suspends inside `store.project`; 2026 has none,
+        // so its load fails synchronously and finishes first. Without a generation guard
+        // the 2024 evaluation then lands *after* the year has already moved to 2026, and
+        // every screen reads 2024's figures under a 2026 heading while the status claims
+        // .ready — the worst kind of wrong for a tax app, because it looks correct.
+        let first = Task { await context.switchYear(to: 2024) }
+        let second = Task { await context.switchYear(to: 2026) }
+        _ = await first.value
+        _ = await second.value
+
+        #expect(context.year == 2026)
+        if let result = context.result {
+            Issue.record("a superseded load assigned \(result.yearOfAssessment) while showing \(context.year)")
+        }
+        guard case .unavailable = context.status else {
+            Issue.record("expected .unavailable for 2026, got \(context.status)")
+            return
+        }
+        #expect(context.ruleSet == nil)
+        // The superseded switch must not win the "resume here next launch" race either.
+        #expect(try await store.preferences().lastViewedYear == 2026)
+    }
+
+    @Test("two overlapping switches leave the result matching the year on screen")
+    func overlappingSwitchesAgreeOnTheYear() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+
+        let first = Task { await context.switchYear(to: 2024) }
+        let second = Task { await context.switchYear(to: 2023) }
+        _ = await first.value
+        _ = await second.value
+
+        // Whichever wins, the invariant every screen depends on holds: the single shared
+        // result describes the year the switcher is showing.
+        let result = try #require(context.result)
+        #expect(result.yearOfAssessment == context.year)
+        #expect(context.status == .ready)
+    }
+
     @Test("a no-op switch to the current ready year does not re-stamp preferences")
     func noOpSwitchDoesNotStampPreferences() async throws {
         let store = try await PresentationFixture.store()

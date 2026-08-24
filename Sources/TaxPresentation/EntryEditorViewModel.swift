@@ -21,18 +21,69 @@ public struct DependentOption: Hashable, Sendable, Identifiable {
 @Observable
 public final class EntryEditorViewModel {
 
-    public var selectedCode: ReliefCode?
-    public var amountText: String = ""
-    public var vendor: String = ""
-    public var spentOn: Date?
+    /// The relief being claimed.
+    ///
+    /// A plain settable property, and every guard in this type derives from its current
+    /// value rather than from what `load()` happened to see — see `readOnlyReason`.
+    /// Changing it clears two pieces of state that were about the *old* code: the
+    /// duplicate warning, and a dependent the new code cannot even show.
+    public var selectedCode: ReliefCode? {
+        get { storedSelectedCode }
+        set {
+            guard newValue != storedSelectedCode else { return }
+            storedSelectedCode = newValue
+            duplicateWarning = nil
+            // `dependentID` is a component of the dedupe key. A relief whose editor
+            // cannot display the field — SSPN, LIFE_INSURANCE — must not carry one
+            // invisibly: two otherwise-identical entries would hash differently and the
+            // sweep could never collapse them, so the duplicate would survive forever.
+            //
+            // Only on a *change*, which is what preserves the case Task 15 fixed:
+            // `load()` assigns the code before the dependent, and re-saving an untouched
+            // CHILDCARE entry never reassigns the code at all, so the child it names
+            // survives the round trip.
+            if !allowsDependent { dependentID = nil }
+        }
+    }
+
+    public var amountText: String {
+        get { storedAmountText }
+        set {
+            guard newValue != storedAmountText else { return }
+            storedAmountText = newValue
+            duplicateWarning = nil
+        }
+    }
+
+    public var vendor: String {
+        get { storedVendor }
+        set {
+            guard newValue != storedVendor else { return }
+            storedVendor = newValue
+            duplicateWarning = nil
+        }
+    }
+
+    public var spentOn: Date? {
+        get { storedSpentOn }
+        set {
+            guard newValue != storedSpentOn else { return }
+            storedSpentOn = newValue
+            duplicateWarning = nil
+        }
+    }
+
     public var claimant: Claimant = .individual
     public var dependentID: UUID?
     public var note: String = ""
 
+    private var storedSelectedCode: ReliefCode?
+    private var storedAmountText: String = ""
+    private var storedVendor: String = ""
+    private var storedSpentOn: Date?
+
     public private(set) var availableCodes: [ReliefOption] = []
     public private(set) var availableDependents: [DependentOption] = []
-    public private(set) var isReadOnly = false
-    public private(set) var readOnlyReason: String?
 
     private let context: YearContext
     private let store: TaxStore
@@ -89,12 +140,20 @@ public final class EntryEditorViewModel {
         claimant = existing.claimant
         dependentID = existing.dependentID
         note = existing.note
-
-        if Self.isAutomatic(existing.code, in: context) {
-            isReadOnly = true
-            readOnlyReason = "\(existing.code.rawValue) is granted automatically from your household details. Any amount recorded here is ignored — edit your details instead."
-        }
     }
+
+    /// Why this form cannot be saved as it stands, or `nil`.
+    ///
+    /// Computed over the *currently selected* code, never captured at `load()`: the user
+    /// can switch an entry that opened against an automatic relief onto a manual one,
+    /// and a sticky flag would leave that form permanently unsaveable while citing a
+    /// code it no longer holds.
+    public var readOnlyReason: String? {
+        guard let selectedCode, Self.isAutomatic(selectedCode, in: context) else { return nil }
+        return "\(selectedCode.rawValue) is granted automatically from your household details. Any amount recorded here is ignored — edit your details instead."
+    }
+
+    public var isReadOnly: Bool { readOnlyReason != nil }
 
     /// Claimants the selected relief admits, from the rulebook via
     /// `admittedClaimantsByCode` — not from `availableCodes`. Empty means no restriction.
@@ -147,7 +206,12 @@ public final class EntryEditorViewModel {
     }
 
     public var canSave: Bool {
-        !isReadOnly && validationError == nil
+        // `TaxStore.save` clears `deletedAt`, so a save after a delete silently revives
+        // the row the user just deleted. The editor is where that is decided, not the
+        // view: a rule left to the view is a rule `swift test` cannot see, and every
+        // platform's view would have to remember it independently. `undoDelete()` clears
+        // `deletedID`, so undo restores the ability to save along with the entry.
+        deletedID == nil && !isReadOnly && validationError == nil
     }
 
     /// Spec §6.5: same-session duplicates are caught by a prompt at entry time, before
@@ -193,14 +257,18 @@ public final class EntryEditorViewModel {
                                code: code,
                                amount: amount,
                                claimant: claimant,
-                               // Always the current value, never forced to nil for a
-                               // relief that doesn't display the field. Nilling it out
-                               // here erased which child a CHILDCARE or BREASTFEEDING
-                               // claim was for the moment the user reopened and saved a
-                               // synced entry — no tax impact (the engine ignores
-                               // `dependentID` on a fixed cap), but a silent loss of the
-                               // user's own record in the two reliefs where naming a
-                               // child is the entire point.
+                               // Always the current value, never forced to nil here.
+                               // Nilling it out at save time erased which child a
+                               // CHILDCARE or BREASTFEEDING claim was for the moment the
+                               // user reopened and saved a synced entry — no tax impact
+                               // (the engine ignores `dependentID` on a fixed cap), but
+                               // a silent loss of the user's own record in the two
+                               // reliefs where naming a child is the entire point.
+                               //
+                               // A dependent the selected relief cannot display is
+                               // already gone by now: `selectedCode`'s setter clears it
+                               // when the code changes to one with no dependent field,
+                               // which is the only moment the two can disagree.
                                dependentID: dependentID,
                                vendor: vendor.trimmingCharacters(in: .whitespaces),
                                spentOn: spentOn,

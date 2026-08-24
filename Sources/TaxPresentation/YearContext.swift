@@ -47,16 +47,28 @@ public final class YearContext {
     }
 
     public func load() async {
+        // The year this load is *for*, captured before any suspension.
+        //
+        // Two loads can be in flight at once — the switcher is a segmented control, and
+        // a year with no shipped rulebook fails synchronously while a year with one
+        // suspends in `store.project`, so the second switch can finish before the first
+        // resumes. Without this guard the older load then writes its evaluation into the
+        // single object every screen reads, and the app shows one year's figures under
+        // another year's label. Every assignment below is gated on the request still
+        // being the current one; a superseded load exits having changed nothing.
+        let requested = year
         status = .loading
         do {
-            let ruleSet = try loader.ruleSet(for: year)
+            let ruleSet = try loader.ruleSet(for: requested)
+            let projected = try await store.project(year: requested)
+            guard requested == year else { return }
             self.ruleSet = ruleSet
-            let projected = try await store.project(year: year)
             result = evaluate(ruleSet: ruleSet,
                               year: projected.snapshot,
                               entries: projected.entries)
             status = .ready
         } catch let error as RuleSetLoadingError {
+            guard requested == year else { return }
             self.ruleSet = nil
             result = nil
             switch error {
@@ -74,6 +86,7 @@ public final class YearContext {
                 status = .unavailable("The rulebook for \(year) could not be read.")
             }
         } catch {
+            guard requested == year else { return }
             self.ruleSet = nil
             result = nil
             status = .unavailable("Could not load \(year): \(error.localizedDescription)")
@@ -100,6 +113,9 @@ public final class YearContext {
         guard newYear != year || status != .ready else { return }
         year = newYear
         await load()
+        // Same reason as the guard in `load()`: a switch that has been superseded must
+        // not write its year back as the one to resume on next launch.
+        guard newYear == year else { return }
         await rememberYear(newYear)
     }
 

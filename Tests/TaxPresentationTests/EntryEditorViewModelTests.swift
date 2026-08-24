@@ -50,6 +50,23 @@ import TaxData
         #expect(MoneyParsing.money(from: "1-2.5") == nil)
         #expect(MoneyParsing.money(from: "-5") == nil)
     }
+
+    @Test("a digit Decimal cannot read does not silently truncate the amount")
+    func rejectsNonASCIIDigits() {
+        // `Character.isNumber` is true for every digit Unicode knows, and
+        // `Decimal(string:)` reads none of them — so a check of `isNumber` alone lets
+        // "12٣4" (an Arabic-Indic 3, one keyboard-switch away on a Malaysian phone)
+        // become RM 12.00 and "5٣" become RM 5.00. Identical failure to the "5-3" case
+        // above, from the identical cause.
+        #expect(MoneyParsing.money(from: "12٣4") == nil)
+        #expect(MoneyParsing.money(from: "5٣") == nil)
+        #expect(MoneyParsing.money(from: "١٢٣") == nil)
+        // Vulgar fractions and enclosed digits are `isNumber` too.
+        #expect(MoneyParsing.money(from: "1½") == nil)
+        #expect(MoneyParsing.money(from: "③") == nil)
+        // ASCII digits still parse, which is the whole point of the tightening.
+        #expect(MoneyParsing.money(from: "1234") == Money(ringgit: 1_234))
+    }
 }
 
 @Suite("EntryEditorViewModel") @MainActor struct EntryEditorViewModelTests {
@@ -395,6 +412,157 @@ import TaxData
         // Spec §11.6: every destructive action is undoable, on all platforms.
         await model.undoDelete()
         #expect(try await store.entryDrafts(forYear: 2025).first { $0.id == existing.id } != nil)
+    }
+
+    @Test("switching off an automatic relief unlocks the form")
+    func readOnlyFollowsTheSelectedCode() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        var draft = EntryDraft(id: UUID(), year: 2025,
+                               code: ReliefCode("SELF_AND_DEPENDENTS"),
+                               amount: Money(ringgit: 9_000))
+        draft.vendor = "Imported"
+        let id = try await store.save(draft)
+
+        let model = await Self.editor(store, editing: id)
+        #expect(model.isReadOnly)
+
+        // The obvious repair for an entry that opened read-only is to point it at a
+        // relief that can actually hold it. A flag assigned once in `load()` leaves the
+        // form permanently unsaveable, still citing SELF_AND_DEPENDENTS — a dead end the
+        // user cannot escape without abandoning the entry.
+        model.selectedCode = ReliefCode("LIFESTYLE")
+        model.amountText = "320"
+
+        #expect(!model.isReadOnly)
+        #expect(model.readOnlyReason == nil)
+        #expect(model.canSave)
+        #expect(await model.save())
+        let saved = try await store.entryDrafts(forYear: 2025).first { $0.id == id }
+        #expect(saved?.code == ReliefCode("LIFESTYLE"))
+        #expect(saved?.amount == Money(ringgit: 320))
+    }
+
+    @Test("switching to a relief with no dependent field drops the dependent")
+    func dependentIsClearedWhenTheNewCodeCannotShowIt() async throws {
+        let store = try await PresentationFixture.store()
+        var aiman = DependentDraft(id: UUID(), name: "Aiman")
+        aiman.dateOfBirth = Date(timeIntervalSince1970: 1_600_000_000)
+        _ = try await store.save(aiman)
+
+        let model = await Self.editor(store)
+        model.selectedCode = ReliefCode("CHILDCARE")
+        model.amountText = "2000"
+        model.dependentID = aiman.id
+        #expect(model.allowsDependent)
+
+        // SSPN admits no dependent-ish claimant and turns on no dependent fact, so the
+        // picker hides the field entirely.
+        model.selectedCode = ReliefCode("SSPN")
+        #expect(!model.allowsDependent)
+        // `dependentID` is hashed into the dedupe key. Kept invisibly, it makes two
+        // otherwise-identical SSPN deposits hash differently, and the sweep can never
+        // collapse them however many times it runs.
+        #expect(model.dependentID == nil)
+
+        #expect(await model.save())
+        let saved = try #require(try await store.entryDrafts(forYear: 2025)
+            .first { $0.code == ReliefCode("SSPN") })
+        #expect(saved.dependentID == nil)
+    }
+
+    @Test("re-saving an untouched CHILDCARE entry keeps the child it names")
+    func dependentSurvivesWhenTheCodeIsNotTouched() async throws {
+        let store = try await PresentationFixture.store()
+        var aiman = DependentDraft(id: UUID(), name: "Aiman")
+        aiman.dateOfBirth = Date(timeIntervalSince1970: 1_600_000_000)
+        _ = try await store.save(aiman)
+
+        var draft = EntryDraft(id: UUID(), year: 2025,
+                               code: ReliefCode("CHILDCARE"), amount: Money(ringgit: 2_000))
+        draft.dependentID = aiman.id
+        draft.vendor = "Tadika Ceria"
+        let id = try await store.save(draft)
+
+        let model = await Self.editor(store, editing: id)
+        #expect(model.dependentID == aiman.id)
+
+        // The other direction of the same rule, and the case Task 15 fixed: clearing on
+        // a code *change* must not become clearing on every save. Editing the amount and
+        // saving leaves the code alone, so the child survives.
+        model.amountText = "2500"
+        #expect(await model.save())
+        let saved = try await store.entryDrafts(forYear: 2025).first { $0.id == id }
+        #expect(saved?.dependentID == aiman.id)
+        #expect(saved?.amount == Money(ringgit: 2_500))
+
+        // Re-assigning the same code is not a change either.
+        model.selectedCode = ReliefCode("CHILDCARE")
+        #expect(model.dependentID == aiman.id)
+    }
+
+    @Test("saving after deleting does not resurrect the entry")
+    func deleteBlocksSaving() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let existing = try #require(try await store.entryDrafts(forYear: 2025).first)
+        let model = await Self.editor(store, editing: existing.id)
+        #expect(model.canSave)
+
+        await model.delete()
+
+        // `TaxStore.save` clears `deletedAt` by design (it is how a merge loser comes
+        // back), so a save after a delete revives the row the user just deleted. Left to
+        // the view, that rule is invisible to `swift test` and has to be re-implemented
+        // on every platform.
+        #expect(!model.canSave)
+        #expect(await model.save() == false)
+        #expect(try await store.entryDrafts(forYear: 2025).first { $0.id == existing.id } == nil)
+
+        // Undo restores the ability to save along with the entry.
+        await model.undoDelete()
+        #expect(model.canSave)
+        #expect(await model.save())
+        #expect(try await store.entryDrafts(forYear: 2025).first { $0.id == existing.id } != nil)
+    }
+
+    @Test("the duplicate warning does not outlive the figures it quotes")
+    func duplicateWarningIsClearedOnEdit() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let existing = try #require(try await store.entryDrafts(forYear: 2025)
+            .first { $0.code == ReliefCode("LIFESTYLE") })
+
+        func warned() async -> EntryEditorViewModel {
+            let model = await Self.editor(store)
+            model.selectedCode = existing.code
+            model.amountText = existing.amount.formattedForEditing()
+            model.vendor = existing.vendor
+            model.spentOn = existing.spentOn
+            await model.checkForDuplicate()
+            return model
+        }
+
+        // The warning names a specific amount ("You already logged RM 1,700.00…"). It
+        // must not still be on screen once that amount is no longer what the user typed
+        // — a stale warning about a figure that is not in the field reads as the app
+        // being wrong about their money.
+        let onAmount = await warned()
+        #expect(onAmount.duplicateWarning != nil)
+        onAmount.amountText = "999"
+        #expect(onAmount.duplicateWarning == nil, "editing the amount must clear it")
+
+        let onVendor = await warned()
+        onVendor.vendor = "Somewhere else"
+        #expect(onVendor.duplicateWarning == nil, "editing the vendor must clear it")
+
+        let onDate = await warned()
+        onDate.spentOn = Date(timeIntervalSince1970: 1_700_000_000)
+        #expect(onDate.duplicateWarning == nil, "changing the date must clear it")
+
+        let onCode = await warned()
+        onCode.selectedCode = ReliefCode("SSPN")
+        #expect(onCode.duplicateWarning == nil, "changing the relief must clear it")
     }
 
     @Test("saving refreshes the shared evaluation")

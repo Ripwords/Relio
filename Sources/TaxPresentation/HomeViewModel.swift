@@ -29,10 +29,20 @@ public struct HomePrompts: Hashable, Sendable {
     /// Relief that would become claimable if those questions were answered favourably.
     public var unlockableRelief: Money
     public var claimsMissingDocuments: Int
+    /// Entries whose code this year's rulebook does not recognise — retired, or from a
+    /// rulebook that never shipped it.
+    ///
+    /// The evaluator reports these separately precisely so they can be surfaced: such an
+    /// entry contributes to no assessment, so without this count the user's money is
+    /// invisible on every screen in the app and their claim looks like it was never
+    /// made. Rendering the actionable row is the reliefs screen's job; owning the number
+    /// is this view model's.
+    public var unresolvedEntryCount: Int
 
     public static let none = HomePrompts(unansweredQuestionCount: 0,
                                          unlockableRelief: .zero,
-                                         claimsMissingDocuments: 0)
+                                         claimsMissingDocuments: 0,
+                                         unresolvedEntryCount: 0)
 }
 
 /// Spec §11: Home answers one question — how much is being left on the table.
@@ -133,6 +143,7 @@ public final class HomeViewModel {
 
         return HomePrompts(unansweredQuestionCount: questions,
                            unlockableRelief: unlockable,
-                           claimsMissingDocuments: missing)
+                           claimsMissingDocuments: missing,
+                           unresolvedEntryCount: result.unresolved.count)
     }
 }
