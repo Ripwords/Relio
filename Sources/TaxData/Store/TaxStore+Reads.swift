@@ -84,6 +84,12 @@ extension TaxStore {
                                    lastViewedYear: row.lastViewedYear)
     }
 
+    /// The stored key for one entry. Exposed for the dedupe tests and for the merge UI.
+    public func dedupeKey(forEntry id: UUID) throws -> String {
+        let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first?.dedupeKey ?? ""
+    }
+
     static func draft(from row: ReliefEntry) -> EntryDraft {
         var draft = EntryDraft(id: row.id,
                                year: row.taxYear?.year ?? 0,

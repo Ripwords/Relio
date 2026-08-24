@@ -127,6 +127,13 @@ public actor TaxStore {
         now = clock
     }
 
+    /// Injectable so a test can pin a rulebook. Production uses the bundled one.
+    private var ruleSetLoader: any RuleSetLoading = BundledRuleSetLoader()
+
+    public func useRuleSetLoader(_ loader: any RuleSetLoading) {
+        ruleSetLoader = loader
+    }
+
     // MARK: - Years
 
     public func saveYearFacts(_ facts: YearFacts, for year: Int) throws {
@@ -179,6 +186,7 @@ public actor TaxStore {
         row.mergedInto = nil
         row.updatedAt = stamp
         year.updatedAt = stamp
+        refreshDerivedFields(on: row)
 
         try modelContext.save()
         return identifier
@@ -297,6 +305,35 @@ public actor TaxStore {
         try modelContext.fetch(
             FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
         ).first
+    }
+
+    /// The two fields the store owns rather than the caller: a key that must never go
+    /// stale, and a flag `#Predicate` needs because it cannot call the engine.
+    private func refreshDerivedFields(on row: ReliefEntry) {
+        row.dedupeKey = DedupeKey.entry(code: row.reliefCode,
+                                        amountSen: row.amountSen,
+                                        day: Normalisation.day(row.spentOn),
+                                        vendor: Normalisation.vendor(row.vendor))
+        row.needsDocument = missingRequiredDocument(for: row)
+    }
+
+    /// A year whose rules this build does not ship yields `false`, not a warning: the
+    /// app has no basis to claim a document is missing against rules it cannot read.
+    private func missingRequiredDocument(for row: ReliefEntry) -> Bool {
+        guard let year = row.taxYear?.year,
+              let ruleSet = try? ruleSetLoader.ruleSet(for: year),
+              let rule = ruleSet.relief(for: row.reliefCode) else { return false }
+        return !Set(rule.requiredDocuments).isSubset(of: row.documentKinds)
+    }
+
+    /// Rewrites every live entry's key. Needed after a change to the normalisation rules
+    /// or to the key's components, which would otherwise leave old rows unmatchable
+    /// against new ones and silently break the sweep.
+    public func recomputeAllDedupeKeys() throws {
+        let rows = try modelContext
+            .fetch(FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.deletedAt == nil }))
+        for row in rows { refreshDerivedFields(on: row) }
+        try modelContext.save()
     }
 
     /// CloudKit cannot enforce a singleton, so two devices first launching offline each
