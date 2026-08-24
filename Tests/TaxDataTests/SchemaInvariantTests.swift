@@ -34,11 +34,10 @@ enum SchemaInvariants {
 
 @Suite("Schema invariants") struct SchemaInvariantTests {
 
-    /// Every `@Model` type in the package. Task 2 and Task 3 append to this list; the
-    /// single source of truth for it becomes `SchemaV1.models` in Task 3.
-    static let allModels: [any PersistentModel.Type] = [
-        TaxYear.self, Dependent.self, ReliefEntry.self, Document.self, DocumentFile.self
-    ]
+    /// The shipped schema is the single source of truth. A model that is not in
+    /// `SchemaV1.models` does not exist as far as the container is concerned, so testing
+    /// any other list would test something the app never opens.
+    static let allModels: [any PersistentModel.Type] = SchemaV1.models
 
     @Test("every model is CloudKit-mirroring-safe")
     func modelsAreMirroringSafe() {
