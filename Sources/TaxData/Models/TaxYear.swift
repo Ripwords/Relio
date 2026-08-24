@@ -13,6 +13,13 @@ import TaxKit
 @Model
 public final class TaxYear {
 
+    /// Stable across devices, unlike `persistentModelID` (a *local store* identity that
+    /// two devices are not guaranteed to derive identically for the same logical row).
+    /// `TaxStore.isNewer` uses this, not `persistentModelID`, to break ties when two
+    /// devices each create a live `TaxYear` row for the same year — otherwise each
+    /// device could pick a different survivor and the duplicate would never converge.
+    public var id: UUID = UUID()
+
     public var year: Int = 0
 
     public var grossIncomeSen: Int?

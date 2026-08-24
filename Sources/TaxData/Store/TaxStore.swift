@@ -267,15 +267,18 @@ public actor TaxStore {
     // MARK: - Internals
 
     /// Total order two devices agree on when more than one live row could otherwise be
-    /// picked: newest `updatedAt` first, ties broken by the model's persistent identity.
-    /// `TaxYear` carries no `id: UUID` of its own (unlike `ReliefEntry`, `Dependent` and
-    /// `UserPreferences`), so `persistentModelID` — itself `Comparable` — stands in for
-    /// it here. Shared by the write path (`fetchOrCreateYear`) and the read path
+    /// picked: newest `updatedAt` first, ties broken on `id.uuidString` — the same rule
+    /// every other resolver in this file uses (`resolvedPreferencesRow`,
+    /// `entryDrafts`'s and `dependentDrafts`'s ordering). `id` is stable across devices;
+    /// `persistentModelID` is a *local store* identity and is not guaranteed to agree
+    /// across two devices for the same logical row, so it cannot serve as a tie-break —
+    /// two devices could each pick a different survivor and the duplicate would never
+    /// converge. Shared by the write path (`fetchOrCreateYear`) and the read path
     /// (`TaxStore+Reads.yearFacts`) so they can never disagree about which duplicate
     /// `TaxYear` row is "the" row for a year.
     static func isNewer(_ lhs: TaxYear, _ rhs: TaxYear) -> Bool {
         if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
-        return lhs.persistentModelID > rhs.persistentModelID
+        return lhs.id.uuidString > rhs.id.uuidString
     }
 
     private func fetchOrCreateYear(_ year: Int) throws -> TaxYear {

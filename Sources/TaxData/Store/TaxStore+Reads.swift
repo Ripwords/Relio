@@ -161,9 +161,12 @@ extension TaxStore {
     }
 
     /// Creates the collision CloudKit can produce but a single device cannot: a second
-    /// live `TaxYear` row for the same year. Only the tests call this.
-    func insertDuplicateYearForTesting(year: Int, updatedAt: Date, grossIncome: Money?) throws {
+    /// live `TaxYear` row for the same year. Takes an explicit `id` so a tie-break test
+    /// can pin which of two identically-stamped rows must win, rather than depending on
+    /// whichever UUID `TaxYear.init` happens to generate. Only the tests call this.
+    func insertDuplicateYearForTesting(id: UUID = UUID(), year: Int, updatedAt: Date, grossIncome: Money?) throws {
         let row = TaxYear(year: year)
+        row.id = id
         row.updatedAt = updatedAt
         row.grossIncome = grossIncome
         modelContext.insert(row)
@@ -180,5 +183,15 @@ extension TaxStore {
             .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.year == year && $0.deletedAt == nil }))
             .sorted(by: TaxStore.isNewer)
             .map(\.grossIncome)
+    }
+
+    /// Every live `TaxYear` row's `id` for a year, ordered by the same `TaxStore.isNewer`
+    /// rule the store applies — so a tie-break test can assert exactly which id survives
+    /// when two rows share an `updatedAt`. Only the tests call this.
+    func liveYearIdsForTesting(year: Int) throws -> [UUID] {
+        try modelContext
+            .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.year == year && $0.deletedAt == nil }))
+            .sorted(by: TaxStore.isNewer)
+            .map(\.id)
     }
 }

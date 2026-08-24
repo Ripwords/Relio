@@ -312,4 +312,34 @@ enum StoreFixture {
         #expect(incomes.first == Money(ringgit: 120_000), "the write must have landed on the survivor the read path also picks")
         #expect(incomes.last == Money(ringgit: 50_000), "the loser row must be left untouched, not merged away")
     }
+
+    @Test("duplicate TaxYear rows with identical updatedAt resolve deterministically by id")
+    func duplicateYearRowsWithSameStampBreakTiesByID() async throws {
+        // Fix round 2: the round-1 tie-break used persistentModelID, a *local store*
+        // identity not guaranteed to agree across two devices for the same logical row.
+        // TaxYear.id is now the stable, cross-device tie-break — the same rule every
+        // other resolver in TaxStore already applies (newest updatedAt, ties on
+        // id.uuidString, higher string wins). Fixed UUIDs pin the expectation instead of
+        // leaving it incidental on whatever order two random UUIDs happen to compare in.
+        let store = try await StoreFixture.store()
+        let lowerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let higherID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+        try await store.insertDuplicateYearForTesting(id: lowerID,
+                                                       year: 2025,
+                                                       updatedAt: StoreFixture.epoch,
+                                                       grossIncome: Money(ringgit: 10_000))
+        try await store.insertDuplicateYearForTesting(id: higherID,
+                                                       year: 2025,
+                                                       updatedAt: StoreFixture.epoch,
+                                                       grossIncome: Money(ringgit: 20_000))
+
+        let ids = try await store.liveYearIdsForTesting(year: 2025)
+        #expect(ids.first == higherID,
+                "with updatedAt tied, the row with the higher id.uuidString must win, deterministically on every run")
+        #expect(ids == ids.sorted { $0.uuidString > $1.uuidString })
+
+        let read = try await store.yearFacts(for: 2025)
+        #expect(read.grossIncome == Money(ringgit: 20_000), "yearFacts must read through the id-tie-break survivor")
+    }
 }
