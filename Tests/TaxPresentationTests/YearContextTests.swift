@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 import TaxKit
 @testable import TaxData
 @testable import TaxPresentation
@@ -54,7 +55,47 @@ private struct FailingRuleSetLoader: RuleSetLoading {
     }
 }
 
+/// Counts calls to `ruleSet(for:)`, so a test can assert `YearContext.rule(for:)` reuses
+/// a cached rule set rather than re-decoding the rulebook on every call. `Mutex` gives
+/// thread-safe interior mutability without `@unchecked Sendable`.
+private final class CallCountingLoader: RuleSetLoading, Sendable {
+    let availableYears: [Int]
+    private let inner: any RuleSetLoading
+    private let count = Mutex<Int>(0)
+
+    init(wrapping inner: any RuleSetLoading) {
+        self.inner = inner
+        self.availableYears = inner.availableYears
+    }
+
+    var callCount: Int { count.withLock { $0 } }
+
+    func ruleSet(for year: Int) throws -> RuleSet {
+        count.withLock { $0 += 1 }
+        return try inner.ruleSet(for: year)
+    }
+}
+
 @Suite("YearContext") @MainActor struct YearContextTests {
+
+    @Test("rule(for:) reuses the cached rule set rather than re-decoding on every call")
+    func ruleForReusesCachedRuleSet() async throws {
+        let store = try await PresentationFixture.store()
+        let countingLoader = CallCountingLoader(wrapping: BundledRuleSetLoader())
+        let context = YearContext(store: store, loader: countingLoader, year: 2025)
+        await context.load()
+        let countAfterLoad = countingLoader.callCount
+
+        // The editor asks `rule(for:)` once per offerable relief plus once per existing
+        // entry it loads — without a cache that is a synchronous file read and JSON
+        // decode per call, on the MainActor, against a spec budget of no frame over 8ms.
+        for code in ["LIFESTYLE", "SSPN", "MEDICAL_CHECKUP", "PARENTS_MEDICAL", "PARENTS_CHECKUP"] {
+            _ = context.rule(for: ReliefCode(code))
+        }
+
+        #expect(countingLoader.callCount == countAfterLoad,
+                "rule(for:) must reuse the cached rule set, not re-decode the rulebook per call")
+    }
 
     @Test("loading evaluates the persisted year")
     func loadEvaluates() async throws {

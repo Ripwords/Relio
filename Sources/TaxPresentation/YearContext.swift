@@ -28,6 +28,13 @@ public final class YearContext {
     public private(set) var availableYears: [Int]
     public private(set) var result: EvaluationResult?
     public private(set) var status: LoadStatus = .idle
+    /// The decoded rulebook behind `result`, cached so `rule(for:)` never re-decodes.
+    /// `BundledRuleSetLoader` has no cache of its own, and a synchronous file read plus
+    /// JSON decode per code — the editor asks once per offerable relief — would blow the
+    /// spec's per-frame budget on the MainActor. Reassigned every `load()`, which is
+    /// exactly when the year (and so the rulebook) can change, so there is no separate
+    /// invalidation path to keep in sync.
+    public private(set) var ruleSet: RuleSet?
 
     private let store: TaxStore
     private let loader: any RuleSetLoading
@@ -43,12 +50,14 @@ public final class YearContext {
         status = .loading
         do {
             let ruleSet = try loader.ruleSet(for: year)
+            self.ruleSet = ruleSet
             let projected = try await store.project(year: year)
             result = evaluate(ruleSet: ruleSet,
                               year: projected.snapshot,
                               entries: projected.entries)
             status = .ready
         } catch let error as RuleSetLoadingError {
+            self.ruleSet = nil
             result = nil
             switch error {
             case .noRulesForYear:
@@ -65,6 +74,7 @@ public final class YearContext {
                 status = .unavailable("The rulebook for \(year) could not be read.")
             }
         } catch {
+            self.ruleSet = nil
             result = nil
             status = .unavailable("Could not load \(year): \(error.localizedDescription)")
         }
@@ -75,9 +85,10 @@ public final class YearContext {
     }
 
     /// The rulebook entry behind a code, for the few decisions the evaluation result
-    /// does not carry — `automatic` chief among them.
+    /// does not carry — `automatic` chief among them. Reads the cache `load()` already
+    /// populated rather than asking the loader again.
     public func rule(for code: ReliefCode) -> ReliefRule? {
-        (try? loader.ruleSet(for: year))?.relief(for: code)
+        ruleSet?.relief(for: code)
     }
 
     public func switchYear(to newYear: Int) async {
