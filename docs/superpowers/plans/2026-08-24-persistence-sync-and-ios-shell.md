@@ -4290,11 +4290,20 @@ public final class YearContext {
                               year: projected.snapshot,
                               entries: projected.entries)
             status = .ready
-        } catch is RuleSetLoadingError {
-            // Not an error state. Every January until the Budget ships, the current year
-            // has no rulebook, and the user's entries for it still exist and still matter.
+        } catch let error as RuleSetLoadingError {
             result = nil
-            status = .unavailable("Rules for \(year) aren't available yet.")
+            switch error {
+            case .noRulesForYear:
+                // Not an error state. Every January until the Budget ships, the current
+                // year has no rulebook, and the user's entries for it still exist and
+                // still matter.
+                status = .unavailable("Rules for \(year) aren't available yet.")
+            case .malformed:
+                // A file bundled inside the app failed to decode. Saying "not available
+                // yet" here would have the user waiting for a Budget that already
+                // happened, while every figure silently shows nothing.
+                status = .unavailable("The rulebook for \(year) could not be read.")
+            }
         } catch {
             result = nil
             status = .unavailable("Could not load \(year): \(error.localizedDescription)")
@@ -4306,6 +4315,10 @@ public final class YearContext {
     }
 
     public func switchYear(to newYear: Int) async {
+        // A no-op switch would still churn `updatedAt` on the UserPreferences singleton,
+        // which the reconciliation sweep and CloudKit's newest-write-wins both key off.
+        // `.ready` is part of the guard so a retry after a failure still reloads.
+        if newYear == year, status == .ready { return }
         year = newYear
         await load()
         await rememberYear(newYear)
