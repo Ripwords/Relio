@@ -47,17 +47,50 @@ import TaxKit
     @Test("entries on a losing row are re-pointed, not orphaned")
     func entriesFollowTheSurvivor() async throws {
         let store = try await StoreFixture.store()
-        _ = try await store.save(StoreFixture.entry("LIFESTYLE", 1_820))
+        // Three, not one: re-pointing mutates `entry.taxYear`, the inverse side of the
+        // very relationship (`loser.entries`) being iterated. With a single entry a
+        // skipped-element bug (e.g. mutating a collection while walking it) would still
+        // pass by accident — this exercises "every entry arrives", not just "one did".
+        _ = try await store.save(StoreFixture.entry("LIFESTYLE", 1_820, vendor: "Popular Bookstore"))
+        _ = try await store.save(StoreFixture.entry("SSPN", 3_000, vendor: "SSPN"))
+        _ = try await store.save(StoreFixture.entry("MEDICAL_SERIOUS", 6_500, vendor: "Hospital"))
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
         try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
         _ = try await store.reconcileYears()
 
-        // The entry was attached to the row that lost. If it were not re-pointed it would
-        // hang off a soft-deleted year and vanish from the user's own records.
+        // All three entries were attached to the row that lost. If they were not
+        // re-pointed they would hang off a soft-deleted year and vanish from the user's
+        // own records.
         let drafts = try await store.entryDrafts(forYear: 2025)
-        #expect(drafts.count == 1)
-        #expect(drafts.first?.code == ReliefCode("LIFESTYLE"))
+        #expect(drafts.count == 3)
+        #expect(Set(drafts.map(\.code)) == [ReliefCode("LIFESTYLE"), ReliefCode("SSPN"), ReliefCode("MEDICAL_SERIOUS")])
+    }
+
+    @Test("two devices seeing the same year rows in opposite orders pick the same survivor")
+    func yearSweepIsOrderIndependent() async throws {
+        let idA = UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!
+        let idB = UUID(uuidString: "00000000-0000-0000-0000-0000000000BB")!
+        let instant = StoreFixture.epoch
+
+        let deviceOne = try await StoreFixture.store()
+        try await deviceOne.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncome: nil)
+        try await deviceOne.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncome: nil)
+
+        let deviceTwo = try await StoreFixture.store()
+        try await deviceTwo.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncome: nil)
+        try await deviceTwo.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncome: nil)
+
+        #expect(try await deviceOne.reconcileYears() == 1)
+        #expect(try await deviceTwo.reconcileYears() == 1)
+
+        let survivorOne = try await deviceOne.liveYearIdsForTesting(year: 2025).first
+        let survivorTwo = try await deviceTwo.liveYearIdsForTesting(year: 2025).first
+        // Identical stamps, so the tie-break (shared with `TaxStore.isNewer`, not a
+        // second copy of it) is doing the work. Without it two devices could pick
+        // different survivors and resurrect each other's soft-deleted loser forever.
+        #expect(survivorOne == survivorTwo)
+        #expect(survivorOne == idB, "highest uuidString wins the tie")
     }
 
     @Test("running year reconciliation twice changes nothing the second time")
@@ -113,7 +146,7 @@ import TaxKit
         #expect(try await store.mergedInto(entryID: older.id) == newer.id)
     }
 
-    @Test("the survivor inherits the losers' documents")
+    @Test("the survivor inherits the losers' documents, and needsDocument reflects them")
     func documentLinksAreUnioned() async throws {
         let store = try await StoreFixture.store()
         var older = StoreFixture.entry("MEDICAL_SERIOUS", 6_500)
@@ -125,8 +158,13 @@ import TaxKit
 
         // The older row is the one that carries the medical certificate. Dropping it
         // would turn a complete claim into one failing its requirement check — the merge
-        // would destroy evidence, which is the one thing it must never do.
+        // would destroy evidence, which is the one thing it must never do. Attached at
+        // two distinct, increasing instants (both later than either save) so the
+        // survivor is genuinely chosen because it is newest — pinning both attaches to
+        // the same instant would instead exercise the uuid tie-break, which is not what
+        // this test is about.
         try await store.attachDocumentForTesting(kind: .medicalCertificate, toEntry: older.id)
+        await store.useClock { Self.t1.addingTimeInterval(60) }
         try await store.attachDocumentForTesting(kind: .officialReceipt, toEntry: newer.id)
 
         _ = try await store.reconcile()
@@ -134,6 +172,11 @@ import TaxKit
         let survivor = try #require(try await store.entryDrafts(forYear: 2025).first)
         #expect(survivor.id == newer.id)
         #expect(survivor.documentKinds == [.medicalCertificate, .officialReceipt])
+        // needsDocument is cached and only recomputed on a write to the row. MEDICAL_SERIOUS
+        // requires both officialReceipt and medicalCertificate; the union satisfies that
+        // requirement, so without a recompute on the survivor this would still read true —
+        // the exact case the union exists to fix would still show as incomplete.
+        #expect(survivor.needsDocument == false)
     }
 
     @Test("two devices seeing the same rows in opposite orders pick the same survivor")

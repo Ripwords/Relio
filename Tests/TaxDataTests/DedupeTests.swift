@@ -60,10 +60,10 @@ import TaxKit
     @Test("a different relief code produces a different key")
     func codeChangesKey() {
         let day = "2025-02-20"
-        let a = DedupeKey.entry(code: ReliefCode("LIFESTYLE"), amountSen: 182_000,
-                                day: day, vendor: "popular")
-        let b = DedupeKey.entry(code: ReliefCode("LIFESTYLE_SPORTS"), amountSen: 182_000,
-                                day: day, vendor: "popular")
+        let a = DedupeKey.entry(year: 2025, code: ReliefCode("LIFESTYLE"), amountSen: 182_000,
+                                day: day, vendor: "popular", claimant: .individual, dependentID: nil)
+        let b = DedupeKey.entry(year: 2025, code: ReliefCode("LIFESTYLE_SPORTS"), amountSen: 182_000,
+                                day: day, vendor: "popular", claimant: .individual, dependentID: nil)
         #expect(a != b)
     }
 
@@ -77,8 +77,59 @@ import TaxKit
         //   ("A|1", amount: 23, day: "D",  vendor: "V")    -> "A|1" + "|23|D|V"
         //   ("A",   amount: 1,  day: "23", vendor: "D|V")  -> "A|1|23" + "|D|V"
         // A length-prefixed encoding must keep them apart.
-        let a = DedupeKey.entry(code: ReliefCode("A|1"), amountSen: 23, day: "D", vendor: "V")
-        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "23", vendor: "D|V")
+        let a = DedupeKey.entry(year: 2025, code: ReliefCode("A|1"), amountSen: 23, day: "D",
+                                vendor: "V", claimant: .individual, dependentID: nil)
+        let b = DedupeKey.entry(year: 2025, code: ReliefCode("A"), amountSen: 1, day: "23",
+                                vendor: "D|V", claimant: .individual, dependentID: nil)
+        #expect(a != b)
+    }
+
+    @Test("a claim in a different Year of Assessment produces a different key, and both years survive reconciliation")
+    func yearChangesKeyAndBothYearsSurvive() async throws {
+        // Regression for the Critical from fix round 1: DedupeKey.entry did not take a
+        // year, and Normalisation.day(nil) == "" while EntryDraft.spentOn defaults to
+        // nil, so an undated recurring claim like SSPN logged in two different years
+        // hashed identically. reconcile() then treated one year's entry as a duplicate
+        // of the other's and silently soft-deleted it.
+        let store = try await StoreFixture.store()
+        let idA = try await store.save(StoreFixture.entry("SSPN", 3_000, year: 2024, spentOn: nil))
+        let idB = try await store.save(StoreFixture.entry("SSPN", 3_000, year: 2025, spentOn: nil))
+
+        let keyA = try await store.dedupeKey(forEntry: idA)
+        let keyB = try await store.dedupeKey(forEntry: idB)
+        #expect(keyA != keyB)
+
+        _ = try await store.reconcile()
+        // The regression collapsed one year's row into the other; asserting the
+        // surviving count per year, not just key inequality, is what actually catches
+        // that — two different keys that both happened to size their group at 1 would
+        // pass a bare inequality check and still miss a collapse elsewhere.
+        #expect(try await store.entryDrafts(forYear: 2024).count == 1)
+        #expect(try await store.entryDrafts(forYear: 2025).count == 1)
+    }
+
+    @Test("a different dependentID produces a different key")
+    func dependentIDChangesKey() {
+        let day = "2025-02-20"
+        let childOne = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let childTwo = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        // Same code, amount, day and vendor — only which child the claim is for differs.
+        // Without dependentID in the key, two children's identical claims in one year
+        // would collapse into a single claim, silently discarding one child's relief.
+        let a = DedupeKey.entry(year: 2025, code: ReliefCode("CHILD_MEDICAL"), amountSen: 150_000,
+                                day: day, vendor: "klinik", claimant: .child, dependentID: childOne)
+        let b = DedupeKey.entry(year: 2025, code: ReliefCode("CHILD_MEDICAL"), amountSen: 150_000,
+                                day: day, vendor: "klinik", claimant: .child, dependentID: childTwo)
+        #expect(a != b)
+    }
+
+    @Test("a different claimant produces a different key")
+    func claimantChangesKey() {
+        let day = "2025-02-20"
+        let a = DedupeKey.entry(year: 2025, code: ReliefCode("MEDICAL_SERIOUS"), amountSen: 650_000,
+                                day: day, vendor: "hospital", claimant: .individual, dependentID: nil)
+        let b = DedupeKey.entry(year: 2025, code: ReliefCode("MEDICAL_SERIOUS"), amountSen: 650_000,
+                                day: day, vendor: "hospital", claimant: .spouse, dependentID: nil)
         #expect(a != b)
     }
 
