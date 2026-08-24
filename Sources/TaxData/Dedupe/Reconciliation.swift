@@ -1,0 +1,187 @@
+import Foundation
+import SwiftData
+import TaxKit
+
+/// One group of duplicates that was collapsed.
+public struct MergeReport: Hashable, Sendable {
+    public var dedupeKey: String
+    public var survivorID: UUID
+    /// Sorted, so two devices produce identical reports for identical data.
+    public var mergedIDs: [UUID]
+}
+
+extension TaxStore {
+
+    /// Collapses duplicate entries. Runs on every sync-complete event.
+    ///
+    /// Deterministic by construction: the survivor is the row with the newest
+    /// `updatedAt`, ties broken on `id.uuidString`. Nothing coordinates the devices, so
+    /// the survivor has to be a pure function of the rows — if two devices disagreed,
+    /// each would resurrect the other's soft-deleted loser and the duplicate would
+    /// survive forever.
+    ///
+    /// Idempotent: a second run over already-merged data reports nothing and writes
+    /// nothing. It has to be, or every sync would churn `updatedAt` and look like a
+    /// change to every other device.
+    @discardableResult
+    public func reconcile() throws -> [MergeReport] {
+        // Years first: an entry re-pointed at the surviving year must be visible to the
+        // entry pass in the same sweep, or a duplicate could hide behind a duplicate.
+        try reconcileYears()
+
+        let live = try modelContext.fetch(
+            FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.deletedAt == nil }))
+
+        // An empty key means the row never went through `save`, which should be
+        // impossible. Grouping all such rows together would merge unrelated entries, so
+        // they are skipped — the safe direction.
+        let groups = Dictionary(grouping: live.filter { !$0.dedupeKey.isEmpty },
+                                by: \.dedupeKey)
+
+        var reports: [MergeReport] = []
+        let stamp = now()
+
+        for key in groups.keys.sorted() {
+            guard let group = groups[key], group.count > 1 else { continue }
+
+            let ordered = group.sorted { left, right in
+                if left.updatedAt != right.updatedAt { return left.updatedAt > right.updatedAt }
+                return left.id.uuidString > right.id.uuidString
+            }
+            guard let survivor = ordered.first else { continue }
+            let losers = Array(ordered.dropFirst())
+
+            var documents = survivor.documents ?? []
+            for loser in losers {
+                for document in loser.documents ?? [] where !documents.contains(where: { $0.id == document.id }) {
+                    documents.append(document)
+                }
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                loser.mergedInto = survivor.id
+            }
+            // Dropping a loser's documents would turn a complete claim into one failing
+            // its requirement check. The merge must never destroy evidence.
+            survivor.documents = documents.sorted { $0.id.uuidString < $1.id.uuidString }
+            survivor.updatedAt = stamp
+
+            reports.append(MergeReport(dedupeKey: key,
+                                       survivorID: survivor.id,
+                                       mergedIDs: losers.map(\.id).sorted { $0.uuidString < $1.uuidString }))
+        }
+
+        if !reports.isEmpty { try modelContext.save() }
+        return reports
+    }
+
+    /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
+    public func unmerge(entryID: UUID) throws {
+        let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
+        guard let row = try modelContext.fetch(descriptor).first, row.mergedInto != nil else { return }
+        row.mergedInto = nil
+        row.deletedAt = nil
+        row.updatedAt = now()
+        try modelContext.save()
+    }
+
+    public func mergedInto(entryID: UUID) throws -> UUID? {
+        let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
+        return try modelContext.fetch(descriptor).first?.mergedInto
+    }
+
+    /// Collapses duplicate `TaxYear` rows, returning how many were merged away.
+    ///
+    /// Two devices first launching offline each create their own row for the same year.
+    /// Task 4 made the *selection* deterministic so both devices at least agree; this
+    /// removes the duplicate.
+    ///
+    /// Facts merge by filling gaps and never by overwriting: `nil` means "not answered
+    /// yet" everywhere in this app, so adopting a loser's value where the survivor has
+    /// none cannot lose an answer, while refusing to overwrite means the newer device's
+    /// answer always wins. Discarding the loser's facts would silently throw away income
+    /// the user entered on their other phone.
+    @discardableResult
+    public func reconcileYears() throws -> Int {
+        let live = try modelContext.fetch(
+            FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+
+        var merged = 0
+        let stamp = now()
+
+        for (_, group) in Dictionary(grouping: live, by: \.year) where group.count > 1 {
+            let ordered = group.sorted { left, right in
+                if left.updatedAt != right.updatedAt { return left.updatedAt > right.updatedAt }
+                return left.id.uuidString > right.id.uuidString
+            }
+            guard let survivor = ordered.first else { continue }
+
+            for loser in ordered.dropFirst() {
+                Self.fillGaps(on: survivor, from: loser)
+                // Re-point rather than orphan: an entry left hanging off a soft-deleted
+                // year would vanish from the user's own records.
+                for entry in loser.entries ?? [] {
+                    entry.taxYear = survivor
+                    entry.updatedAt = stamp
+                }
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                merged += 1
+            }
+            survivor.updatedAt = stamp
+        }
+
+        if merged > 0 { try modelContext.save() }
+        return merged
+    }
+
+    /// Copies every fact the survivor has not answered from the loser. Never overwrites.
+    private static func fillGaps(on survivor: TaxYear, from loser: TaxYear) {
+        if survivor.grossIncomeSen == nil { survivor.grossIncomeSen = loser.grossIncomeSen }
+        if survivor.epfSen == nil { survivor.epfSen = loser.epfSen }
+        if survivor.socsoSen == nil { survivor.socsoSen = loser.socsoSen }
+        if survivor.maritalStatusRaw == nil { survivor.maritalStatusRaw = loser.maritalStatusRaw }
+        if survivor.spouseHasIncome == nil { survivor.spouseHasIncome = loser.spouseHasIncome }
+        if survivor.assessmentTypeRaw == nil { survivor.assessmentTypeRaw = loser.assessmentTypeRaw }
+        if survivor.employmentTypeRaw == nil { survivor.employmentTypeRaw = loser.employmentTypeRaw }
+        if survivor.genderRaw == nil { survivor.genderRaw = loser.genderRaw }
+        if survivor.propertyPriceSen == nil { survivor.propertyPriceSen = loser.propertyPriceSen }
+        if survivor.selfIsDisabled == nil { survivor.selfIsDisabled = loser.selfIsDisabled }
+        if survivor.spouseIsDisabled == nil { survivor.spouseIsDisabled = loser.spouseIsDisabled }
+    }
+}
+
+// MARK: - Test-only seams
+
+extension TaxStore {
+
+    /// Creates the second live `TaxYear` row for a year that only two devices syncing
+    /// can otherwise produce.
+    func insertDuplicateYearForTesting(_ year: Int, grossIncome: Money?) throws {
+        let row = TaxYear(year: year)
+        row.grossIncome = grossIncome
+        row.updatedAt = now()
+        modelContext.insert(row)
+        try modelContext.save()
+    }
+
+    func liveYearRowCount(_ year: Int) throws -> Int {
+        try modelContext
+            .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.year == year }
+            .count
+    }
+
+    /// Attaches a bare document of a given kind. The real pipeline is a later plan; the
+    /// sweep only needs the links to exist.
+    func attachDocumentForTesting(kind: DocumentKind, toEntry id: UUID) throws {
+        let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
+        guard let row = try modelContext.fetch(descriptor).first else { return }
+        let document = Document()
+        document.kind = kind
+        document.updatedAt = now()
+        modelContext.insert(document)
+        row.documents = (row.documents ?? []) + [document]
+        row.updatedAt = now()
+        try modelContext.save()
+    }
+}
