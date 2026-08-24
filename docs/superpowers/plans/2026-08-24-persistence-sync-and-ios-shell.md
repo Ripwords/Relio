@@ -2164,14 +2164,23 @@ import TaxKit
         #expect(a != b)
     }
 
-    @Test("fields cannot be smuggled across the separator")
-    func separatorIsUnambiguous() {
-        // Without a separator that cannot appear in a component, ("AB", 1) and ("A", "B1")
-        // would hash identically. Vendor normalisation strips everything but alphanumerics
-        // and spaces, so "|" is safe — this test pins that it stays safe.
-        let a = DedupeKey.entry(code: ReliefCode("AB"), amountSen: 1, day: "", vendor: "x")
-        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "", vendor: "Bx")
+    @Test("components cannot be smuggled across the encoding")
+    func componentsCannotBeSmuggledAcrossTheEncoding() {
+        // `ReliefCode` performs no character validation and `reliefCodeRaw` is written
+        // directly by sync, so a code containing the delimiter is reachable from a synced
+        // record rather than hypothetical. Under a plain `|` join these two would produce
+        // the same flat string; length prefixes keep them distinct.
+        let a = DedupeKey.entry(code: ReliefCode("A|B"), amountSen: 1, day: "", vendor: "x")
+        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "B", vendor: "x")
         #expect(a != b)
+    }
+
+    @Test("the length-prefixed encoding is injective on the boundary case")
+    func encodingIsInjective() {
+        // "ab" + "" and "a" + "b" are the minimal pair that a bare concatenation cannot
+        // tell apart.
+        #expect(DedupeKey.encode(["ab", ""]) != DedupeKey.encode(["a", "b"]))
+        #expect(DedupeKey.encode(["a|b"]) != DedupeKey.encode(["a", "b"]))
     }
 
     @Test("editing an entry recomputes its key")
@@ -2281,15 +2290,26 @@ public enum DedupeKey {
 
     /// SHA-256 over the identifying tuple, lowercase hex.
     ///
-    /// `|` is a safe separator because every component is already restricted to
-    /// characters that cannot contain it: the code is `[A-Z_]`, the amount is digits,
-    /// the day is `yyyy-MM-dd`, and `Normalisation.vendor` emits only alphanumerics and
-    /// single spaces. Without that guarantee, ("AB", 1) and ("A", "B1") would collide.
+    /// Components are length-prefixed rather than merely delimited, which makes the
+    /// encoding injective for ANY component content. A plain `|` separator would rest on
+    /// the assumption that no component can contain one — and nothing enforces that:
+    /// `ReliefCode` is a bare `RawRepresentable` with no character validation, and
+    /// `reliefCodeRaw` is a plain `String` that CloudKit sync writes into directly. A
+    /// record from a future or corrupted build could carry a `|` and defeat exactly the
+    /// guarantee this type exists to provide.
     public static func entry(code: ReliefCode,
                              amountSen: Int,
                              day: String,
                              vendor: String) -> String {
-        hex(of: "\(code.rawValue)|\(amountSen)|\(day)|\(vendor)")
+        hex(of: encode([code.rawValue, String(amountSen), day, vendor]))
+    }
+
+    /// `["ab", "c"]` becomes `"2:ab|1:c"`. The byte count preceding each component makes
+    /// the boundary unambiguous no matter what the component contains.
+    static func encode(_ components: [String]) -> String {
+        components
+            .map { "\($0.utf8.count):\($0)" }
+            .joined(separator: "|")
     }
 
     /// SHA-256 of a file's bytes — catches the same photo imported on two devices with
