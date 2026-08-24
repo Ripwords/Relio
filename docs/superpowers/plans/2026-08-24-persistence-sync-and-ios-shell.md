@@ -2168,10 +2168,14 @@ import TaxKit
     func componentsCannotBeSmuggledAcrossTheEncoding() {
         // `ReliefCode` performs no character validation and `reliefCodeRaw` is written
         // directly by sync, so a code containing the delimiter is reachable from a synced
-        // record rather than hypothetical. Under a plain `|` join these two would produce
-        // the same flat string; length prefixes keep them distinct.
-        let a = DedupeKey.entry(code: ReliefCode("A|B"), amountSen: 1, day: "", vendor: "x")
-        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "B", vendor: "x")
+        // record rather than hypothetical.
+        //
+        // These two both flatten to "A|1|23|D|V" under the old pipe-joined scheme and so
+        // hashed identically. Note the collision has to cascade across all four fields:
+        // amountSen renders as bare digits with no separators of its own, so a simple
+        // code-versus-vendor swap is not reachable on its own.
+        let a = DedupeKey.entry(code: ReliefCode("A|1"), amountSen: 23, day: "D", vendor: "V")
+        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "23", vendor: "D|V")
         #expect(a != b)
     }
 
