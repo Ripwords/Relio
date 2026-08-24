@@ -5,7 +5,8 @@ let package = Package(
     name: "TaxKit",
     platforms: [.iOS(.v26), .macOS(.v26), .watchOS(.v26)],
     products: [
-        .library(name: "TaxKit", targets: ["TaxKit"])
+        .library(name: "TaxKit", targets: ["TaxKit"]),
+        .library(name: "TaxData", targets: ["TaxData"])
     ],
     targets: [
         .target(
@@ -34,6 +35,16 @@ let package = Package(
             name: "TaxKitTests",
             dependencies: ["TaxKit"],
             resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
+            name: "TaxData",
+            dependencies: ["TaxKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "TaxDataTests",
+            dependencies: ["TaxData"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

@@ -289,4 +289,45 @@ import Foundation
         #expect(try Self.load(2025).relief(for: ReliefCode("LIFESTYLE_SPORTS"))?.cap
                 == .fixed(Money(ringgit: 1000)))
     }
+
+    /// Carried forward from Plan 1's final review.
+    ///
+    /// A dependent predicate is satisfied when ANY dependent satisfies it (existential).
+    /// Wrapping one in `.not` therefore means "no dependent satisfies it", which is not
+    /// the negation a rulebook author would expect to write, and nothing in the decoder
+    /// stops them. Zero `not` ops exist over dependent facts in any shipped rulebook, so
+    /// this guard costs nothing today and refuses the construct until the semantics are
+    /// defined and tested.
+    @Test("no shipped rulebook wraps a dependent fact in `not`", arguments: shippedYears)
+    func noNotOverDependentFacts(year: Int) throws {
+        for relief in try Self.load(year).allReliefs {
+            guard let predicate = relief.eligibility else { continue }
+            #expect(!Self.containsNotOverDependentFact(predicate),
+                    "\(year) \(relief.code): `not` over a dependent fact has undefined semantics")
+        }
+    }
+
+    /// True when any `.not` in the tree has a dependent fact anywhere beneath it.
+    static func containsNotOverDependentFact(_ predicate: EligibilityPredicate) -> Bool {
+        func mentionsDependent(_ node: EligibilityPredicate) -> Bool {
+            switch node {
+            case .dependentAge, .dependentEducation, .dependentIsDisabled:
+                return true
+            case .not(let inner):
+                return mentionsDependent(inner)
+            case .all(let children), .any(let children):
+                return children.contains(where: mentionsDependent)
+            default:
+                return false
+            }
+        }
+        switch predicate {
+        case .not(let inner):
+            return mentionsDependent(inner)
+        case .all(let children), .any(let children):
+            return children.contains(where: containsNotOverDependentFact)
+        default:
+            return false
+        }
+    }
 }
