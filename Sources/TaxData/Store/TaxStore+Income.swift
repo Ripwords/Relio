@@ -2,6 +2,14 @@ import Foundation
 import SwiftData
 import TaxKit
 
+/// Writing a record against a source that does not exist would silently drop income:
+/// the row would save, return a valid `UUID`, and then be invisible to
+/// `incomeRecordDrafts(forSource:)` and to the derivation — understating chargeable
+/// income with no signal to the caller. Spec §6.
+public enum IncomeStoreError: Error, Equatable {
+    case unknownIncomeSource(UUID)
+}
+
 public struct IncomeSourceDraft: Hashable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
@@ -80,9 +88,22 @@ extension TaxStore {
         let existing = try modelContext.fetch(
             FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.id == identifier })
         ).first
+        // Deliberately not filtered to `deletedAt == nil`: a source that resolves but is
+        // soft-deleted still attaches. That self-heals — `liveSources()` filters the
+        // record out just as it would a deleted record, and it reappears correctly if
+        // the source is revived, since `save(_ draft: IncomeSourceDraft)` clears
+        // `deletedAt`. Only a source that does not exist at all is a problem.
         let source = try modelContext.fetch(
             FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == sourceID })
         ).first
+
+        // Only a brand-new record insists its source resolve. Nothing is written before
+        // this check: an unresolvable `sourceID` here would otherwise save successfully
+        // and silently vanish from every read, understating the year's income with no
+        // signal to the caller.
+        if existing == nil && source == nil {
+            throw IncomeStoreError.unknownIncomeSource(sourceID)
+        }
 
         let row = existing ?? IncomeRecord(id: identifier)
         if existing == nil { modelContext.insert(row) }

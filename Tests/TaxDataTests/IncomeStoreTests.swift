@@ -142,4 +142,24 @@ import TaxKit
         #expect(first == second)
         #expect(first == first.sorted { $0.uuidString < $1.uuidString })
     }
+
+    @Test("saving a record against an unknown source throws instead of orphaning it")
+    func unknownSourceThrows() async throws {
+        let store = try await StoreFixture.store()
+        let phantomSourceID = UUID()
+        var rate = IncomeRecordDraft(sourceID: phantomSourceID)
+        rate.amount = Money(ringgit: 8_000)
+        rate.effectiveFrom = Self.date(2025, 1, 1)
+
+        // Saving this silently would leave a record with no live source: invisible to
+        // incomeRecordDrafts(forSource:) and to the derivation, understating the year's
+        // income with no signal to the caller — exactly what onboarding's
+        // `(try? await store.save(...)) ?? UUID()` fallback would trigger.
+        await #expect(throws: IncomeStoreError.unknownIncomeSource(phantomSourceID)) {
+            try await store.save(rate)
+        }
+
+        #expect(try await store.incomeSourceDrafts().isEmpty)
+        #expect(try await store.incomeRecordDrafts(forSource: phantomSourceID).isEmpty)
+    }
 }
