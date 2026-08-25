@@ -54,15 +54,23 @@ struct OnboardingView: View {
         @Bindable var model = model
         switch model.step {
         case .welcome:
-            VStack(spacing: 12) {
-                Text("Relio").font(.largeTitle.bold())
-                Text("Track your Malaysian tax relief. No account, no server — your data stays on your devices.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                Text("Estimates only. Verify with LHDN before you file.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(spacing: 12) {
+                        Text("Relio").font(.largeTitle.bold())
+                        Text("Track your Malaysian tax relief. No account, no server — your data stays on your devices.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Estimates only. Verify with LHDN before you file.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: proxy.size.height)
+                }
             }
 
         case .household:
