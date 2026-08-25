@@ -203,4 +203,71 @@ import TaxKit
         let job = Self.source([Self.rate(9_000, from: Self.date(2026, 3, 1))])
         #expect(IncomeDerivation.annualGross(for: 2025, from: [job]) == Money.zero)
     }
+
+    // MARK: - Known versus not known
+
+    // `annualGross` answers "how much", and its RM 0 for a year the timeline says nothing
+    // about is the honest answer to that question. `knownAnnualGross` answers the prior
+    // question — "do we know at all?" — because the projection must not hand the engine a
+    // confident RM 0.00 income for a year the household has told us nothing about.
+
+    @Test("a source with no records at all is not known, rather than zero")
+    func noRecordsIsUnknown() {
+        // The moment between creating a source and saving its first rate.
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [Self.source([])]) == nil)
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: []) == nil)
+    }
+
+    @Test("a timeline that starts after the year is not known for that year")
+    func earlierYearIsUnknown() {
+        // Switching the year menu back to YA2024 with a 2025-only timeline must not claim
+        // they earned nothing in 2024.
+        let job = Self.source([Self.rate(8_000, from: Self.date(2025, 1, 1))])
+        #expect(IncomeDerivation.knownAnnualGross(for: 2024, from: [job]) == nil)
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [job]) == Money(ringgit: 96_000))
+    }
+
+    @Test("a source that ended in a past year is not known for a later one")
+    func endedSourceIsUnknown() {
+        let job = Self.source(endedOn: Self.date(2024, 6, 30),
+                              [Self.rate(8_000, from: Self.date(2024, 1, 1))])
+        #expect(IncomeDerivation.knownAnnualGross(for: 2024, from: [job]) == Money(ringgit: 48_000))
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [job]) == nil)
+    }
+
+    @Test("a zero amount inside the year is a real answer, not an absence")
+    func zeroInsideTheYearIsKnown() {
+        // A RM 0 one-off dated in the year, and a RM 0 rate in force through it, both say
+        // something about the year: nothing was earned. That is an answer, and it is not
+        // the same as never having been asked.
+        let bonus = Self.source([Self.oneOff(0, on: Self.date(2025, 5, 1))])
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [bonus]) == Money.zero)
+
+        let unpaid = Self.source([Self.rate(0, from: Self.date(2025, 1, 1))])
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [unpaid]) == Money.zero)
+    }
+
+    @Test("when the year is known, the figure is the same one annualGross derives")
+    func knownFigureMatchesAnnualGross() {
+        // The two must never disagree: the same walk decides both whether a record
+        // contributes and what it contributes.
+        let job = Self.source("Main job", [Self.rate(8_000, from: Self.date(2024, 4, 1)),
+                                           Self.rate(9_000, from: Self.date(2025, 7, 1)),
+                                           Self.oneOff(12_000, on: Self.date(2025, 2, 14))])
+        let flat = Self.source("Rental", kind: .rental,
+                               [Self.rate(1_500, from: Self.date(2025, 1, 1))])
+        for year in [2024, 2025] {
+            #expect(IncomeDerivation.knownAnnualGross(for: year, from: [job, flat])
+                    == IncomeDerivation.annualGross(for: year, from: [job, flat]))
+        }
+    }
+
+    @Test("one source reaching into the year makes the year known for all of them")
+    func oneContributingSourceIsEnough() {
+        // The empty source contributes nothing to the sum, but the year is still known
+        // because the other one reaches into it.
+        let job = Self.source("Main job", [Self.rate(8_000, from: Self.date(2025, 1, 1))])
+        #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [Self.source("New job", []), job])
+                == Money(ringgit: 96_000))
+    }
 }

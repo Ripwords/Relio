@@ -276,11 +276,64 @@ import TaxKit
     @Test("an override of zero is respected as a real answer")
     func explicitZeroIsRespected() async throws {
         let store = try await StoreFixture.store()
+        // Seeded with a real timeline, so this proves an explicit zero beats a *non-zero*
+        // derived figure — the sharpest form of the precedence rule.
+        try await Self.seedSalary(store, 8_000)
         var facts = try await store.yearFacts(for: 2025)
         facts.grossIncomeOverride = .zero
         try await store.saveYearFacts(facts, for: 2025)
         // A user who genuinely earned nothing this year has said so. That is different
         // from not having told us.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money.zero)
+    }
+
+    @Test("a source with no records yet still projects nil, not zero")
+    func sourceWithoutRecordsIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        // Creating a source and saving its first rate are two writes. Between them the
+        // household has named a job and told us nothing about what it pays.
+        _ = try await store.save(IncomeSourceDraft(name: "Main job"))
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("a timeline that only covers 2025 projects nil for 2024")
+    func earlierYearIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        // Switching the year menu back a year must not report a confident RM 0.00 income
+        // for a year the timeline says nothing about.
+        #expect(try await store.project(year: 2024).snapshot.grossIncome == nil)
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("a source that ended in a past year projects nil for a later one")
+    func endedSourceIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        var job = IncomeSourceDraft(name: "Old job")
+        job.endedOn = Self.date(2024, 6, 30)
+        let sourceID = try await store.save(job)
+        var rate = IncomeRecordDraft(sourceID: sourceID)
+        rate.amount = Money(ringgit: 8_000)
+        rate.effectiveFrom = Self.date(2024, 1, 1)
+        _ = try await store.save(rate)
+
+        #expect(try await store.project(year: 2024).snapshot.grossIncome == Money(ringgit: 48_000))
+        // The source still exists; it just stopped paying before this year began.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("a zero-amount one-off inside the year projects zero, not nil")
+    func zeroOneOffIsKnown() async throws {
+        let store = try await StoreFixture.store()
+        let sourceID = try await store.save(IncomeSourceDraft(name: "Side business"))
+        var payment = IncomeRecordDraft(sourceID: sourceID)
+        payment.shape = .oneOff
+        payment.amount = .zero
+        payment.effectiveFrom = Self.date(2025, 5, 1)
+        _ = try await store.save(payment)
+
+        // A record dated inside the year says something about the year, even when what it
+        // says is RM 0. That is an answer; nil is the absence of one.
         #expect(try await store.project(year: 2025).snapshot.grossIncome == Money.zero)
     }
 }
