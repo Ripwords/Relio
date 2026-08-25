@@ -42,6 +42,20 @@ public enum IncomeCalendar {
         calendar.date(byAdding: .day, value: -1, to: startOfDay(date)) ?? date
     }
 
+    public static func dayAfter(_ date: Date) -> Date {
+        calendar.date(byAdding: .day, value: 1, to: startOfDay(date)) ?? date
+    }
+
+    /// True when two instants fall on the same Kuala Lumpur day.
+    ///
+    /// Two rates on one day is a tie the derivation breaks on id — deterministic across
+    /// devices, but arbitrary with respect to what the user meant. Comparing instants
+    /// would miss it: a `DatePicker` and an existing record can name the same day at
+    /// different times of it.
+    public static func isSameDay(_ left: Date, _ right: Date) -> Bool {
+        startOfDay(left) == startOfDay(right)
+    }
+
     public static func startOfYear(_ year: Int) -> Date {
         var components = DateComponents()
         components.year = year; components.month = 1; components.day = 1

@@ -26,6 +26,10 @@ struct IncomeView: View {
     @State private var overrideError: String?
     /// The source a destructive tap is asking about, held until it is confirmed.
     @State private var sourcePendingDeletion: IncomeSourceRow?
+    /// Set when a delete reported failure. Shown the same way as `overrideError` — the row
+    /// staying put is exactly what a tap that never registered looks like, and there is no
+    /// undo for income to fall back on.
+    @State private var deleteError: String?
     @FocusState private var overrideFieldFocused: Bool
 
     var body: some View {
@@ -44,26 +48,46 @@ struct IncomeView: View {
                 Section {
                     ForEach(source.records) { record in
                         Button {
-                            editing = IncomeRecordEditorViewModel(mode: .edit(record))
+                            editing = IncomeRecordEditorViewModel(
+                                mode: .edit(record),
+                                today: record.effectiveFrom,
+                                // A record never collides with itself.
+                                occupiedDays: model.occupiedDays(forSource: source.id,
+                                                                 excluding: record.id))
                         } label: { recordRow(record) }
                             .buttonStyle(.plain)
                             .swipeActions {
                                 Button("Delete", role: .destructive) {
-                                    Task { await model.deleteRecord(id: record.id) }
+                                    Task {
+                                        deleteError = nil
+                                        let deleted = await model.deleteRecord(id: record.id)
+                                        if !deleted {
+                                            deleteError = "Relio could not remove that record. It is still here — try again."
+                                        }
+                                    }
                                 }
                             }
                     }
                     Button("Add a change") {
-                        // Anchored to the year on screen, not to today: see
-                        // `IncomeViewModel.newRecordDate`.
-                        editing = IncomeRecordEditorViewModel(mode: .addRecord(sourceID: source.id),
-                                                              today: model.newRecordDate)
+                        // The day after this source's latest record, clamped into the year
+                        // on screen — never today, and never a date that ties with a rate
+                        // already there. See `IncomeViewModel.newRecordDate(forSource:)`.
+                        editing = IncomeRecordEditorViewModel(
+                            mode: .addRecord(sourceID: source.id),
+                            today: model.newRecordDate(forSource: source.id),
+                            occupiedDays: model.occupiedDays(forSource: source.id))
                     }
                     .font(.subheadline)
                     // A row, not a swipe on the header: list headers do not take swipe
-                    // actions, and there is no way to rename a source, so removing one
-                    // is the only remedy for a name typed wrong. It has to be reachable.
-                    //
+                    // actions. This is where a job that has ended gets its end date, which
+                    // is the only thing that can stop a recurring rate — without it, a
+                    // salary the user left behind keeps being paid for every future year.
+                    Button(source.endedOn == nil ? "Edit this source" : "Edit or reopen this source") {
+                        editing = IncomeRecordEditorViewModel(
+                            mode: .editSource(source.draft),
+                            today: model.newRecordDate(forSource: source.id))
+                    }
+                    .font(.subheadline)
                     // Confirmed, unlike the per-record swipe: this destroys the source and
                     // every record under it, there is no undo, and it sits one row under
                     // the entirely benign "Add a change".
@@ -85,7 +109,17 @@ struct IncomeView: View {
 
             Section {
                 LabeledContent("From your records") {
-                    MoneyText(amount: model.derivedTotal, weight: .medium)
+                    // `nil` is "the timeline says nothing about this year", which is not
+                    // RM 0.00. Rendering zero here would state, in the app's most
+                    // confident voice, that the household earned nothing in a year they
+                    // simply have not told Relio about.
+                    if let derived = model.derivedTotal {
+                        MoneyText(amount: derived, weight: .medium)
+                    } else {
+                        Text("Not recorded")
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
                 LabeledContent("Your own figure") {
                     TextField("Optional", text: $overrideText)
@@ -108,14 +142,20 @@ struct IncomeView: View {
             } header: {
                 Text("Gross income for YA \(String(model.context.year))")
             } footer: {
-                Text(model.isOverridden
-                     ? "Relio is using your own figure. Your EA form is the one that counts."
-                     : "Relio adds up your records. If your EA form says something different, enter it above.")
+                Text(Self.incomeFooter(isOverridden: model.isOverridden,
+                                       isYearKnown: model.isYearKnown,
+                                       year: model.context.year))
             }
 
             if let overrideError {
                 Section {
                     Text(overrideError).foregroundStyle(.orange).font(.footnote)
+                }
+            }
+
+            if let deleteError {
+                Section {
+                    Text(deleteError).foregroundStyle(.orange).font(.footnote)
                 }
             }
         }
@@ -152,7 +192,13 @@ struct IncomeView: View {
                                     set: { if !$0 { sourcePendingDeletion = nil } }),
                presenting: sourcePendingDeletion) { source in
             Button("Delete \(source.name)", role: .destructive) {
-                Task { await model.deleteSource(id: source.id) }
+                Task {
+                    deleteError = nil
+                    let deleted = await model.deleteSource(id: source.id)
+                    if !deleted {
+                        deleteError = "Relio could not remove \(source.name). It is still here — try again."
+                    }
+                }
                 sourcePendingDeletion = nil
             }
             Button("Keep it", role: .cancel) { sourcePendingDeletion = nil }
@@ -208,6 +254,20 @@ struct IncomeView: View {
         }
     }
 
+    /// Says which figure is in force, and says nothing confident about a year Relio has
+    /// no records for. "Relio adds up your records" under a RM 0.00 is a claim about the
+    /// user's earnings; "you have not recorded anything" is a description of the app.
+    private static func incomeFooter(isOverridden: Bool, isYearKnown: Bool,
+                                     year: Int) -> String {
+        if isOverridden {
+            return "Relio is using your own figure. Your EA form is the one that counts."
+        }
+        if !isYearKnown {
+            return "Nothing you have recorded reaches YA \(String(year)), so Relio has no figure for it. Add a record dated in that year, or enter your own figure above."
+        }
+        return "Relio adds up your records. If your EA form says something different, enter it above."
+    }
+
     /// Plain counting, spelled out rather than inflected: this sentence is the last thing
     /// a user reads before losing the records for good. Kept to four lines at AX5, which
     /// is what an alert shows before it starts scrolling — the source's own name is
@@ -226,12 +286,24 @@ struct IncomeView: View {
             HStack {
                 Text(source.name)
                 Spacer()
-                MoneyText(amount: source.total, font: .subheadline, weight: .semibold)
+                sourceSubtotal(source)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(source.name)
-                MoneyText(amount: source.total, font: .subheadline, weight: .semibold)
+                sourceSubtotal(source)
             }
+        }
+    }
+
+    /// Held to the same standard as the year's total beneath it. When nothing in the
+    /// timeline reaches the year on screen, no source contributed to it either — and a
+    /// per-source RM 0.00 makes the same false claim in smaller type, once per row.
+    @ViewBuilder
+    private func sourceSubtotal(_ source: IncomeSourceRow) -> some View {
+        if model.isYearKnown {
+            MoneyText(amount: source.total, font: .subheadline, weight: .semibold)
+        } else {
+            Text("Not recorded").font(.subheadline).foregroundStyle(.secondary)
         }
     }
 

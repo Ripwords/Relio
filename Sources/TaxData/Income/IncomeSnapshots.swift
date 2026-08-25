@@ -46,3 +46,42 @@ public struct IncomeSourceTotal: Hashable, Sendable, Identifiable {
 
     public var id: UUID { sourceID }
 }
+
+/// One source as the Income screen shows it: the source itself, what it contributed to the
+/// year, and the records the contribution is built from.
+///
+/// The source travels as a whole `IncomeSourceDraft` rather than as the name and kind the
+/// list happens to display. An edit round-trips this draft back through
+/// `TaxStore.save(_: IncomeSourceDraft)`, which overwrites every field it carries — so a
+/// partial draft would silently null `deductsEPF`/`deductsSOCSO`, turning "confirmed no
+/// EPF" back into "not asked" without anyone touching them.
+public struct IncomeYearRow: Hashable, Sendable, Identifiable {
+    public var source: IncomeSourceDraft
+    public var total: Money
+    public var records: [IncomeRecordDraft]
+
+    public var id: UUID { source.id }
+
+    public init(source: IncomeSourceDraft, total: Money = .zero,
+                records: [IncomeRecordDraft] = []) {
+        self.source = source
+        self.total = total
+        self.records = records
+    }
+}
+
+/// A year's income, answered in one read.
+public struct IncomeYearSummary: Hashable, Sendable {
+    public var rows: [IncomeYearRow]
+
+    /// The year's gross, or `nil` when nothing in the timeline reaches into it — see
+    /// `IncomeDerivation.knownAnnualGross`. `nil` is "we have not been told", which is a
+    /// different claim from RM 0.00, and the screen must not render the second when it
+    /// means the first.
+    public var knownTotal: Money?
+
+    public init(rows: [IncomeYearRow] = [], knownTotal: Money? = nil) {
+        self.rows = rows
+        self.knownTotal = knownTotal
+    }
+}

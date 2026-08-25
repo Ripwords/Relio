@@ -15,6 +15,11 @@ public final class IncomeRecordEditorViewModel {
 
     public enum Mode: Hashable, Sendable {
         case addSource
+        /// An existing source, carried whole so `sourceDraft()` can hand every field back
+        /// — including the id, so the store updates in place instead of inserting a
+        /// second row, and `deductsEPF`/`deductsSOCSO`, which this sheet never shows and
+        /// must not quietly reset to "not asked".
+        case editSource(IncomeSourceDraft)
         case addRecord(sourceID: UUID)
         case edit(IncomeRecordDraft)
     }
@@ -26,10 +31,37 @@ public final class IncomeRecordEditorViewModel {
     public var amountText: String = ""
     public var effectiveFrom: Date
 
-    public init(mode: Mode, today: Date = Date()) {
+    /// Whether this source has stopped paying. A toggle plus a date, the same shape
+    /// onboarding uses for "started part way through the year", because "no end date" has
+    /// to stay representable: a bare `DatePicker` always holds *some* date, so a user
+    /// could set an end date and never clear it again.
+    public var hasEndDate: Bool = false
+    public var endedOn: Date
+
+    /// Days this source already has a record on, so a new one can say when it ties with
+    /// an existing rate. Empty is simply "nothing to warn about".
+    public var occupiedDays: [Date] = []
+
+    /// `today` has no default on purpose. Both live call sites anchor it to the year on
+    /// screen; a `Date()` fallback would let a future one silently regress to the device's
+    /// date, which for the usual case — the newest rulebook being last year — pre-fills a
+    /// date outside the year being edited.
+    public init(mode: Mode, today: Date, occupiedDays: [Date] = []) {
         self.mode = mode
         self.effectiveFrom = today
-        if case .edit(let record) = mode {
+        self.endedOn = today
+        self.occupiedDays = occupiedDays
+        switch mode {
+        case .addSource:
+            break
+        case .editSource(let source):
+            name = source.name
+            kind = source.kind
+            hasEndDate = source.endedOn != nil
+            endedOn = source.endedOn ?? today
+        case .addRecord:
+            break
+        case .edit(let record):
             shape = record.shape
             amountText = record.amount.formattedForEditing()
             effectiveFrom = record.effectiveFrom
@@ -37,8 +69,25 @@ public final class IncomeRecordEditorViewModel {
     }
 
     public var isSourceMode: Bool {
-        if case .addSource = mode { return true }
+        switch mode {
+        case .addSource, .editSource: true
+        case .addRecord, .edit: false
+        }
+    }
+
+    public var isEditingSource: Bool {
+        if case .editSource = mode { return true }
         return false
+    }
+
+    /// A note, not an error: two records on one day is legal and the derivation resolves it
+    /// the same way every time. It is just never what someone meant, and nothing on the
+    /// list distinguishes the rate that wins from the one contributing nothing.
+    public var dateCollisionNote: String? {
+        guard !isSourceMode else { return nil }
+        guard occupiedDays.contains(where: { IncomeCalendar.isSameDay($0, effectiveFrom) })
+        else { return nil }
+        return "This source already has a record on that date. Only one of the two will count — pick a different day unless you meant to replace it."
     }
 
     public var validationError: String? {
@@ -53,10 +102,23 @@ public final class IncomeRecordEditorViewModel {
 
     public var canSave: Bool { validationError == nil }
 
+    /// For `.editSource`, keeps the source's id — and every field this sheet does not
+    /// show — so the store updates in place rather than inserting a second row.
     public func sourceDraft() -> IncomeSourceDraft? {
         guard isSourceMode, canSave else { return nil }
-        var draft = IncomeSourceDraft(name: name.trimmingCharacters(in: .whitespaces))
+
+        var draft: IncomeSourceDraft
+        if case .editSource(let existing) = mode {
+            draft = existing
+        } else {
+            draft = IncomeSourceDraft()
+        }
+        draft.name = name.trimmingCharacters(in: .whitespaces)
         draft.kind = kind
+        // Normalised to the start of the day: `endedOn` is compared against day
+        // boundaries in the derivation, and the picker hands back whatever time of day it
+        // happened to be carrying.
+        draft.endedOn = hasEndDate ? IncomeCalendar.startOfDay(endedOn) : nil
         return draft
     }
 
@@ -72,7 +134,7 @@ public final class IncomeRecordEditorViewModel {
             draft = IncomeRecordDraft(sourceID: sourceID)
         case .edit(let record):
             draft = record
-        case .addSource:
+        case .addSource, .editSource:
             return nil
         }
         draft.shape = shape

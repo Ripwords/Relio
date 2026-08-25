@@ -143,6 +143,58 @@ import TaxKit
         #expect(first == first.sorted { $0.uuidString < $1.uuidString })
     }
 
+    @Test("updating a record whose source has vanished throws rather than orphaning it")
+    func updatingIntoAnUnknownSourceThrows() async throws {
+        let store = try await StoreFixture.store()
+        let sourceID = try await store.save(IncomeSourceDraft(name: "Main job"))
+        var rate = IncomeRecordDraft(sourceID: sourceID)
+        rate.amount = Money(ringgit: 8_000)
+        rate.effectiveFrom = Self.date(2025, 1, 1)
+        let recordID = try await store.save(rate)
+
+        // Re-pointing an existing record at a source that does not exist used to take the
+        // update branch, which set `row.source = nil` — the same orphaning the insert
+        // branch throws to prevent, reached down the other side of the same `if`.
+        var moved = IncomeRecordDraft(id: recordID, sourceID: UUID())
+        moved.amount = Money(ringgit: 8_000)
+        moved.effectiveFrom = Self.date(2025, 1, 1)
+        await #expect(throws: IncomeStoreError.self) { try await store.save(moved) }
+
+        // And the record is untouched, still under the source it had.
+        #expect(try await store.incomeRecordDrafts(forSource: sourceID).count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("one summary call answers the subtotals, the sources and the known/unknown year")
+    func summaryAnswersTheYearInOneRead() async throws {
+        let store = try await StoreFixture.store()
+        var job = IncomeSourceDraft(name: "Main job")
+        job.deductsEPF = true
+        let jobID = try await store.save(job)
+        var rate = IncomeRecordDraft(sourceID: jobID)
+        rate.amount = Money(ringgit: 8_000)
+        rate.effectiveFrom = Self.date(2025, 1, 1)
+        _ = try await store.save(rate)
+
+        let summary = try await store.incomeSummary(for: 2025)
+        #expect(summary.rows.count == 1)
+        let row = try #require(summary.rows.first)
+        #expect(row.source.id == jobID)
+        // The whole draft, not the name and kind the list happens to show: an edit
+        // round-trips this back through `save`, which overwrites every field it carries.
+        #expect(row.source.deductsEPF == true)
+        #expect(row.total == Money(ringgit: 96_000))
+        #expect(row.records.count == 1)
+        #expect(summary.knownTotal == Money(ringgit: 96_000))
+
+        // A year the timeline never reaches lists its sources but has no figure. `nil`,
+        // not zero: the same answer `project(year:)` hands the engine.
+        let earlier = try await store.incomeSummary(for: 2024)
+        #expect(earlier.knownTotal == nil)
+        #expect(earlier.rows.count == 1)
+        #expect(earlier.rows.first?.total == Money.zero)
+    }
+
     @Test("saving a record against an unknown source throws instead of orphaning it")
     func unknownSourceThrows() async throws {
         let store = try await StoreFixture.store()

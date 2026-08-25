@@ -132,6 +132,23 @@ public actor TaxStore {
         ruleSetLoader = loader
     }
 
+    /// Injected so a test can exercise a caller's write-failure path. `nil` in every build
+    /// that has not asked for it, and `internal`, so the app target cannot reach it.
+    ///
+    /// A SwiftData write fails only when SwiftData itself does, which a test cannot
+    /// arrange. Without a seam, the branches that decide what the app *says* when a write
+    /// did not happen would be asserted by nothing — including onboarding refusing to
+    /// mark itself complete after losing the user's salary, which is the one failure they
+    /// cannot recover from, because that screen never opens again.
+    ///
+    /// Scoped to the record write on purpose: it reproduces the realistic partial failure
+    /// — the source row written, the rate not — rather than an all-or-nothing stub.
+    var incomeRecordWriteFailure: (any Error)?
+
+    func failIncomeRecordWrites(with error: (any Error)?) {
+        incomeRecordWriteFailure = error
+    }
+
     // MARK: - Years
 
     public func saveYearFacts(_ facts: YearFacts, for year: Int) throws {

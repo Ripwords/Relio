@@ -34,6 +34,22 @@ struct IncomeRecordEditor: View {
                     } footer: {
                         Text(IncomeRecordEditorViewModel.footnote(for: editor.kind))
                     }
+
+                    Section {
+                        // A toggle plus a picker, the same shape onboarding uses for
+                        // "started part way through the year". A bare `DatePicker` always
+                        // holds some date, so there would be no way to say "still paying"
+                        // again once an end date had been set.
+                        Toggle("This source has ended", isOn: $editor.hasEndDate)
+                        if editor.hasEndDate {
+                            DatePicker("Last day paid", selection: $editor.endedOn,
+                                       displayedComponents: .date)
+                        }
+                    } footer: {
+                        Text(editor.hasEndDate
+                             ? "Counted through that day, inclusive. This is the only thing that stops a monthly rate — without it the last rate keeps being paid for every year from here on."
+                             : "Leave this off while the source is still paying. Turn it on when you leave a job, so its salary stops counting.")
+                    }
                 } else {
                     Section {
                         // Inline for the same reason as the kind picker above: the menu
@@ -60,6 +76,17 @@ struct IncomeRecordEditor: View {
                     if let error = editor.validationError, !editor.amountText.isEmpty {
                         Section { Text(error).foregroundStyle(.orange).font(.footnote) }
                     }
+
+                    // A note, not a blocker: two records on one day is legal and resolves
+                    // deterministically. It is just almost never what someone meant, and
+                    // the list gives no sign which of the two is the one that counts.
+                    if let collision = editor.dateCollisionNote {
+                        Section {
+                            Label(collision, systemImage: "calendar.badge.exclamationmark")
+                                .foregroundStyle(.orange)
+                                .font(.footnote)
+                        }
+                    }
                 }
 
                 if let saveError {
@@ -68,7 +95,7 @@ struct IncomeRecordEditor: View {
                     }
                 }
             }
-            .navigationTitle(editor.isSourceMode ? "New source" : "Change")
+            .navigationTitle(Self.title(for: editor))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -82,13 +109,23 @@ struct IncomeRecordEditor: View {
         }
     }
 
+    private static func title(for editor: IncomeRecordEditorViewModel) -> String {
+        if editor.isEditingSource { return "Edit source" }
+        return editor.isSourceMode ? "New source" : "Change"
+    }
+
     /// Dismisses only on a write that actually happened. Dismissing regardless would throw
     /// away everything the user typed and leave them looking at a screen that does not
     /// show what they just entered, with nothing said about why.
     private func save() async {
         saveError = nil
         if let source = editor.sourceDraft() {
-            guard await model.addSource(source) != nil else {
+            // `.editSource` keeps the source's id, so this updates in place; `.addSource`
+            // carries a fresh one and inserts. One store call either way.
+            let saved = editor.isEditingSource
+                ? await model.saveSource(source)
+                : await model.addSource(source) != nil
+            guard saved else {
                 saveError = "Relio could not save this source. Nothing was lost — try again."
                 return
             }
