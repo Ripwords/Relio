@@ -230,8 +230,15 @@ derived annual total per year, and the override. Adding a raise is one action: a
 and the date it took effect.
 
 The derivation is shown, not just its result. A user who cannot see why Relio thinks they
-earned RM 129,050 cannot tell whether it is right — and this figure drives every tax number
+earned RM 113,950 cannot tell whether it is right — and this figure drives every tax number
 in the app.
+
+That figure is the worked example this design is verified against: a salary of RM 8,000 a
+month from 1 January, rising to RM 9,500 on 15 April, plus side payments of RM 1,800,
+RM 2,400 and RM 950. April blends to exactly RM 8,800.00 — RM 3,733.33 for the fourteen
+days on the old rate and RM 5,066.67 for the sixteen on the new — which is worth noting
+because the two halves round in opposite directions and still sum cleanly. An
+implementation that rounds once at the end, or truncates, produces a different number.
 
 ## 11. Testing
 
