@@ -76,6 +76,37 @@ private final class CallCountingLoader: RuleSetLoading, Sendable {
     }
 }
 
+/// Records `YearContext.status` at the instant the rulebook is asked for.
+///
+/// `load()` sets its status and then calls the loader with no suspension in between, so
+/// this is the one deterministic window in which the transient `.loading` can be seen —
+/// polling from the outside would race the completion.
+@MainActor
+final class LoadStatusProbe {
+    var context: YearContext?
+    var statusesAtRuleSetLookup: [LoadStatus] = []
+
+    func record() {
+        guard let context else { return }
+        statusesAtRuleSetLookup.append(context.status)
+    }
+}
+
+/// Calls back into a `LoadStatusProbe` from inside `ruleSet(for:)`.
+///
+/// `assumeIsolated` rather than a hop: `YearContext` is `@MainActor` and calls the loader
+/// synchronously, so this genuinely is the main actor — and a hop would introduce exactly
+/// the suspension the probe exists to avoid.
+private struct ProbingRuleSetLoader: RuleSetLoading {
+    let availableYears: [Int]
+    let onLookup: @MainActor @Sendable () -> Void
+
+    func ruleSet(for year: Int) throws -> RuleSet {
+        MainActor.assumeIsolated { onLookup() }
+        return try BundledRuleSetLoader().ruleSet(for: year)
+    }
+}
+
 @Suite("YearContext") @MainActor struct YearContextTests {
 
     @Test("rule(for:) reuses the cached rule set rather than re-decoding on every call")
@@ -170,6 +201,68 @@ private final class CallCountingLoader: RuleSetLoading, Sendable {
 
         let after = try #require(context.result?.assessment(for: ReliefCode("SSPN"))?.claimed)
         #expect(after == before + Money(ringgit: 500))
+    }
+
+    @Test("a cold load announces itself as loading")
+    func coldLoadAnnouncesLoading() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+
+        let probe = LoadStatusProbe()
+        let loader = ProbingRuleSetLoader(availableYears: [2025]) { probe.record() }
+        let context = YearContext(store: store, loader: loader, year: 2025)
+        probe.context = context
+
+        #expect(context.status == .idle)
+        await context.load()
+
+        // Nothing was on screen, so the spinner every screen draws off `.loading` was the
+        // honest thing to show.
+        #expect(probe.statusesAtRuleSetLookup == [.loading])
+        #expect(context.status == .ready)
+    }
+
+    @Test("a reload over an existing result never drops to loading")
+    func reloadPreservesReady() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+
+        let probe = LoadStatusProbe()
+        let loader = ProbingRuleSetLoader(availableYears: [2025]) { probe.record() }
+        let context = YearContext(store: store, loader: loader, year: 2025)
+        probe.context = context
+        await context.load()
+
+        var addition = EntryDraft(id: UUID(), year: 2025,
+                                  code: ReliefCode("SSPN"), amount: Money(ringgit: 500))
+        addition.vendor = "Extra deposit"
+        _ = try await store.save(addition)
+        await context.reload()
+
+        // The status this asserts on is load-bearing, not cosmetic: the app switches the
+        // Home tab's stack root on it, so a momentary `.loading` here tore the navigation
+        // stack down on every save, delete and undo — which is how saving from an editor
+        // pushed two levels deep popped back onto an empty "Relief not found" screen.
+        #expect(probe.statusesAtRuleSetLookup == [.loading, .ready])
+        #expect(context.status == .ready)
+    }
+
+    @Test("a reload with nothing loaded yet is a cold load and says so")
+    func reloadWithoutResultStillAnnouncesLoading() async throws {
+        let store = try await PresentationFixture.store()
+
+        let probe = LoadStatusProbe()
+        let loader = ProbingRuleSetLoader(availableYears: [2025]) { probe.record() }
+        let context = YearContext(store: store, loader: loader, year: 2025)
+        probe.context = context
+
+        // Onboarding finishes with a `reload()`, not a `load()`, and at that point there
+        // is no result to preserve. Suppressing `.loading` there would leave the app on
+        // its `.idle` spinner with no evidence anything was happening.
+        await context.reload()
+
+        #expect(probe.statusesAtRuleSetLookup == [.loading])
+        #expect(context.status == .ready)
     }
 
     @Test("switching year remembers the choice for next launch")

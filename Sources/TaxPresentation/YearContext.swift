@@ -46,7 +46,28 @@ public final class YearContext {
         self.availableYears = loader.availableYears
     }
 
+    /// A cold load: nothing is on screen yet, so `.loading` is the honest status and the
+    /// spinner it drives is the right thing to show.
     public func load() async {
+        await load(announcingLoad: true)
+    }
+
+    /// Re-evaluates after a write, keeping whatever is already on screen.
+    ///
+    /// A refresh is not a cold load. Dropping to `.loading` here would tell every screen
+    /// that reads `status` there is nothing to show — which tore down the Home tab's
+    /// navigation stack on every save, delete and undo, so a save from a pushed editor
+    /// popped back onto a freshly-constructed detail screen with no data. The figures on
+    /// screen are one evaluation stale for the few milliseconds this takes; a torn-down
+    /// stack is not recoverable at all.
+    ///
+    /// When there is no result yet — a first load that failed, or a reload racing the
+    /// launch load — this *is* a cold load and still announces itself.
+    public func reload() async {
+        await load(announcingLoad: result == nil)
+    }
+
+    private func load(announcingLoad: Bool) async {
         // The year this load is *for*, captured before any suspension.
         //
         // Two loads can be in flight at once — the switcher is a segmented control, and
@@ -57,7 +78,7 @@ public final class YearContext {
         // another year's label. Every assignment below is gated on the request still
         // being the current one; a superseded load exits having changed nothing.
         let requested = year
-        status = .loading
+        if announcingLoad { status = .loading }
         do {
             let ruleSet = try loader.ruleSet(for: requested)
             let projected = try await store.project(year: requested)
@@ -91,10 +112,6 @@ public final class YearContext {
             result = nil
             status = .unavailable("Could not load \(String(year)): \(error.localizedDescription)")
         }
-    }
-
-    public func reload() async {
-        await load()
     }
 
     /// The rulebook entry behind a code, for the few decisions the evaluation result
