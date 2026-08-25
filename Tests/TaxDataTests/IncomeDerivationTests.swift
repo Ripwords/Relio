@@ -289,7 +289,13 @@ import TaxKit
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
                 guard text.contains("Double") else { continue }
-                #expect(text.contains("//"),
+                // Checking the whole line lets a real `Double` through as long as the line
+                // also has a `//` anywhere on it — `let x: Double = 0 // temp` contains both
+                // substrings. Only the code before the first `//` can be a genuine `Double`;
+                // an occurrence after the marker is inside the comment itself and must still
+                // pass, so the check is scoped to the code segment, not the raw line.
+                let code = text.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0]
+                #expect(!code.contains("Double"),
                         "\(file.lastPathComponent):\(number + 1) uses Double on the derivation path")
             }
         }

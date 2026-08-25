@@ -40,7 +40,6 @@ A pure Swift package with no SwiftData, SwiftUI or platform dependency, so every
 - **Requirement checks** — a set difference between the documents attached to a claim and the kinds the relief requires.
 - **Tax saved**, computed as a real difference between two tax calculations rather than headroom times a marginal rate, because relief that straddles a band boundary saves less than the higher rate implies.
 - **Year comparison**, including a counterfactual that replays *your* entries under a different year's rules to report what a rule change is worth to you in ringgit.
-- **Income that changes.** A raise in April or a second job in September is recorded once, as it happens. Relio derives the year's gross by pro-rating each month by days, so a mid-month raise blends correctly — and shows its working, because that figure drives every tax number in the app. Your own figure from your EA form always wins.
 
 ### Example
 
@@ -56,6 +55,12 @@ Still claimable         RM   5,563.20
 ```
 
 Those are the recorded values in [`golden-ya2025.json`](Tests/TaxKitTests/Fixtures/golden-ya2025.json), so the suite fails if the engine ever stops producing them.
+
+## What TaxData adds
+
+TaxData is the SwiftData layer on top of TaxKit — models, `TaxStore`, dedupe, reconciliation — and it owns the facts TaxKit's evaluator is fed, including income.
+
+- **Income that changes.** A raise in April or a second job in September is recorded once, as it happens. Relio derives the year's gross by pro-rating each month by days, so a mid-month raise blends correctly — and shows its working, because that figure drives every tax number in the app. Your own figure from your EA form always wins.
 
 ## Running the tests
 
