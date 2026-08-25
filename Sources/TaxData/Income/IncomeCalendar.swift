@@ -22,7 +22,7 @@ public enum IncomeCalendar {
         }
     }
 
-    static let calendar: Calendar = {
+    private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Kuala_Lumpur")
             ?? TimeZone(secondsFromGMT: 8 * 3600)!
@@ -70,14 +70,31 @@ public enum IncomeCalendar {
             guard let monthRange = calendar.range(of: .day, in: .month, for: cursor),
                   let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: cursor)),
                   let nextMonth = calendar.date(byAdding: .month, value: 1, to: monthStart)
-            else { break }
+            else {
+                // This is a money path: a truncated span here undercounts income. These
+                // `Calendar` lookups do not fail for any real Gregorian date, so reaching
+                // this branch means a sentinel (e.g. `.distantPast`/`.distantFuture` from
+                // `startOfYear`/`endOfYear`'s fallbacks) made it in as `cursor`. Trap in
+                // debug/test so it's caught in development; degrade — stop accumulating
+                // rather than crash — in a shipped build.
+                assertionFailure("IncomeCalendar.monthSpans: Calendar lookup failed for cursor \(cursor); truncating span rather than under- or over-counting income.")
+                break
+            }
 
             let monthEnd = dayBefore(nextMonth)
             let spanEnd = min(monthEnd, last)
             let days = (calendar.dateComponents([.day], from: cursor, to: spanEnd).day ?? 0) + 1
             spans.append(MonthSpan(days: days, daysInMonth: monthRange.count))
 
-            cursor = calendar.date(byAdding: .day, value: 1, to: spanEnd) ?? last.addingTimeInterval(86_400)
+            let advanced = calendar.date(byAdding: .day, value: 1, to: spanEnd)
+            if advanced == nil {
+                // Same rationale: advancing the cursor by one day should never fail for a
+                // real date. If it does, the `??` fallback below jumps the cursor a fixed
+                // day past `last` so the loop still terminates — but that jump is itself a
+                // silent skip on a money path, so trap it in debug/test.
+                assertionFailure("IncomeCalendar.monthSpans: could not advance cursor past \(spanEnd); falling back to a fixed day past `last`.")
+            }
+            cursor = advanced ?? last.addingTimeInterval(86_400)
         }
         return spans
     }
