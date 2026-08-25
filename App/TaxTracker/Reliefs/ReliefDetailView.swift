@@ -4,7 +4,22 @@ import TaxPresentation
 
 struct ReliefDetailView: View {
 
-    @Bindable var model: ReliefDetailViewModel
+    /// `@State`, not a stored `let`: this screen is a navigation destination, so the view
+    /// struct is rebuilt every time the view that declared the destination re-renders.
+    /// A stored model meant each of those rebuilds handed the live screen a fresh, empty
+    /// view model whose `.task` had already run — which is what put "Relief not found"
+    /// on the screen after saving an entry from here.
+    @State private var model: ReliefDetailViewModel
+
+    /// The shared evaluation, read live. `ReliefDetailViewModel.refresh()` copies out of
+    /// it rather than reading it through, so now that this screen survives a write it
+    /// needs to be told when to copy again — see `.task(id:)` below.
+    private let context: YearContext
+
+    init(model: ReliefDetailViewModel, context: YearContext) {
+        _model = State(initialValue: model)
+        self.context = context
+    }
 
     var body: some View {
         List {
@@ -86,16 +101,19 @@ struct ReliefDetailView: View {
                     }
                 }
 
-                if let url = model.sourceURL {
-                    Section {
+                // Spec §13: the disclaimer is not conditional on the relief happening to
+                // carry an LHDN link. Nesting it inside `if let url` meant every relief
+                // without a source URL showed its figures with nothing saying they are
+                // estimates — the exact mistake the mitigation exists to prevent.
+                Section {
+                    if let url = model.sourceURL {
                         Link("LHDN source", destination: url)
-                        if let notes = model.notes {
-                            Text(notes).font(.footnote).foregroundStyle(.secondary)
-                        }
-                    } footer: {
-                        // Spec §13: the user must never mistake an estimate for advice.
-                        Text("Estimate only. Verify with LHDN before you file.")
                     }
+                    if let notes = model.notes {
+                        Text(notes).font(.footnote).foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Estimate only. Verify with LHDN before you file.")
                 }
             } else {
                 ContentUnavailableView("Relief not found",
@@ -105,7 +123,12 @@ struct ReliefDetailView: View {
         }
         .navigationTitle(model.assessment?.name ?? "Relief")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await model.refresh() }
+        // Re-copies whenever the shared evaluation changes, which is what a save, delete
+        // or undo from the entry editor pushed on top of this screen produces. `.task`
+        // alone fires once per view identity and this screen's identity now survives
+        // those writes, so it would sit showing pre-save figures. `EvaluationResult` is
+        // `Hashable`, so an unchanged evaluation does not re-fire.
+        .task(id: context.result) { await model.refresh() }
     }
 
     private func labelled(_ title: String, _ amount: Money) -> some View {

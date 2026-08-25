@@ -4,10 +4,19 @@ import TaxPresentation
 
 struct ReliefsListView: View {
 
-    @Bindable var model: ReliefsListViewModel
+    /// `@State`, not a stored `let`: the view model must outlive a body evaluation of the
+    /// view that pushed this one. `State(initialValue:)` keeps the first model handed in
+    /// and drops every later one, so a re-render cannot swap a loaded screen for an empty
+    /// one.
+    @State private var model: ReliefsListViewModel
+
+    init(model: ReliefsListViewModel) {
+        _model = State(initialValue: model)
+    }
 
     var body: some View {
-        List {
+        @Bindable var model = model
+        return List {
             ForEach(model.sections) { section in
                 Section(section.title) {
                     ForEach(section.rows) { row in

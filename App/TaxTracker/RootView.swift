@@ -16,8 +16,13 @@ struct RootView: View {
     // launch.
     @State private var needsOnboarding: Bool?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(store: TaxStore) {
         self.store = store
+        // The newest shipped year is the fallback, not the answer. The year the user was
+        // last on lives in `UserPreferences`, which only an `await` can read — see the
+        // `.task` below.
         let context = YearContext(store: store,
                                   loader: BundledRuleSetLoader(),
                                   year: BundledRuleSetLoader().availableYears.last ?? 2025)
@@ -39,10 +44,29 @@ struct RootView: View {
             }
         }
         .task {
-            needsOnboarding = !((try? await store.preferences().hasCompletedOnboarding) ?? false)
-            await context.load()
+            let preferences = try? await store.preferences()
+            needsOnboarding = !(preferences?.hasCompletedOnboarding ?? false)
+            await resumeLastViewedYear(preferences?.lastViewedYear)
             await home.refresh()
         }
+    }
+
+    /// Launch resumes on the year the user left off on. `switchYear` is the only way in:
+    /// it owns the supersede guard and writes the preference back, and it also performs
+    /// the load, so the fallback path is the one that calls `load()` directly.
+    ///
+    /// `0` is the default a never-written preference carries, and a year whose rulebook
+    /// this build no longer ships would strand the user on a permanent "no rules"
+    /// screen — both fall back to the newest available year the initialiser already
+    /// chose.
+    private func resumeLastViewedYear(_ remembered: Int?) async {
+        guard let remembered,
+              remembered != context.year,
+              context.availableYears.contains(remembered) else {
+            await context.load()
+            return
+        }
+        await context.switchYear(to: remembered)
     }
 
     private var tabs: some View {
@@ -50,18 +74,27 @@ struct RootView: View {
             NavigationStack {
                 content
                     .navigationBarTitleDisplayMode(.inline)
+                    // Every destination builds its view model at the call site but hands
+                    // it straight to a `@State` inside the destination view, so the model
+                    // outlives a body evaluation of this view. Constructing one that is
+                    // *read* from `body` — as these closures used to — meant every
+                    // re-render handed the pushed screen a brand-new empty model whose
+                    // `.task` had already fired and would not fire again.
                     .navigationDestination(for: ReliefsRoute.self) { _ in
                         ReliefsListView(model: ReliefsListViewModel(context: context))
                     }
                     .navigationDestination(for: ReliefCode.self) { code in
                         ReliefDetailView(model: ReliefDetailViewModel(context: context,
                                                                       store: store,
-                                                                      code: code))
+                                                                      code: code),
+                                         context: context)
                     }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
                                                         editing: route.entryID),
+                            presentation: .pushed,
+                            onSaved: handleSaved,
                             onDeleted: handleDeleted)
                     }
                     .toolbar {
@@ -120,7 +153,10 @@ struct RootView: View {
             .tabItem { Label("Ask", systemImage: "bubble.left.and.bubble.right") }
         }
         .sheet(item: $editingEntry) { model in
-            EntryEditorView(model: model, onDeleted: handleDeleted)
+            EntryEditorView(model: model,
+                            presentation: .sheet,
+                            onSaved: handleSaved,
+                            onDeleted: handleDeleted)
         }
         .overlay(alignment: .bottom) {
             if showUndo, let lastDeleted {
@@ -133,7 +169,17 @@ struct RootView: View {
                 .padding(.bottom, 60)
             }
         }
-        .animation(.spring(duration: 0.3), value: showUndo)
+        // Spec §11.3: honour Reduce Motion. A `nil` animation still applies the change,
+        // it just does not travel to get there.
+        .animation(reduceMotion ? nil : .spring(duration: 0.3), value: showUndo)
+    }
+
+    /// Home is no longer torn down and rebuilt by every write — that teardown was the
+    /// defect this wave fixes — so it no longer re-runs its `.task` afterwards. Its view
+    /// model copies out of `context.result` rather than reading it live, so the save path
+    /// has to say when to copy again, exactly as the delete path already did.
+    private func handleSaved() {
+        Task { await home.refresh() }
     }
 
     private func handleDeleted(_ model: EntryEditorViewModel) {

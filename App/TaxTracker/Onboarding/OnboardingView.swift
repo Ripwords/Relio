@@ -4,13 +4,24 @@ import TaxPresentation
 
 struct OnboardingView: View {
 
-    @Bindable var model: OnboardingViewModel
+    /// `@State` for the same reason every other model-owning screen here is: the caller
+    /// builds this view inside its own `body`, so a stored model would be replaced by a
+    /// fresh one — resetting the user to step one, mid-answer — on any re-render. Nothing
+    /// currently re-renders `RootView` while onboarding is up, which made the old code
+    /// correct by luck rather than by construction.
+    @State private var model: OnboardingViewModel
     let onFinished: () -> Void
 
     @State private var incomeText = ""
 
+    init(model: OnboardingViewModel, onFinished: @escaping () -> Void) {
+        _model = State(initialValue: model)
+        self.onFinished = onFinished
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
+        @Bindable var model = model
+        return VStack(spacing: 0) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(24)
@@ -38,6 +49,9 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private var content: some View {
+        // `@Bindable` is what turns the `@State`-held observable back into a source of
+        // bindings; it is scoped to the block that needs one, per Apple's guidance.
+        @Bindable var model = model
         switch model.step {
         case .welcome:
             VStack(spacing: 12) {
