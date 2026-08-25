@@ -81,6 +81,23 @@ import TaxData
         #expect(model.effectiveTotal == Money(ringgit: 113_950))
     }
 
+    @Test("the override reads back as plain digits, so the field can show what is in force")
+    func overrideEditingText() async throws {
+        let store = try await PresentationFixture.store()
+        try await Self.seedWorkedExample(store)
+        let model = await Self.model(store)
+
+        #expect(model.overrideEditingText.isEmpty)
+        await model.saveOverride(Money(ringgit: 120_000))
+        // Plain digits, not `RM 120,000.00`: the screen puts this straight back into an
+        // editable field, and a blank field under a footer saying an override is in force
+        // tells the user two contradictory things at once.
+        #expect(model.overrideEditingText == "120000.00")
+
+        await model.clearOverride()
+        #expect(model.overrideEditingText.isEmpty)
+    }
+
     @Test("saving an override refreshes the shared evaluation")
     func overrideRefreshesTheContext() async throws {
         let store = try await PresentationFixture.store()

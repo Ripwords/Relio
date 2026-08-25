@@ -40,6 +40,15 @@ public final class IncomeViewModel {
     /// The figure that actually reaches the engine.
     public var effectiveTotal: Money { override ?? derivedTotal }
 
+    /// The override as the user would type it, for the screen's text field.
+    ///
+    /// `Money.formattedForEditing()` is internal to this module, so an app-target view
+    /// cannot produce this itself — and a field left blank while the footer beneath it
+    /// says Relio is using the user's own figure tells them two contradictory things at
+    /// once. It is also what the view puts back when someone types something that is not
+    /// an amount, rather than silently clearing a figure they never asked to clear.
+    public var overrideEditingText: String { override?.formattedForEditing() ?? "" }
+
     public func refresh() async {
         let year = context.year
         let totals = (try? await store.incomeTotals(for: year)) ?? []

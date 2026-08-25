@@ -108,3 +108,12 @@ public final class IncomeRecordEditorViewModel {
         }
     }
 }
+
+extension IncomeRecordEditorViewModel: Identifiable {
+    /// `.sheet(item:)` needs `Identifiable`, and there is no natural stable id here: an
+    /// `.addSource` or `.addRecord` editor has nothing saved yet, and two `.edit`
+    /// editors for the same record are still two separate pieces of typing. Identity is
+    /// the view model instance itself, which is exactly the lifetime `.sheet(item:)`
+    /// cares about — the same choice `EntryEditorViewModel` makes.
+    public nonisolated var id: ObjectIdentifier { ObjectIdentifier(self) }
+}
