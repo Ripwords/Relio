@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 import TaxKit
-import TaxData
+@testable import TaxData
 @testable import TaxPresentation
 
 @Suite("OnboardingViewModel") @MainActor struct OnboardingViewModelTests {
@@ -95,6 +95,74 @@ import TaxData
         // No start date given, so it runs from the start of the year being onboarded —
         // a salary the user has had all year counts for the whole year.
         #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("a lost salary keeps onboarding open instead of completing without it")
+    func lostSalaryDoesNotCompleteOnboarding() async throws {
+        let store = try await PresentationFixture.store()
+        await store.failIncomeRecordWrites(with: IncomeStoreError.unknownIncomeSource(UUID()))
+
+        let model = OnboardingViewModel(store: store, year: 2025)
+        model.facts.maritalStatus = .married
+        model.incomeEnabled = true
+        model.monthlySalary = Money(ringgit: 8_000)
+
+        // Reported, not swallowed. Completing here strands the user on Home believing they
+        // entered a salary: no tax figures, no explanation, and onboarding — the only
+        // screen that asks for one — never runs again.
+        #expect(await model.finish() == .incomeNotSaved)
+        #expect(try await store.preferences().hasCompletedOnboarding == false)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+
+        // The household facts the user did give are still saved. Losing those too would
+        // punish them twice for a failure neither of them caused.
+        #expect(try await store.yearFacts(for: 2025).maritalStatus == .married)
+    }
+
+    @Test("retrying after a lost salary finishes, without leaving a duplicate source")
+    func retryAfterALostSalaryFinishes() async throws {
+        let store = try await PresentationFixture.store()
+        await store.failIncomeRecordWrites(with: IncomeStoreError.unknownIncomeSource(UUID()))
+
+        let model = OnboardingViewModel(store: store, year: 2025)
+        model.incomeEnabled = true
+        model.monthlySalary = Money(ringgit: 8_000)
+        #expect(await model.finish() == .incomeNotSaved)
+
+        await store.failIncomeRecordWrites(with: nil)
+        #expect(await model.finish() == .finished)
+
+        #expect(try await store.preferences().hasCompletedOnboarding)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+        // One "Main job", not two. The source id is fixed for the life of the view model,
+        // so the retry updates the row the first attempt wrote; a fresh `UUID()` per
+        // attempt would leave an orphan behind, and nothing dedupes `IncomeSource`.
+        #expect(try await store.incomeSourceDrafts().count == 1)
+    }
+
+    @Test("skipping still completes, even with a salary write that would fail")
+    func skippingStillCompletes() async throws {
+        let store = try await PresentationFixture.store()
+        await store.failIncomeRecordWrites(with: IncomeStoreError.unknownIncomeSource(UUID()))
+
+        let model = OnboardingViewModel(store: store, year: 2025)
+        model.incomeEnabled = true
+        model.monthlySalary = Money(ringgit: 8_000)
+        await model.skip()
+
+        // Skipping asks for no income, so there is nothing that can fail to save and
+        // nothing to hold the screen open for. Unchanged behaviour.
+        #expect(try await store.preferences().hasCompletedOnboarding)
+        #expect(try await store.incomeSourceDrafts().isEmpty)
+    }
+
+    @Test("finishing successfully reports that it finished")
+    func finishReportsSuccess() async throws {
+        let store = try await PresentationFixture.store()
+        let model = OnboardingViewModel(store: store, year: 2025)
+        model.incomeEnabled = true
+        model.monthlySalary = Money(ringgit: 8_000)
+        #expect(await model.finish() == .finished)
     }
 
     @Test("a salary start date part-way through the year is honoured")

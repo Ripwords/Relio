@@ -17,6 +17,11 @@ struct OnboardingView: View {
     /// string and half-typed text is not a `Money`. It is committed on Done.
     @State private var salaryText = ""
     @State private var startedPartWay = false
+    /// Set when the salary the user asked for did not save. The step stays open and says
+    /// so — same construction as `IncomeRecordEditor`'s `saveError`. Finishing anyway
+    /// would strand them on Home with no tax figures, no explanation, and no second run of
+    /// the only screen that asks for a salary.
+    @State private var finishError: String?
 
     init(model: OnboardingViewModel, onFinished: @escaping () -> Void) {
         _model = State(initialValue: model)
@@ -34,7 +39,7 @@ struct OnboardingView: View {
                 Button(model.isLastStep ? "Done" : "Continue") {
                     if model.isLastStep {
                         model.monthlySalary = MoneyParsing.money(from: salaryText)
-                        Task { await model.finish(); onFinished() }
+                        Task { await finish() }
                     } else {
                         model.advance()
                     }
@@ -43,12 +48,23 @@ struct OnboardingView: View {
                 .controlSize(.large)
 
                 Button("Skip for now") {
+                    // Unchanged: skipping asks for no income, so nothing can fail to save.
                     Task { await model.skip(); onFinished() }
                 }
                 .font(.subheadline)
             }
             .padding(24)
         }
+    }
+
+    /// Leaves onboarding only when the writes the user asked for actually happened.
+    private func finish() async {
+        finishError = nil
+        guard await model.finish() == .finished else {
+            finishError = "Relio could not save your salary, so it has not finished setting up. Nothing was lost — tap Done to try again, or turn the toggle off to carry on without it."
+            return
+        }
+        onFinished()
     }
 
     @ViewBuilder
@@ -130,6 +146,15 @@ struct OnboardingView: View {
                     Text(model.incomeEnabled
                          ? "Relio works out the year from this, and you can add raises and bonuses later. Leave the date off if you have earned this all year."
                          : "Optional. Without it Relio still tracks every relief and cap — it just cannot tell you what they are worth in tax.")
+                }
+
+                if let finishError {
+                    Section {
+                        Text(finishError)
+                            .foregroundStyle(.orange)
+                            .font(.footnote)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
