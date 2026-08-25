@@ -10,7 +10,8 @@ import TaxKit
     func schemaIsComplete() {
         let names = Set(SchemaV1.models.map { String(describing: $0) })
         #expect(names == ["TaxYear", "Dependent", "ReliefEntry",
-                          "Document", "DocumentFile", "ChatMessage", "UserPreferences"])
+                          "Document", "DocumentFile", "ChatMessage", "UserPreferences",
+                          "IncomeSource", "IncomeRecord"])
     }
 
     @Test("SchemaV1 is version 1.0.0")
