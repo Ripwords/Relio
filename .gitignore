@@ -10,3 +10,4 @@ xcuserdata/
 TaxTracker.xcodeproj/
 # Local signing identity — never committed
 Config/Signing.xcconfig
+.build-ios/
