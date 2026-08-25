@@ -405,4 +405,39 @@ private struct ProbingRuleSetLoader: RuleSetLoading {
 
         #expect(stampAfterNoOp == stampAfterRealSwitch)
     }
+
+    @Test("switching to a year already stored as lastViewedYear does not move the stored updatedAt")
+    func rememberYearSkipsWriteWhenPreferenceAlreadyMatches() async throws {
+        let store = try await PresentationFixture.store()
+
+        // A real switch to 2024 first, so `UserPreferences.lastViewedYear` is genuinely
+        // 2024 going into the scenario below — not merely its unwritten default.
+        let firstContext = PresentationFixture.context(store, year: 2025)
+        await firstContext.load()
+        await firstContext.switchYear(to: 2024)
+        #expect(try await store.preferences().lastViewedYear == 2024)
+
+        let stampBeforeResume = try #require(
+            try await store.allPreferencesUpdatedAtForTesting().first)
+
+        // Advance the clock so a re-stamp, if it happened, would be observable.
+        await store.useClock { PresentationFixture.epoch.addingTimeInterval(3_600) }
+
+        // This mirrors `RootView.resumeLastViewedYear`: a fresh launch starts a new
+        // `YearContext` on the newest available year, reads the remembered year back
+        // from preferences, and calls `switchYear(to:)` to resume it. Because the
+        // context's own `year` (2025) differs from the remembered year (2024),
+        // `switchYear`'s top-level guard does not block this — it reloads and calls
+        // `rememberYear(2024)` for real. Preferences already say 2024, so this must not
+        // write, even though a genuine year change is happening from this context's
+        // point of view.
+        let resumedContext = PresentationFixture.context(store, year: 2025)
+        await resumedContext.load()
+        await resumedContext.switchYear(to: 2024)
+
+        let stampAfterResume = try #require(
+            try await store.allPreferencesUpdatedAtForTesting().first)
+
+        #expect(stampAfterResume == stampBeforeResume)
+    }
 }

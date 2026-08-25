@@ -141,6 +141,14 @@ public final class YearContext {
     private func rememberYear(_ newYear: Int) async {
         do {
             var preferences = try await store.preferences()
+            // Already the stored value: `savePreferences` stamps `updatedAt`
+            // unconditionally, and that field is what CloudKit's newest-write-wins and
+            // the duplicate-preferences collision resolver both key off. Without this
+            // guard, launch resuming the last-viewed year — which calls this via
+            // `switchYear` even though the preference already says this year — would
+            // re-stamp the row on every launch, and a device that merely launched could
+            // outrank a genuine settings change made on another device.
+            guard preferences.lastViewedYear != newYear else { return }
             preferences.lastViewedYear = newYear
             try await store.savePreferences(preferences)
         } catch {

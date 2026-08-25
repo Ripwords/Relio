@@ -129,6 +129,15 @@ struct ReliefDetailView: View {
         // those writes, so it would sit showing pre-save figures. `EvaluationResult` is
         // `Hashable`, so an unchanged evaluation does not re-fire.
         .task(id: context.result) { await model.refresh() }
+        // `EvaluationResult` carries amounts, eligibility, requirements and unresolved
+        // entries — not an entry's `vendor`, `note` or `spentOn`, which `model.entries`
+        // (and the "Entries" section above) also reads from `store.entryDrafts`. Editing
+        // only one of those fields and saving produces an *equal* `EvaluationResult`, so
+        // `.task(id:)` above does not re-fire and this screen would still show the value
+        // the user just replaced. `.onAppear` re-fires on pop-back where `.task(id:)`
+        // does not, covering that case; `.task(id:)` stays because it covers the result
+        // changing while this screen is still visible, which `.onAppear` would not catch.
+        .onAppear { Task { await model.refresh() } }
     }
 
     private func labelled(_ title: String, _ amount: Money) -> some View {
