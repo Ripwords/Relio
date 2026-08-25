@@ -78,27 +78,61 @@ public final class IncomeViewModel {
 
     // MARK: - Writes
 
-    public func saveOverride(_ amount: Money?) async {
-        guard var facts = try? await store.yearFacts(for: context.year) else { return }
-        facts.grossIncomeOverride = amount
-        try? await store.saveYearFacts(facts, for: context.year)
+    /// `false` on failure. A swallowed failure here is the worst kind for this screen:
+    /// the user types a corrected figure, believes it saved, and every tax number in the
+    /// app keeps quoting the stale one with no signal anything went wrong.
+    @discardableResult
+    public func saveOverride(_ amount: Money?) async -> Bool {
+        var succeeded = false
+        do {
+            var facts = try await store.yearFacts(for: context.year)
+            facts.grossIncomeOverride = amount
+            try await store.saveYearFacts(facts, for: context.year)
+            succeeded = true
+        } catch {
+            succeeded = false
+        }
+        // Either way, so the screen reflects what is actually persisted rather than
+        // what the caller hoped to write.
         await reloadEverything()
-    }
-
-    public func clearOverride() async {
-        await saveOverride(nil)
+        return succeeded
     }
 
     @discardableResult
-    public func addSource(_ draft: IncomeSourceDraft) async -> UUID {
-        let id = (try? await store.save(draft)) ?? draft.id
+    public func clearOverride() async -> Bool {
+        await saveOverride(nil)
+    }
+
+    /// `nil` on failure — never a fabricated id. `TaxStore.save(_ draft:
+    /// IncomeSourceDraft)` returns `draft.id` on success, so falling back to `draft.id`
+    /// on failure would return the identical value either way: the caller could not
+    /// tell a write that actually happened from one that silently didn't.
+    @discardableResult
+    public func addSource(_ draft: IncomeSourceDraft) async -> UUID? {
+        var id: UUID?
+        do {
+            id = try await store.save(draft)
+        } catch {
+            id = nil
+        }
         await reloadEverything()
         return id
     }
 
-    public func addRecord(_ draft: IncomeRecordDraft) async {
-        _ = try? await store.save(draft)
+    /// `false` on failure, including `IncomeStoreError.unknownIncomeSource` — a record
+    /// saved against a source that does not exist. Swallowing that would let the user
+    /// add income, see no error, and have the entry silently vanish from every read.
+    @discardableResult
+    public func addRecord(_ draft: IncomeRecordDraft) async -> Bool {
+        var succeeded = false
+        do {
+            _ = try await store.save(draft)
+            succeeded = true
+        } catch {
+            succeeded = false
+        }
         await reloadEverything()
+        return succeeded
     }
 
     public func deleteSource(id: UUID) async {

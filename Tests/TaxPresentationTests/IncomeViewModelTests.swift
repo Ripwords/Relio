@@ -97,7 +97,7 @@ import TaxData
         let store = try await PresentationFixture.store()
         var shop = IncomeSourceDraft(name: "Side business"); shop.kind = .business
         _ = try await store.save(shop)
-        var job = IncomeSourceDraft(name: "Main job")
+        let job = IncomeSourceDraft(name: "Main job")
         _ = try await store.save(job)
         var gig = IncomeSourceDraft(name: "Tutoring"); gig.kind = .occasional
         _ = try await store.save(gig)
@@ -117,13 +117,31 @@ import TaxData
         let model = await Self.model(store)
         #expect(model.derivedTotal == Money.zero)
 
-        let sourceID = await model.addSource(IncomeSourceDraft(name: "Main job"))
+        let sourceID = try #require(await model.addSource(IncomeSourceDraft(name: "Main job")))
         var rate = IncomeRecordDraft(sourceID: sourceID)
         rate.amount = Money(ringgit: 8_000)
         rate.effectiveFrom = Self.date(2025, 1, 1)
         await model.addRecord(rate)
 
         #expect(model.derivedTotal == Money(ringgit: 96_000))
+    }
+
+    @Test("adding a record against a source that does not exist fails, leaving the total unchanged")
+    func addingARecordForAnUnknownSourceFails() async throws {
+        let store = try await PresentationFixture.store()
+        try await Self.seedWorkedExample(store)
+        let model = await Self.model(store)
+        let before = model.derivedTotal
+
+        var orphan = IncomeRecordDraft(sourceID: UUID())
+        orphan.amount = Money(ringgit: 5_000)
+        orphan.effectiveFrom = Self.date(2025, 6, 1)
+        let succeeded = await model.addRecord(orphan)
+
+        // `IncomeStoreError.unknownIncomeSource` must surface as a clear failure, not a
+        // save that silently drops the record and understates income.
+        #expect(!succeeded)
+        #expect(model.derivedTotal == before)
     }
 
     @Test("deleting a record lowers the total")
@@ -191,7 +209,7 @@ import TaxData
         record.amount = Money(ringgit: 8_000)
         let editor = IncomeRecordEditorViewModel(mode: .edit(record))
         editor.amountText = "9500"
-        let produced = try? #require(editor.recordDraft())
+        let produced = editor.recordDraft()
         #expect(produced?.id == record.id)
         #expect(produced?.amount == Money(ringgit: 9_500))
     }
