@@ -21,7 +21,7 @@ correctly — see [Running the app](#running-the-app) for verification scope.
 | | Status |
 |---|---|
 | **TaxKit** — the tax engine behind Relio | ✅ Done |
-| **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation | ✅ Done |
+| **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation, income as a dated timeline (not one figure per year) | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
 | iOS app — Home, Reliefs, entry CRUD, onboarding | Built, installed and launched; onboarding verified on iOS 26.1 simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
@@ -40,6 +40,7 @@ A pure Swift package with no SwiftData, SwiftUI or platform dependency, so every
 - **Requirement checks** — a set difference between the documents attached to a claim and the kinds the relief requires.
 - **Tax saved**, computed as a real difference between two tax calculations rather than headroom times a marginal rate, because relief that straddles a band boundary saves less than the higher rate implies.
 - **Year comparison**, including a counterfactual that replays *your* entries under a different year's rules to report what a rule change is worth to you in ringgit.
+- **Income that changes.** A raise in April or a second job in September is recorded once, as it happens. Relio derives the year's gross by pro-rating each month by days, so a mid-month raise blends correctly — and shows its working, because that figure drives every tax number in the app. Your own figure from your EA form always wins.
 
 ### Example
 

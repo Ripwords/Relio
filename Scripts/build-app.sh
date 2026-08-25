@@ -2,6 +2,11 @@
 # Generates the Xcode project and builds the app for the iOS simulator.
 # This is the gate every UI task runs: `swift test` cannot see SwiftUI, so the only
 # automated proof the views compile and link is a real build.
+#
+# Needs `sudo xcodebuild -runFirstLaunch` to have installed the simulator platform;
+# without it, `xcodebuild` cannot enumerate simulator destinations at all. Once that has
+# run, this is the real gate — prefer it over Scripts/typecheck-app.sh and
+# Scripts/run-app.sh, which exist only for machines where it is blocked.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -20,7 +25,11 @@ xcodegen generate
 RUNTIME=$(xcrun simctl list runtimes --json \
   | python3 -c 'import json,sys; rs=[r for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and "iOS" in r["name"]]; print(sorted(rs, key=lambda r: r["version"])[-1]["identifier"])')
 
-if ! xcrun simctl list devices | grep -q "$DEVICE_NAME"; then
+# A device with this name may already exist on some other, older runtime (e.g. left
+# over from before a new simulator platform was installed) without existing on the
+# current $RUNTIME — so the check must be scoped to $RUNTIME, not just the device name.
+if ! xcrun simctl list devices --json \
+  | python3 -c "import json,sys; d=json.load(sys.stdin)['devices'].get('$RUNTIME', []); sys.exit(0 if any(x['name'] == '$DEVICE_NAME' for x in d) else 1)"; then
   echo "Creating simulator '$DEVICE_NAME' on $RUNTIME"
   xcrun simctl create "$DEVICE_NAME" "$DEVICE_TYPE" "$RUNTIME"
 fi

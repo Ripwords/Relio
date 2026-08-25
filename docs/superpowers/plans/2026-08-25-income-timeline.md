@@ -2576,3 +2576,21 @@ git commit -m "test: pin the engine and golden persona as unchanged by the incom
    are real, so this stays explicit.
 4. Everything already carried from Plan 2, including that `reconcile()` and
    `recomputeAllDedupeKeys()` still have no production caller.
+5. **No restore path for income.** `TaxStore` has `softDeleteIncomeSource`/
+   `softDeleteIncomeRecord` but no restore, so the Income screen's deletions are
+   unrecoverable from the UI — unlike relief entries, which have `undoDelete()` and an undo
+   toast. The source delete is confirmed by an alert; per-record swipe-delete is not.
+6. **Records that do not contribute to the viewed year are not marked.** They render
+   identically to contributing ones beneath a year-scoped subtotal. Marking them by date
+   would be wrong — a recurring rate dated 1 April 2024 with no successor legitimately
+   contributes to YA2025 — so doing this correctly needs per-record contribution data from
+   `IncomeDerivation`.
+7. **A user in a time zone east of UTC+8** who picks a date stores an instant that can
+   still be the previous day in Kuala Lumpur, so it reads back a day earlier. This is a
+   pre-existing, codebase-wide property affecting `Dependent.dateOfBirth` and relief-entry
+   dates identically; this plan neither introduces nor worsens it.
+8. **`IncomeRecordEditorViewModel.init`'s `today:` default is still `Date()`.** Both live
+   "add" call sites pass a year-anchored date, but a future call site added without one
+   would silently regress to the device's date.
+9. **`deleteSource`/`deleteRecord` swallow errors** and return nothing, so the screen
+   cannot report a failed delete — the row simply stays.

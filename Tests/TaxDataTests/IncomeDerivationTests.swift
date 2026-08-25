@@ -270,4 +270,28 @@ import TaxKit
         #expect(IncomeDerivation.knownAnnualGross(for: 2025, from: [Self.source("New job", []), job])
                 == Money(ringgit: 96_000))
     }
+
+    @Test("the derivation path contains no Double")
+    func noDoubleInDerivation() throws {
+        // This is a calculation path feeding chargeable income. `Double` here would
+        // reintroduce exactly the representation error `Money` exists to prevent, at the
+        // point where a user's salary becomes a tax figure.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let income = root.appending(path: "Sources/TaxData/Income")
+        let files = try FileManager.default
+            .contentsOfDirectory(at: income, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "swift" }
+        #expect(!files.isEmpty)
+
+        for file in files {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                let text = String(line)
+                guard text.contains("Double") else { continue }
+                #expect(text.contains("//"),
+                        "\(file.lastPathComponent):\(number + 1) uses Double on the derivation path")
+            }
+        }
+    }
 }
