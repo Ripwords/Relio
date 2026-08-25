@@ -13,12 +13,18 @@ Account-less and server-less. Data lives on your own devices and in your own iCl
 
 ## Current state
 
-The calculation core is built and tested. **There is no user interface yet.**
+The calculation core, persistence layer and view models are built and tested. The iOS
+app's screens are written and type-check against the iOS SDK, but the app itself has
+never been built, launched, or exercised in the simulator — see [Running the
+app](#running-the-app).
 
 | | Status |
 |---|---|
-| **TaxKit** — the tax engine behind Relio | ✅ Done, 136 tests |
-| Persistence, iCloud sync, iOS app | Not started |
+| **TaxKit** — the tax engine behind Relio | ✅ Done |
+| **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation | ✅ Done |
+| **TaxPresentation** — tested view models | ✅ Done |
+| iOS app — Home, Reliefs, entry CRUD, onboarding | Screens written and type-check; never built or launched |
+| iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started |
 | On-device AI assistant | Not started |
 | watchOS, macOS, widgets | Not started |
@@ -57,6 +63,30 @@ swift test
 ```
 
 Requires Xcode 26 or later (Swift 6.2 tools, iOS/macOS/watchOS 26 SDKs). No simulator needed — the engine has no platform dependency.
+
+## Running the app
+
+The iOS app's screens (`App/TaxTracker/`) are written and type-check against the iOS
+simulator SDK via `./Scripts/typecheck-app.sh`, but the app has not been built, linked,
+or launched — `xcodebuild` refuses to enumerate simulator destinations, or link and run
+anything, until Xcode's first-launch component install has completed, and that install
+needs interactive admin authentication. On a machine where that has never been done:
+
+```bash
+sudo xcodebuild -runFirstLaunch   # one-time, needs admin authentication; not yet run here
+```
+
+Once that has completed once on the machine, the real build gate is:
+
+```bash
+cp Config/Signing.example.xcconfig Config/Signing.xcconfig   # first time only
+./Scripts/build-app.sh
+```
+
+The app is expected to build and run with no Apple Developer account, storing data
+locally, though this has not been verified end to end. To enable iCloud sync, put your
+team id in `Config/Signing.xcconfig` and point `TAXTRACKER_ENTITLEMENTS` at
+`App/TaxTracker/TaxTracker.entitlements`.
 
 ## Updating the rulebook
 
