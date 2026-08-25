@@ -14,16 +14,16 @@ Account-less and server-less. Data lives on your own devices and in your own iCl
 ## Current state
 
 The calculation core, persistence layer and view models are built and tested. The iOS
-app's screens are written and type-check against the iOS SDK, but the app itself has
-never been built, launched, or exercised in the simulator — see [Running the
-app](#running-the-app).
+app's screens are written and type-check against the iOS SDK. The app has been built,
+installed and launched on the iOS 26.1 simulator, and the onboarding screen renders
+correctly — see [Running the app](#running-the-app) for verification scope.
 
 | | Status |
 |---|---|
 | **TaxKit** — the tax engine behind Relio | ✅ Done |
 | **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
-| iOS app — Home, Reliefs, entry CRUD, onboarding | Screens written and type-check; never built or launched |
+| iOS app — Home, Reliefs, entry CRUD, onboarding | Built, installed and launched; onboarding verified on iOS 26.1 simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started |
 | On-device AI assistant | Not started |
@@ -67,26 +67,41 @@ Requires Xcode 26 or later (Swift 6.2 tools, iOS/macOS/watchOS 26 SDKs). No simu
 ## Running the app
 
 The iOS app's screens (`App/TaxTracker/`) are written and type-check against the iOS
-simulator SDK via `./Scripts/typecheck-app.sh`, but the app has not been built, linked,
-or launched — `xcodebuild` refuses to enumerate simulator destinations, or link and run
-anything, until Xcode's first-launch component install has completed, and that install
-needs interactive admin authentication. On a machine where that has never been done:
+simulator SDK. Three build scripts are available:
 
+**Type-checking only (no simulator needed):**
 ```bash
-sudo xcodebuild -runFirstLaunch   # one-time, needs admin authentication; not yet run here
+./Scripts/typecheck-app.sh
 ```
 
-Once that has completed once on the machine, the real build gate is:
+**Hand-assembled simulator bundle (current workaround):**
+```bash
+./Scripts/run-app.sh
+```
+This cross-compiles the package for the simulator, links the app sources against it,
+stages TaxKit's resource bundle, ad-hoc signs and installs the bundle via `simctl`.
+The app has been verified to launch and render the onboarding screen on iOS 26.1
+simulator. Dark Mode is correct. Dynamic Type at the largest accessibility size (AX5)
+renders the screen without truncation and both buttons are reachable. The script does
+not perform asset catalog compilation, entitlements processing or App Store packaging,
+so a real `xcodebuild` build could still surface issues this path did not.
 
+**Proper Xcode build (once first-launch is done):**
 ```bash
 cp Config/Signing.example.xcconfig Config/Signing.xcconfig   # first time only
 ./Scripts/build-app.sh
 ```
+This requires `sudo xcodebuild -runFirstLaunch` to have been run once on the machine
+(for interactive admin authentication). Once that completes, `build-app.sh` is the
+proper gate.
 
-The app is expected to build and run with no Apple Developer account, storing data
-locally, though this has not been verified end to end. To enable iCloud sync, put your
-team id in `Config/Signing.xcconfig` and point `TAXTRACKER_ENTITLEMENTS` at
-`App/TaxTracker/TaxTracker.entitlements`.
+**Not yet verified:** VoiceOver and Reduce Motion (the simulator control tool cannot
+toggle either), and every screen past onboarding (Home, Reliefs, detail, entry editor)
+— these have been type-checked and unit-tested but never rendered. CloudKit sync
+remains entirely unverified and requires two devices and a paid Apple Developer team.
+
+To enable iCloud sync on a verified build, put your team id in `Config/Signing.xcconfig`
+and point `TAXTRACKER_ENTITLEMENTS` at `App/TaxTracker/TaxTracker.entitlements`.
 
 ## Updating the rulebook
 
