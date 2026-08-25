@@ -24,6 +24,14 @@ struct RootView: View {
                 content
                     .navigationTitle("YA \(String(context.year))")
                     .navigationBarTitleDisplayMode(.inline)
+                    .navigationDestination(for: ReliefsRoute.self) { _ in
+                        ReliefsListView(model: ReliefsListViewModel(context: context))
+                    }
+                    .navigationDestination(for: ReliefCode.self) { code in
+                        ReliefDetailView(model: ReliefDetailViewModel(context: context,
+                                                                      store: store,
+                                                                      code: code))
+                    }
             }
             .tabItem { Label("Home", systemImage: "house") }
 

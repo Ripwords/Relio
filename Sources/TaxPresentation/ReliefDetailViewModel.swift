@@ -24,6 +24,11 @@ public final class ReliefDetailViewModel {
         self.code = code
     }
 
+    /// The Year of Assessment this detail screen is showing, for the "not part of the
+    /// YYYY rulebook" empty state. `context` stays `private`: this computed property is
+    /// declared on the same type, where `private` is already visible.
+    public var yearOfAssessment: Int { context.year }
+
     public func refresh() async {
         guard let found = context.result?.assessment(for: code) else {
             assessment = nil

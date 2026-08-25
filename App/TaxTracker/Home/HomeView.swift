@@ -96,12 +96,16 @@ struct HomeView: View {
                 Text("Biggest opportunities")
                     .font(.headline)
                 ForEach(model.opportunities) { row in
-                    OpportunityRowView(row: row)
+                    NavigationLink(value: row.code) {
+                        OpportunityRowView(row: row)
+                    }
+                    .buttonStyle(.plain)
                 }
                 if model.remainingOpportunityCount > 0 {
-                    Text("See all \(model.remainingOpportunityCount + model.opportunities.count)")
-                        .font(.subheadline)
-                        .foregroundStyle(.tint)
+                    NavigationLink(value: ReliefsRoute()) {
+                        Text("See all \(model.remainingOpportunityCount + model.opportunities.count)")
+                            .font(.subheadline)
+                    }
                 }
             }
         }
