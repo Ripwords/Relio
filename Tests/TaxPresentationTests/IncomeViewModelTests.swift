@@ -125,7 +125,50 @@ import TaxData
         #expect(model.sources.first { $0.name == "Side business" }?.needsScopeWarning == true)
         #expect(model.sources.first { $0.name == "Main job" }?.needsScopeWarning == false)
         #expect(model.sources.first { $0.name == "Tutoring" }?.needsScopeWarning == false)
-        #expect(model.outOfScopeWarnings.count == 1)
+        #expect(model.sources.filter { $0.warning != nil }.count == 1)
+
+        // The notice travels on the row it belongs to, not as a loose list the view has
+        // to match up again by name.
+        let flagged = try #require(model.sources.first { $0.name == "Side business" })
+        #expect(flagged.warning?.contains("Side business") == true)
+        #expect(flagged.warning?.contains("Form B") == true)
+        #expect(model.sources.first { $0.name == "Main job" }?.warning == nil)
+        #expect(model.sources.first { $0.name == "Tutoring" }?.warning == nil)
+    }
+
+    @Test("sources whose names overlap each keep their own notice")
+    func warningsSurviveOverlappingNames() async throws {
+        let store = try await PresentationFixture.store()
+        var flat = IncomeSourceDraft(name: "Rental"); flat.kind = .rental
+        _ = try await store.save(flat)
+        var shop = IncomeSourceDraft(name: "Rental Penang"); shop.kind = .business
+        _ = try await store.save(shop)
+        let model = await Self.model(store)
+
+        // "Rental" is a substring of "Rental Penang". Matching a flat list of warnings by
+        // name — which is what the view used to do — hands one source the other's
+        // compliance notice, telling the user to file the wrong form.
+        let rental = try #require(model.sources.first { $0.name == "Rental" })
+        let business = try #require(model.sources.first { $0.name == "Rental Penang" })
+        #expect(rental.warning?.contains("rental income") == true)
+        #expect(business.warning?.contains("business income") == true)
+        #expect(business.warning?.hasPrefix("Rental Penang") == true)
+    }
+
+    @Test("a new record defaults into the year being viewed, not today")
+    func newRecordDateIsAnchoredToTheYear() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.model(store)
+
+        // The newest shipped rulebook is normally the previous assessment year, so a
+        // `Date()` default pre-fills a date outside the year on screen: the record is
+        // then listed under a subtotal it contributes nothing to.
+        #expect(IncomeCalendar.year(of: model.newRecordDate) == model.context.year)
+        #expect(model.newRecordDate == IncomeCalendar.startOfYear(model.context.year))
+
+        let editor = IncomeRecordEditorViewModel(mode: .addRecord(sourceID: UUID()),
+                                                 today: model.newRecordDate)
+        #expect(IncomeCalendar.year(of: editor.effectiveFrom) == model.context.year)
     }
 
     @Test("adding a rate updates the total without a manual reload")

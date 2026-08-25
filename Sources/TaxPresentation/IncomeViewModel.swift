@@ -11,6 +11,13 @@ public struct IncomeSourceRow: Hashable, Sendable, Identifiable {
     public var records: [IncomeRecordDraft]
     /// True for income Relio does not model correctly — see `IncomeViewModel`.
     public var needsScopeWarning: Bool
+    /// The compliance notice for this source, or `nil` when there is nothing to say.
+    ///
+    /// It is joined to its source here, where the kind is known, rather than handed to the
+    /// view as a loose list to match up by name. Two sources whose names are substrings of
+    /// one another — "Rental" and "Rental Penang" — would otherwise attach each other's
+    /// notice, and a data join has no business in a view.
+    public var warning: String?
 }
 
 /// The Income screen's state.
@@ -26,7 +33,6 @@ public final class IncomeViewModel {
     public private(set) var sources: [IncomeSourceRow] = []
     public private(set) var derivedTotal: Money = .zero
     public private(set) var override: Money?
-    public private(set) var outOfScopeWarnings: [String] = []
 
     private let store: TaxStore
 
@@ -49,6 +55,15 @@ public final class IncomeViewModel {
     /// an amount, rather than silently clearing a figure they never asked to clear.
     public var overrideEditingText: String { override?.formattedForEditing() ?? "" }
 
+    /// The date a newly-added record should start out on.
+    ///
+    /// The first day of the year being viewed, not today. The newest shipped rulebook is
+    /// normally the previous assessment year, so `Date()` pre-fills a date *outside* the
+    /// year on screen: the record is then written, listed under a year-scoped subtotal it
+    /// contributes nothing to, and the arithmetic visibly does not close. Onboarding
+    /// anchors its salary date the same way, and for the same reason.
+    public var newRecordDate: Date { IncomeCalendar.startOfYear(context.year) }
+
     public func refresh() async {
         let year = context.year
         let totals = (try? await store.incomeTotals(for: year)) ?? []
@@ -58,14 +73,18 @@ public final class IncomeViewModel {
         for total in totals {
             guard let draft = drafts.first(where: { $0.id == total.sourceID }) else { continue }
             let records = (try? await store.incomeRecordDrafts(forSource: total.sourceID)) ?? []
+            let needsWarning = Self.isOutOfScope(draft.kind)
             rows.append(IncomeSourceRow(id: total.sourceID, name: total.name, kind: total.kind,
                                         total: total.total, records: records,
-                                        needsScopeWarning: Self.isOutOfScope(draft.kind)))
+                                        needsScopeWarning: needsWarning,
+                                        // Joined here, where the kind is already in hand.
+                                        warning: needsWarning
+                                            ? Self.warning(name: total.name, kind: draft.kind)
+                                            : nil))
         }
         sources = rows
         derivedTotal = totals.reduce(Money.zero) { $0 + $1.total }
         override = (try? await store.yearFacts(for: year))?.grossIncomeOverride
-        outOfScopeWarnings = rows.filter(\.needsScopeWarning).map(Self.warning(for:))
     }
 
     /// Business and rental income only. Occasional work is ITA 1967 §4(f) and is declared
@@ -74,14 +93,14 @@ public final class IncomeViewModel {
         kind == .business || kind == .rental
     }
 
-    static func warning(for row: IncomeSourceRow) -> String {
-        switch row.kind {
+    static func warning(name: String, kind: IncomeKind) -> String? {
+        switch kind {
         case .business:
-            return "\(row.name) looks like business income. Relio estimates Form BE figures; business income belongs on Form B, where expenses are deductible."
+            return "\(name) looks like business income. Relio estimates Form BE figures; business income belongs on Form B, where expenses are deductible."
         case .rental:
-            return "\(row.name) is rental income. Relio counts it in full, but rental expenses are deductible, so your real chargeable income is lower."
+            return "\(name) is rental income. Relio counts it in full, but rental expenses are deductible, so your real chargeable income is lower."
         default:
-            return ""
+            return nil
         }
     }
 
