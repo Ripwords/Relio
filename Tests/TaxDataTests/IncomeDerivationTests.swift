@@ -93,6 +93,11 @@ import TaxKit
             + Money(ringgit: 9_500).applying(Decimal(30) / Decimal(31))
         #expect(IncomeDerivation.annualGross(for: 2025, from: [job])
                 == january + Money(ringgit: 11 * 9_500))
+        // The computed figure, spelled out. The expression above says the two sides agree;
+        // this says what they agree *on*, so a change to `applying`'s rounding cannot move
+        // both sides together and stay green. 8,000 x 1/31 = 258.06 and 9,500 x 30/31 =
+        // 9,193.55, so January is 9,451.61, on top of eleven months at 9,500.
+        #expect(IncomeDerivation.annualGross(for: 2025, from: [job]) == Money(sen: 11_395_161))
     }
 
     @Test("a job that ends is paid through its last day, inclusive")
@@ -110,6 +115,28 @@ import TaxKit
         let expected = Money(ringgit: 9_000)                                  // all January
             + Money(ringgit: 9_000).applying(Decimal(1) / Decimal(28))        // 1 February
         #expect(IncomeDerivation.annualGross(for: 2025, from: [job]) == expected)
+        // 9,000 x 1/28 = 321.43. Pinned as a literal so the rounding cannot drift with the
+        // expression that computes it.
+        #expect(IncomeDerivation.annualGross(for: 2025, from: [job]) == Money(sen: 932_143))
+    }
+
+    @Test("an end date between two rates clips the earlier rate and voids the later one")
+    func endedOnBetweenTwoRates() {
+        // Nothing exercised `spanEnd` being decided by the successor for one rate and by
+        // `endedOn` for the next. Jan-Mar is clipped by the April raise; April onwards is
+        // clipped by leaving on 15 August; and the two clips must compose.
+        let job = Self.source(endedOn: Self.date(2025, 8, 15),
+                              [Self.rate(8_000, from: Self.date(2025, 1, 1)),
+                               Self.rate(9_500, from: Self.date(2025, 4, 1))])
+        // 3 x 8,000 = 24,000; 4 x 9,500 = 38,000; 1-15 August is 9,500 x 15/31 = 4,596.77.
+        #expect(IncomeDerivation.annualGross(for: 2025, from: [job]) == Money(sen: 6_659_677))
+
+        // And when the end date falls before the successor takes effect at all, the later
+        // rate contributes nothing rather than resuming after the source stopped paying.
+        let quit = Self.source(endedOn: Self.date(2025, 4, 30),
+                               [Self.rate(8_000, from: Self.date(2025, 1, 1)),
+                                Self.rate(9_500, from: Self.date(2025, 9, 1))])
+        #expect(IncomeDerivation.annualGross(for: 2025, from: [quit]) == Money(ringgit: 32_000))
     }
 
     @Test("one-off amounts count only in the year they were received")
@@ -190,6 +217,11 @@ import TaxKit
                                Self.rate(8_000, from: Self.date(2025, 1, 1))])
         #expect(IncomeDerivation.annualGross(for: 2025, from: [one])
                 == IncomeDerivation.annualGross(for: 2025, from: [two]))
+        // Order-independence alone would also hold if both orders were equally wrong, so
+        // pin which rate actually wins: the tie breaks on id, so `later` (BB) is second and
+        // `earlier` (AA) is paid through the day before it — the same day — contributing
+        // nothing. Jan-May at 8,000 is 40,000; June-December at 9,500 is 66,500.
+        #expect(IncomeDerivation.annualGross(for: 2025, from: [one]) == Money(ringgit: 106_500))
     }
 
     @Test("no income at all is zero, not a crash")
