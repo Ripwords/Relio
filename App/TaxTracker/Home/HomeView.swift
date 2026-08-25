@@ -6,6 +6,13 @@ struct HomeView: View {
 
     @Bindable var model: HomeViewModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Spec §11.2: no fixed point sizes. This is the one number the screen exists for, so
+    /// leaving it unscaled while every label around it grows inverts the hierarchy at the
+    /// larger accessibility sizes — the headline ends up smaller than its own caption.
+    /// `relativeTo: .largeTitle` ties its growth curve to the closest built-in style.
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = 44
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
@@ -22,14 +29,27 @@ struct HomeView: View {
 
     // The only large number on the screen. Spec §11.
     private var headline: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            MoneyText(amount: model.headline, font: .system(size: 44), weight: .bold)
-                .contentTransition(.numericText())
-            Text(model.headlineKind == .taxSaved ? "in tax still claimable" : "of relief still claimable")
-                .font(.subheadline)
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                MoneyText(amount: model.headline, font: .system(size: headlineSize), weight: .bold)
+                    // Spec §11.3: rolling digits are motion. Reduce Motion swaps the
+                    // value outright instead.
+                    .contentTransition(reduceMotion ? .identity : .numericText())
+                Text(model.headlineKind == .taxSaved ? "in tax still claimable" : "of relief still claimable")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+
+            // Spec §13: the largest computed figure in the app had nothing anywhere on
+            // the screen saying it is an estimate. A footnote, not a banner — it has to
+            // be readable without competing with the number it qualifies. Kept out of the
+            // combined element above so VoiceOver reads the figure first and the caveat
+            // as its own stop, rather than one long run-on label.
+            Text("Estimate only. Verify with LHDN before you file.")
+                .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
