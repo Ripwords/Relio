@@ -155,6 +155,16 @@ public final class EntryEditorViewModel {
 
     public var isReadOnly: Bool { readOnlyReason != nil }
 
+    /// Whether this editor opened against an existing entry rather than a blank form —
+    /// drives the title ("Edit entry" vs. "New entry") and whether Delete can show at all.
+    public var isEditing: Bool { editingID != nil }
+
+    /// Delete only ever makes sense for an entry that already exists, and never for one
+    /// this same editor has already deleted (that state is `deletedID`, not `editingID`,
+    /// and it is already handled by `canSave`) — but showing Delete on a read-only
+    /// automatic relief would offer to delete a row the evaluator ignores anyway.
+    public var canDelete: Bool { editingID != nil && !isReadOnly }
+
     /// Claimants the selected relief admits, from the rulebook via
     /// `admittedClaimantsByCode` — not from `availableCodes`. Empty means no restriction.
     public var admittedClaimants: [Claimant] {
@@ -361,6 +371,13 @@ public final class EntryEditorViewModel {
     static func isAutomatic(_ code: ReliefCode, in context: YearContext) -> Bool {
         context.rule(for: code)?.automatic ?? false
     }
+}
+
+extension EntryEditorViewModel: Identifiable {
+    /// `.sheet(item:)` needs `Identifiable`; there is no natural stable id before the
+    /// first save (a new entry has no `editingID`), so identity is the view model
+    /// instance itself, which is exactly the lifetime `.sheet(item:)` cares about.
+    public nonisolated var id: ObjectIdentifier { ObjectIdentifier(self) }
 }
 
 extension Money {

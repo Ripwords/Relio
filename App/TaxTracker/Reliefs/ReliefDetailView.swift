@@ -25,7 +25,7 @@ struct ReliefDetailView: View {
                 if case .needsInfo(let questions) = assessment.eligibility {
                     Section("To claim this") {
                         ForEach(questions, id: \.self) { question in
-                            Label(Self.text(for: question), systemImage: "questionmark.circle")
+                            Label(ReliefCopy.text(for: question), systemImage: "questionmark.circle")
                         }
                     }
                 }
@@ -55,7 +55,7 @@ struct ReliefDetailView: View {
                 if !model.requirements.isEmpty {
                     Section("Documents") {
                         ForEach(model.requirements, id: \.kind) { check in
-                            Label(Self.text(for: check.kind),
+                            Label(ReliefCopy.text(for: check.kind),
                                   systemImage: check.isSatisfied ? "checkmark.circle" : "exclamationmark.circle")
                                 .foregroundStyle(check.isSatisfied ? Color.primary : Color.orange)
                         }
@@ -113,41 +113,6 @@ struct ReliefDetailView: View {
             Text(title)
             Spacer()
             MoneyText(amount: amount, font: .body, weight: .medium)
-        }
-    }
-
-    /// Presentation-only copy for a fact the app still needs to ask about. `ProfileQuestion`
-    /// carries no display text of its own (it is a plain `String` enum used as a rulebook
-    /// key), so this is the one place that maps a question to what the user reads —
-    /// `String(describing:)` would otherwise leak the raw case name ("maritalStatus").
-    private static func text(for question: ProfileQuestion) -> String {
-        switch question {
-        case .maritalStatus: "Marital status"
-        case .spouseHasIncome: "Whether your spouse has income"
-        case .assessmentType: "How you are assessed"
-        case .employmentType: "Employment type"
-        case .gender: "Gender"
-        case .dependentDetails: "Dependant details"
-        case .lastClaimYear: "When you last claimed this"
-        case .propertyPrice: "Property price"
-        case .disabilityStatus: "Disability status"
-        case .spouseDisabilityStatus: "Your spouse's disability status"
-        }
-    }
-
-    /// Presentation-only copy for a required document kind, for the same reason as
-    /// `text(for: ProfileQuestion)` above.
-    private static func text(for kind: DocumentKind) -> String {
-        switch kind {
-        case .officialReceipt: "Official receipt"
-        case .taxInvoice: "Tax invoice"
-        case .eInvoice: "e-Invoice"
-        case .medicalCertificate: "Medical certificate"
-        case .referralLetter: "Referral letter"
-        case .insuranceStatement: "Insurance statement"
-        case .epfStatement: "EPF statement"
-        case .bankStatement: "Bank statement"
-        case .other: "Other document"
         }
     }
 }

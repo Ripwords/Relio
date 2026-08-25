@@ -76,20 +76,20 @@ public final class YearContext {
                 // Not an error state. Every January until the Budget ships, the current
                 // year has no rulebook, and the user's entries for it still exist and
                 // still matter.
-                status = .unavailable("Rules for \(year) aren't available yet.")
+                status = .unavailable("Rules for \(String(year)) aren't available yet.")
             case .malformed:
                 // A genuine failure: a rulebook shipped inside the app failed to decode.
                 // The screen shape stays the same as the calm "not shipped yet" state —
                 // there is still nothing to show — but the message must not tell the
                 // user this is a normal wait, or they will sit waiting for a Budget that
                 // already happened while every figure silently shows nothing.
-                status = .unavailable("The rulebook for \(year) could not be read.")
+                status = .unavailable("The rulebook for \(String(year)) could not be read.")
             }
         } catch {
             guard requested == year else { return }
             self.ruleSet = nil
             result = nil
-            status = .unavailable("Could not load \(year): \(error.localizedDescription)")
+            status = .unavailable("Could not load \(String(year)): \(error.localizedDescription)")
         }
     }
 
