@@ -84,6 +84,12 @@ simulator SDK. Three build scripts are available:
 ```bash
 ./Scripts/run-app.sh
 ```
+If you have a build from before the income timeline installed, delete it from the
+simulator (or device) first. `SchemaV1` was amended in place rather than bumped — the
+app has not shipped, so there was no store to migrate — and the old store either fails
+to open against the new schema or lightweight-migrates and drops the year's income
+figure with it. A fresh install starts at onboarding, which is the intended path.
+
 This cross-compiles the package for the simulator, links the app sources against it,
 stages TaxKit's resource bundle, ad-hoc signs and installs the bundle via `simctl`.
 The app has been verified to launch and render the onboarding screen on iOS 26.1
