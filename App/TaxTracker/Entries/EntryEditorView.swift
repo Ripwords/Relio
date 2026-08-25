@@ -108,9 +108,15 @@ struct EntryEditorView: View {
                 if !isOn { model.spentOn = nil }
             }
             // Spec §6.5: catch the duplicate at entry time, before the sweep has to.
+            // Every field that composes the dedupe key must re-check — leaving one out
+            // (claimant, dependent, date) lets an edit to just that field silently drop
+            // or miss a warning that still applies.
             .onChange(of: model.amountText) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.vendor) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.selectedCode) { Task { await model.checkForDuplicate() } }
+            .onChange(of: model.claimant) { Task { await model.checkForDuplicate() } }
+            .onChange(of: model.dependentID) { Task { await model.checkForDuplicate() } }
+            .onChange(of: model.spentOn) { Task { await model.checkForDuplicate() } }
         }
     }
 }

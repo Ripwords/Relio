@@ -11,6 +11,10 @@ struct RootView: View {
     @State private var editingEntry: EntryEditorViewModel?
     @State private var showUndo = false
     @State private var lastDeleted: EntryEditorViewModel?
+    // `nil` means the preference has not been read yet. Defaulting this to "show
+    // onboarding" would flash the welcome screen at every returning user on every
+    // launch.
+    @State private var needsOnboarding: Bool?
 
     init(store: TaxStore) {
         self.store = store
@@ -22,6 +26,26 @@ struct RootView: View {
     }
 
     var body: some View {
+        Group {
+            if needsOnboarding == true {
+                OnboardingView(model: OnboardingViewModel(store: store, year: context.year)) {
+                    needsOnboarding = false
+                    Task { await context.reload(); await home.refresh() }
+                }
+            } else if needsOnboarding == false {
+                tabs
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            needsOnboarding = !((try? await store.preferences().hasCompletedOnboarding) ?? false)
+            await context.load()
+            await home.refresh()
+        }
+    }
+
+    private var tabs: some View {
         TabView {
             NavigationStack {
                 content
@@ -53,8 +77,11 @@ struct RootView: View {
                                         // The check marks the current year; Compare joins
                                         // this menu in a later plan, which is why the
                                         // switcher lives in the title rather than a tab.
-                                        Label("YA \(String(year))",
-                                              systemImage: year == context.year ? "checkmark" : "")
+                                        if year == context.year {
+                                            Label("YA \(String(year))", systemImage: "checkmark")
+                                        } else {
+                                            Text("YA \(String(year))")
+                                        }
                                     }
                                 }
                             } label: {
@@ -107,10 +134,6 @@ struct RootView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: showUndo)
-        .task {
-            await context.load()
-            await home.refresh()
-        }
     }
 
     private func handleDeleted(_ model: EntryEditorViewModel) {
