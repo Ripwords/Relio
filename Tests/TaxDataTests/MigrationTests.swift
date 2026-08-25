@@ -14,6 +14,79 @@ import TaxKit
                           "IncomeSource", "IncomeRecord"])
     }
 
+    /// Pins V1's stored shape property by property, not just its model list.
+    ///
+    /// `schemaIsComplete` above pins the *names of the models*, which a rename like
+    /// `grossIncomeSen` → `grossIncomeOverrideSen` sails straight past. Post-release that
+    /// rename drops the old column: SwiftData lightweight-migrates the store, every user's
+    /// income figure goes to the default, and the whole suite stays green. Nothing else
+    /// here would notice.
+    ///
+    /// So the expectation below is the shipped contract, and editing it is the bug. If
+    /// this test fails, read the message.
+    @Test("SchemaV1's attributes are frozen, entity by entity")
+    func schemaV1AttributesAreFrozen() {
+        // Sorted, exact, and per entity — a superset check would let an added property
+        // through, and an added property is a schema change too.
+        let expected: [String: [String]] = [
+            "ChatMessage": ["createdAt", "deletedAt", "id", "roleRaw", "text", "updatedAt",
+                            "year"],
+            "Dependent": ["dateOfBirth", "deletedAt", "id", "isDisabled", "kindRaw", "name",
+                          "updatedAt", "yearStatuses"],
+            "Document": ["deletedAt", "documentDate", "eInvoiceUUID", "id", "kindRaw",
+                         "ocrText", "thumbnail", "totalSen", "updatedAt", "vendor"],
+            "DocumentFile": ["byteCount", "contentHash", "deletedAt",
+                             "downloadProgressPercent", "downloadStateRaw", "id",
+                             "updatedAt", "uti"],
+            "IncomeRecord": ["amountSen", "deletedAt", "effectiveFrom", "id", "note",
+                             "shapeRaw", "updatedAt"],
+            "IncomeSource": ["deductsEPF", "deductsSOCSO", "deletedAt", "endedOn", "id",
+                             "kindRaw", "name", "updatedAt"],
+            "ReliefEntry": ["amountSen", "claimantRaw", "dedupeKey", "deletedAt",
+                            "dependentID", "id", "mergedInto", "needsDocument", "note",
+                            "reliefCodeRaw", "spentOn", "updatedAt", "vendor"],
+            "TaxYear": ["assessmentTypeRaw", "deletedAt", "employmentTypeRaw", "genderRaw",
+                        "grossIncomeOverrideSen", "id", "maritalStatusRaw",
+                        "propertyPriceSen", "selfIsDisabled", "spouseHasIncome",
+                        "spouseIsDisabled", "updatedAt", "year"],
+            "UserPreferences": ["accentName", "assistantEnabled", "captureQualityRaw",
+                                "deletedAt", "hasCompletedOnboarding", "id",
+                                "incomeModuleEnabled", "lastViewedYear", "updatedAt"],
+        ]
+
+        // Relationships are stored shape too: renaming one is the same silent data loss.
+        let expectedRelationships: [String: [String]] = [
+            "ChatMessage": [],
+            "Dependent": [],
+            "Document": ["entries", "file"],
+            "DocumentFile": ["document"],
+            "IncomeRecord": ["source"],
+            "IncomeSource": ["records"],
+            "ReliefEntry": ["documents", "taxYear"],
+            "TaxYear": ["entries"],
+            "UserPreferences": [],
+        ]
+
+        let remedy = """
+            SchemaV1 has shipped. Do NOT edit this expectation to match the code: \
+            renaming, removing or retyping a stored property drops its column, and the \
+            user's data in it, with no error. The remedy is a new `SchemaV2` in \
+            Sources/TaxData/Schema/ plus a `MigrationStage` in `TaxMigrationPlan`, \
+            leaving `SchemaV1` exactly as it is.
+            """
+
+        let entities = Schema(SchemaV1.models).entities
+        #expect(Set(entities.map(\.name)) == Set(expected.keys), "\(remedy)")
+
+        for entity in entities.sorted(by: { $0.name < $1.name }) {
+            #expect(entity.attributes.map(\.name).sorted() == expected[entity.name],
+                    "\(entity.name) attributes changed. \(remedy)")
+            #expect(entity.relationships.map(\.name).sorted()
+                    == expectedRelationships[entity.name],
+                    "\(entity.name) relationships changed. \(remedy)")
+        }
+    }
+
     @Test("SchemaV1 is version 1.0.0")
     func schemaVersion() {
         #expect(SchemaV1.versionIdentifier == Schema.Version(1, 0, 0))
@@ -98,3 +171,4 @@ import TaxKit
         #expect(preferences.captureQuality == .balanced)
     }
 }
+
