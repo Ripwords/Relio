@@ -22,9 +22,13 @@ public final class TaxYear {
 
     public var year: Int = 0
 
-    public var grossIncomeSen: Int?
-    public var epfSen: Int?
-    public var socsoSen: Int?
+    /// What the user says the year's gross income really was, overriding the figure
+    /// derived from their income timeline.
+    ///
+    /// `nil` means "derive it". Their EA form is authoritative — it includes
+    /// benefits-in-kind, allowances and anything they never logged — so the derived figure
+    /// is a default, not the truth. Spec §6.
+    public var grossIncomeOverrideSen: Int?
 
     public var maritalStatusRaw: String?
     public var spouseHasIncome: Bool?
@@ -56,19 +60,9 @@ public final class TaxYear {
 
 extension TaxYear {
 
-    public var grossIncome: Money? {
-        get { grossIncomeSen.map(Money.init(sen:)) }
-        set { grossIncomeSen = newValue?.sen }
-    }
-
-    public var epf: Money? {
-        get { epfSen.map(Money.init(sen:)) }
-        set { epfSen = newValue?.sen }
-    }
-
-    public var socso: Money? {
-        get { socsoSen.map(Money.init(sen:)) }
-        set { socsoSen = newValue?.sen }
+    public var grossIncomeOverride: Money? {
+        get { grossIncomeOverrideSen.map(Money.init(sen:)) }
+        set { grossIncomeOverrideSen = newValue?.sen }
     }
 
     public var maritalStatus: MaritalStatus? {

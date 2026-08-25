@@ -21,7 +21,10 @@ extension TaxStore {
         let dependents = try dependentDrafts()
 
         var snapshot = TaxYearSnapshot(year: year)
-        snapshot.grossIncome = facts.grossIncome
+        // The user's own figure wins; otherwise derive it from the timeline. `nil` here
+        // means "not known", which the engine renders as no tax figures at all — quite
+        // different from zero, which would claim they earned nothing.
+        snapshot.grossIncome = try facts.grossIncomeOverride ?? nonZeroDerivedGross(for: year)
         snapshot.maritalStatus = facts.maritalStatus
         snapshot.spouseHasIncome = facts.spouseHasIncome
         snapshot.assessmentType = facts.assessmentType
@@ -43,6 +46,13 @@ extension TaxStore {
                               dependentID: draft.dependentID,
                               documentKinds: draft.documentKinds)
             })
+    }
+
+    /// The derived gross, or `nil` when there is no income timeline at all. Without this
+    /// an empty store would report a confident RM 0.00 income and the engine would produce
+    /// a full set of tax figures for a household that has told us nothing.
+    private func nonZeroDerivedGross(for year: Int) throws -> Money? {
+        try incomeSnapshots().isEmpty ? nil : derivedGrossIncome(for: year)
     }
 
     static func dependentSnapshot(_ draft: DependentDraft, forYear year: Int) -> DependentSnapshot {

@@ -4,9 +4,7 @@ import TaxKit
 
 /// One Year of Assessment's income and household facts, as a value.
 public struct YearFacts: Hashable, Sendable {
-    public var grossIncome: Money?
-    public var epf: Money?
-    public var socso: Money?
+    public var grossIncomeOverride: Money?
     public var maritalStatus: MaritalStatus?
     public var spouseHasIncome: Bool?
     public var assessmentType: AssessmentType?
@@ -139,9 +137,7 @@ public actor TaxStore {
     public func saveYearFacts(_ facts: YearFacts, for year: Int) throws {
         let stamp = now()
         let row = try fetchOrCreateYear(year)
-        row.grossIncome = facts.grossIncome
-        row.epf = facts.epf
-        row.socso = facts.socso
+        row.grossIncomeOverride = facts.grossIncomeOverride
         row.maritalStatus = facts.maritalStatus
         row.spouseHasIncome = facts.spouseHasIncome
         row.assessmentType = facts.assessmentType

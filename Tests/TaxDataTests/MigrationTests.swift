@@ -37,13 +37,13 @@ import TaxKit
         let context = ModelContext(container)
 
         let year = TaxYear(year: 2025)
-        year.grossIncome = Money(ringgit: 128_000)
+        year.grossIncomeOverride = Money(ringgit: 128_000)
         context.insert(year)
         try context.save()
 
         let fetched = try context.fetch(FetchDescriptor<TaxYear>())
         #expect(fetched.count == 1)
-        #expect(fetched.first?.grossIncome == Money(ringgit: 128_000))
+        #expect(fetched.first?.grossIncomeOverride == Money(ringgit: 128_000))
     }
 
     /// This establishes two things nothing else in the suite covers:
@@ -69,7 +69,7 @@ import TaxKit
             let context = ModelContext(container)
 
             let year = TaxYear(year: 2025)
-            year.grossIncome = Money(ringgit: 128_000)
+            year.grossIncomeOverride = Money(ringgit: 128_000)
             context.insert(year)
             try context.save()
         }
@@ -79,7 +79,7 @@ import TaxKit
         let fetched = try reopenedContext.fetch(FetchDescriptor<TaxYear>())
 
         #expect(fetched.count == 1)
-        #expect(fetched.first?.grossIncome == Money(ringgit: 128_000))
+        #expect(fetched.first?.grossIncomeOverride == Money(ringgit: 128_000))
     }
 
     @Test("chat history caps at the most recent 200 messages")

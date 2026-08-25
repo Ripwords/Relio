@@ -50,7 +50,7 @@ import TaxKit
     func yearFactsProject() async throws {
         let store = try await StoreFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         facts.maritalStatus = .married
         facts.spouseHasIncome = false
         facts.assessmentType = .separate
@@ -209,5 +209,78 @@ import TaxKit
         let second = try await store.project(year: 2025).snapshot.dependents.map(\.id)
         #expect(first == second)
         #expect(first == first.sorted { $0.uuidString < $1.uuidString })
+    }
+}
+
+@Suite("Income projection") struct IncomeProjectionTests {
+
+    static func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var c = DateComponents(); c.year = y; c.month = m; c.day = d; c.hour = 12
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Kuala_Lumpur")!
+        return cal.date(from: c)!
+    }
+
+    static func seedSalary(_ store: TaxStore, _ ringgit: Decimal) async throws {
+        let sourceID = try await store.save(IncomeSourceDraft(name: "Main job"))
+        var rate = IncomeRecordDraft(sourceID: sourceID)
+        rate.amount = Money(ringgit: ringgit)
+        rate.effectiveFrom = date(2025, 1, 1)
+        _ = try await store.save(rate)
+    }
+
+    @Test("with no override, the projection uses the derived figure")
+    func derivedReachesTheEngine() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        let projected = try await store.project(year: 2025)
+        #expect(projected.snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("an override wins over the derived figure")
+    func overrideWins() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        var facts = try await store.yearFacts(for: 2025)
+        // The EA form is authoritative: it includes benefits-in-kind and allowances Relio
+        // never saw. When the user says the real total, that is the total.
+        facts.grossIncomeOverride = Money(ringgit: 101_500)
+        try await store.saveYearFacts(facts, for: 2025)
+
+        let projected = try await store.project(year: 2025)
+        #expect(projected.snapshot.grossIncome == Money(ringgit: 101_500))
+    }
+
+    @Test("clearing the override returns to the derived figure")
+    func clearingOverrideReverts() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        var facts = try await store.yearFacts(for: 2025)
+        facts.grossIncomeOverride = Money(ringgit: 101_500)
+        try await store.saveYearFacts(facts, for: 2025)
+        facts.grossIncomeOverride = nil
+        try await store.saveYearFacts(facts, for: 2025)
+
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("no income at all still projects nil, not zero")
+    func noIncomeIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        // nil means "not known", which the engine renders as no tax figures at all. Zero
+        // would mean "earned nothing", which is a claim nobody made and which would show a
+        // confident RM 0.00 tax bill.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("an override of zero is respected as a real answer")
+    func explicitZeroIsRespected() async throws {
+        let store = try await StoreFixture.store()
+        var facts = try await store.yearFacts(for: 2025)
+        facts.grossIncomeOverride = .zero
+        try await store.saveYearFacts(facts, for: 2025)
+        // A user who genuinely earned nothing this year has said so. That is different
+        // from not having told us.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money.zero)
     }
 }

@@ -29,7 +29,7 @@ struct OnboardingView: View {
             VStack(spacing: 12) {
                 Button(model.isLastStep ? "Done" : "Continue") {
                     if model.isLastStep {
-                        model.facts.grossIncome = MoneyParsing.money(from: incomeText)
+                        model.facts.grossIncomeOverride = MoneyParsing.money(from: incomeText)
                         Task { await model.finish(); onFinished() }
                     } else {
                         model.advance()

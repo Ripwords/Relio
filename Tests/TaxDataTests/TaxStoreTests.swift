@@ -95,7 +95,7 @@ enum StoreFixture {
     func yearFacts() async throws {
         let store = try await StoreFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         facts.maritalStatus = .married
         facts.spouseHasIncome = false
         facts.assessmentType = .separate
@@ -105,7 +105,7 @@ enum StoreFixture {
         try await store.saveYearFacts(facts, for: 2025)
 
         let read = try await store.yearFacts(for: 2025)
-        #expect(read.grossIncome == Money(ringgit: 128_000))
+        #expect(read.grossIncomeOverride == Money(ringgit: 128_000))
         #expect(read.maritalStatus == .married)
         #expect(read.spouseHasIncome == false)
         #expect(read.propertyPrice == Money(ringgit: 480_000))
@@ -118,7 +118,7 @@ enum StoreFixture {
         // Empty, not absent: every optional means "not yet known", which the engine
         // renders as a prompt. Throwing here would make the Home screen an error screen
         // for anyone who switches to a year they have not filled in.
-        #expect(facts.grossIncome == nil)
+        #expect(facts.grossIncomeOverride == nil)
         #expect(facts.maritalStatus == nil)
     }
 
@@ -288,26 +288,26 @@ enum StoreFixture {
         // deterministic.
         let store = try await StoreFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 50_000)
+        facts.grossIncomeOverride = Money(ringgit: 50_000)
         try await store.saveYearFacts(facts, for: 2025)
 
         let later = StoreFixture.epoch.addingTimeInterval(3_600)
         await store.useClock { later }
         try await store.insertDuplicateYearForTesting(year: 2025,
                                                        updatedAt: later,
-                                                       grossIncome: Money(ringgit: 99_000))
+                                                       grossIncomeOverride: Money(ringgit: 99_000))
 
         // The read path must pick the newer (duplicate) row.
         let read = try await store.yearFacts(for: 2025)
-        #expect(read.grossIncome == Money(ringgit: 99_000))
+        #expect(read.grossIncomeOverride == Money(ringgit: 99_000))
 
         // The write path must land on that same row, not create a third row or silently
         // mutate the older loser.
         var updated = YearFacts()
-        updated.grossIncome = Money(ringgit: 120_000)
+        updated.grossIncomeOverride = Money(ringgit: 120_000)
         try await store.saveYearFacts(updated, for: 2025)
 
-        let incomes = try await store.liveYearGrossIncomesForTesting(year: 2025)
+        let incomes = try await store.liveYearGrossIncomeOverridesForTesting(year: 2025)
         #expect(incomes.count == 2, "the loser row must still exist — Task 4 does not merge duplicate TaxYear rows")
         #expect(incomes.first == Money(ringgit: 120_000), "the write must have landed on the survivor the read path also picks")
         #expect(incomes.last == Money(ringgit: 50_000), "the loser row must be left untouched, not merged away")
@@ -328,11 +328,11 @@ enum StoreFixture {
         try await store.insertDuplicateYearForTesting(id: lowerID,
                                                        year: 2025,
                                                        updatedAt: StoreFixture.epoch,
-                                                       grossIncome: Money(ringgit: 10_000))
+                                                       grossIncomeOverride: Money(ringgit: 10_000))
         try await store.insertDuplicateYearForTesting(id: higherID,
                                                        year: 2025,
                                                        updatedAt: StoreFixture.epoch,
-                                                       grossIncome: Money(ringgit: 20_000))
+                                                       grossIncomeOverride: Money(ringgit: 20_000))
 
         let ids = try await store.liveYearIdsForTesting(year: 2025)
         #expect(ids.first == higherID,
@@ -340,6 +340,6 @@ enum StoreFixture {
         #expect(ids == ids.sorted { $0.uuidString > $1.uuidString })
 
         let read = try await store.yearFacts(for: 2025)
-        #expect(read.grossIncome == Money(ringgit: 20_000), "yearFacts must read through the id-tie-break survivor")
+        #expect(read.grossIncomeOverride == Money(ringgit: 20_000), "yearFacts must read through the id-tie-break survivor")
     }
 }

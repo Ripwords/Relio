@@ -20,7 +20,7 @@ enum PresentationFixture {
     /// A household with income, so `taxSaved` and `totalOpportunity` are non-nil.
     static func seedTypicalHousehold(_ store: TaxStore) async throws {
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         facts.maritalStatus = .married
         facts.spouseHasIncome = false
         facts.assessmentType = .separate

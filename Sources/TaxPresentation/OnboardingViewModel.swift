@@ -51,9 +51,7 @@ public final class OnboardingViewModel {
         if !incomeEnabled {
             // Otherwise turning the module off later leaves a stale salary quietly
             // driving every tax figure in the app.
-            toSave.grossIncome = nil
-            toSave.epf = nil
-            toSave.socso = nil
+            toSave.grossIncomeOverride = nil
         }
 
         try? await store.saveYearFacts(toSave, for: year)

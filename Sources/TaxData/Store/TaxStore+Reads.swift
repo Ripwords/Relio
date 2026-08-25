@@ -34,9 +34,7 @@ extension TaxStore {
         }
 
         var facts = YearFacts()
-        facts.grossIncome = row.grossIncome
-        facts.epf = row.epf
-        facts.socso = row.socso
+        facts.grossIncomeOverride = row.grossIncomeOverride
         facts.maritalStatus = row.maritalStatus
         facts.spouseHasIncome = row.spouseHasIncome
         facts.assessmentType = row.assessmentType
@@ -181,25 +179,25 @@ extension TaxStore {
     /// live `TaxYear` row for the same year. Takes an explicit `id` so a tie-break test
     /// can pin which of two identically-stamped rows must win, rather than depending on
     /// whichever UUID `TaxYear.init` happens to generate. Only the tests call this.
-    func insertDuplicateYearForTesting(id: UUID = UUID(), year: Int, updatedAt: Date, grossIncome: Money?) throws {
+    func insertDuplicateYearForTesting(id: UUID = UUID(), year: Int, updatedAt: Date, grossIncomeOverride: Money?) throws {
         let row = TaxYear(year: year)
         row.id = id
         row.updatedAt = updatedAt
-        row.grossIncome = grossIncome
+        row.grossIncomeOverride = grossIncomeOverride
         modelContext.insert(row)
         try modelContext.save()
     }
 
-    /// Every live `TaxYear` row's `grossIncome` for a year, ordered by the same
+    /// Every live `TaxYear` row's `grossIncomeOverride` for a year, ordered by the same
     /// `TaxStore.isNewer` rule the store applies, so tests can confirm the write and
     /// read paths pick the same survivor and leave the loser row untouched (Task 4's
     /// scope explicitly excludes merging duplicate `TaxYear` rows). Only the tests call
     /// this.
-    func liveYearGrossIncomesForTesting(year: Int) throws -> [Money?] {
+    func liveYearGrossIncomeOverridesForTesting(year: Int) throws -> [Money?] {
         try modelContext
             .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.year == year && $0.deletedAt == nil }))
             .sorted(by: TaxStore.isNewer)
-            .map(\.grossIncome)
+            .map(\.grossIncomeOverride)
     }
 
     /// Every live `TaxYear` row's `id` for a year, ordered by the same `TaxStore.isNewer`
