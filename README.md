@@ -14,16 +14,16 @@ Account-less and server-less. Data lives on your own devices and in your own iCl
 ## Current state
 
 The calculation core, persistence layer and view models are built and tested. The iOS
-app's screens are written and type-check against the iOS SDK. The app has been built,
-installed and launched on the iOS 26.1 simulator, and the onboarding screen renders
-correctly — see [Running the app](#running-the-app) for verification scope.
+app's screens are written, build and link through `xcodebuild`, and have been installed,
+launched and read on the simulator at default and largest Dynamic Type sizes — see
+[Running the app](#running-the-app) for verification scope.
 
 | | Status |
 |---|---|
 | **TaxKit** — the tax engine behind Relio | ✅ Done |
 | **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation, income as a dated timeline (not one figure per year) | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
-| iOS app — Home, Reliefs, entry CRUD, onboarding | Built, installed and launched; onboarding verified on iOS 26.1 simulator |
+| iOS app — Home, Reliefs, entry CRUD, Income, onboarding | Built, installed and launched; Home, Income and onboarding read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started |
 | On-device AI assistant | Not started |
@@ -133,6 +133,12 @@ The integrity suite pins every cap and every band literally, checks that sub-lim
 - [Design spec](docs/superpowers/specs/2026-08-23-malaysian-tax-relief-tracker-design.md) — architecture, data model, sync, and the verified rulebook tables
 - [Implementation plan](docs/superpowers/plans/2026-08-23-taxkit-foundation-and-rules-engine.md) — the 16 tasks that built TaxKit
 - [Execution ledger](docs/superpowers/logs/2026-08-23-taxkit-execution-ledger.md) — every decision made during the build, including the bugs found and the ones deliberately deferred
+
+Later work, newest first:
+
+- [Income timeline design](docs/superpowers/specs/2026-08-25-income-timeline-design.md) and its [plan](docs/superpowers/plans/2026-08-25-income-timeline.md) — why income became a dated timeline rather than one figure per year. The plan's **Carried forward** section is the list of what is deliberately left undone.
+- [Income timeline execution ledger](docs/superpowers/logs/2026-08-25-income-timeline-execution-ledger.md) — the rulings taken during that build, the verification gates, the simulator/`xcodebuild` environment traps, and where to pick the work up.
+- [Persistence and iOS shell plan](docs/superpowers/plans/2026-08-24-persistence-sync-and-ios-shell.md) — SwiftData, `TaxStore`, the view models and the app.
 
 ## Not in scope
 
