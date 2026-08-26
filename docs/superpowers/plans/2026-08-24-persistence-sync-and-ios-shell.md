@@ -400,6 +400,11 @@ import TaxKit
 @Model
 public final class TaxYear {
 
+    /// Stable across devices, like every other model here. `persistentModelID` is a
+    /// local store identity and is not guaranteed equal on two devices for the same
+    /// logical row, so it cannot serve as the tie-break that makes duplicate resolution
+    /// converge.
+    public var id: UUID = UUID()
     public var year: Int = 0
 
     public var grossIncomeSen: Int?
@@ -2065,9 +2070,21 @@ git commit -m "feat: add TaxStore as the only write path, with value types at th
 
 **Why the key is computed, not chosen.** CloudKit forbids unique constraints, so
 duplicates cannot be prevented — spec §6 makes them *detectable and collapsible* instead.
-The key is SHA-256 over `(reliefCode, amount.sen, day, normalised vendor)`. Every
-component must be canonical or two devices produce different keys for the same receipt
-and the sweep in Task 6 never converges:
+The key is SHA-256 over `(reliefCode, year, amount.sen, day, normalised vendor, claimant,
+dependentID)`.
+
+**The key must carry everything that distinguishes one claim from another, not merely what
+distinguishes one receipt from another.** Spec §6.1 lists four components; four is not
+enough, and Task 6's review found why. `Normalisation.day(nil)` is `""` and `spentOn`
+defaults to `nil`, so an undated recurring claim — SSPN, LIFE_INSURANCE, a LIFESTYLE entry
+typed without a receipt date — logged in YA2024 and again in YA2025 would hash identically,
+and the sweep would soft-delete the earlier year's row. A whole year's claim would vanish
+from the user's records. Year, claimant and `dependentID` are therefore part of the key: a
+receipt belongs to exactly one year, one claimant and at most one dependent. Without
+`dependentID`, two children's identical claims in one year collapse into one.
+
+Every component must also be canonical, or two devices produce different keys for the same
+receipt and the sweep in Task 6 never converges:
 
 - **Vendor** is folded for case and diacritics, then reduced to alphanumeric words joined
   by single spaces. `"Guardian Health–KL"`, `"guardian  health kl"` and `"GUARDIAN
@@ -2151,21 +2168,75 @@ import TaxKit
 
     @Test("a different relief code produces a different key")
     func codeChangesKey() {
-        let day = "2025-02-20"
-        let a = DedupeKey.entry(code: ReliefCode("LIFESTYLE"), amountSen: 182_000,
-                                day: day, vendor: "popular")
-        let b = DedupeKey.entry(code: ReliefCode("LIFESTYLE_SPORTS"), amountSen: 182_000,
-                                day: day, vendor: "popular")
+        let a = Self.key(code: "LIFESTYLE")
+        let b = Self.key(code: "LIFESTYLE_SPORTS")
         #expect(a != b)
     }
 
-    @Test("fields cannot be smuggled across the separator")
-    func separatorIsUnambiguous() {
-        // Without a separator that cannot appear in a component, ("AB", 1) and ("A", "B1")
-        // would hash identically. Vendor normalisation strips everything but alphanumerics
-        // and spaces, so "|" is safe — this test pins that it stays safe.
-        let a = DedupeKey.entry(code: ReliefCode("AB"), amountSen: 1, day: "", vendor: "x")
-        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "", vendor: "Bx")
+    /// One builder so each test varies exactly one component.
+    static func key(code: String = "LIFESTYLE",
+                    year: Int = 2025,
+                    amountSen: Int = 182_000,
+                    day: String = "2025-02-20",
+                    vendor: String = "popular",
+                    claimant: Claimant = .individual,
+                    dependentID: UUID? = nil) -> String {
+        DedupeKey.entry(code: ReliefCode(code), year: year, amountSen: amountSen,
+                        day: day, vendor: vendor, claimant: claimant,
+                        dependentID: dependentID)
+    }
+
+    @Test("the same undated claim in two years is two claims, not one")
+    func yearSeparatesKeys() {
+        // The regression test for a Critical found in Task 6's review. day("") for an
+        // undated entry plus a recurring claim like SSPN meant YA2024 and YA2025 hashed
+        // identically, and the sweep soft-deleted the earlier year's row — a whole year's
+        // claim gone from the user's records.
+        #expect(Self.key(year: 2024, day: "") != Self.key(year: 2025, day: ""))
+    }
+
+    @Test("two dependents' identical claims are two claims")
+    func dependentSeparatesKeys() {
+        let farah = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let danish = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
+        #expect(Self.key(dependentID: farah) != Self.key(dependentID: danish))
+        #expect(Self.key(dependentID: nil) != Self.key(dependentID: farah))
+    }
+
+    @Test("the same spend claimed for a different person is a different claim")
+    func claimantSeparatesKeys() {
+        #expect(Self.key(claimant: .individual) != Self.key(claimant: .spouse))
+    }
+
+    @Test("an undated recurring claim in two years survives the sweep")
+    func recurringClaimAcrossYearsIsNotCollapsed() async throws {
+        let store = try await StoreFixture.store()
+        for year in [2024, 2025] {
+            var draft = StoreFixture.entry("SSPN", 3_000, year: year, spentOn: nil)
+            draft.id = UUID()
+            draft.vendor = ""
+            _ = try await store.save(draft)
+        }
+
+        #expect(try await store.reconcile().isEmpty)
+        // Row counts, not key inequality: this is the assertion that would have caught
+        // the Critical.
+        #expect(try await store.entryDrafts(forYear: 2024).count == 1)
+        #expect(try await store.entryDrafts(forYear: 2025).count == 1)
+    }
+
+    @Test("components cannot be smuggled across the encoding")
+    func componentsCannotBeSmuggledAcrossTheEncoding() {
+        // `ReliefCode` performs no character validation and `reliefCodeRaw` is written
+        // directly by sync, so a code containing the delimiter is reachable from a synced
+        // record rather than hypothetical.
+        //
+        // These two both flatten to "A|1|23|D|V" under the old pipe-joined scheme and so
+        // hashed identically. Note the collision has to cascade across all four fields:
+        // amountSen renders as bare digits with no separators of its own, so a simple
+        // code-versus-vendor swap is not reachable on its own.
+        let a = DedupeKey.entry(code: ReliefCode("A|1"), amountSen: 23, day: "D", vendor: "V")
+        let b = DedupeKey.entry(code: ReliefCode("A"), amountSen: 1, day: "23", vendor: "D|V")
         #expect(a != b)
     }
 
@@ -2276,15 +2347,35 @@ public enum DedupeKey {
 
     /// SHA-256 over the identifying tuple, lowercase hex.
     ///
-    /// `|` is a safe separator because every component is already restricted to
-    /// characters that cannot contain it: the code is `[A-Z_]`, the amount is digits,
-    /// the day is `yyyy-MM-dd`, and `Normalisation.vendor` emits only alphanumerics and
-    /// single spaces. Without that guarantee, ("AB", 1) and ("A", "B1") would collide.
+    /// Components are length-prefixed rather than merely delimited, which makes the
+    /// encoding injective for ANY component content. A plain `|` separator would rest on
+    /// the assumption that no component can contain one — and nothing enforces that:
+    /// `ReliefCode` is a bare `RawRepresentable` with no character validation, and
+    /// `reliefCodeRaw` is a plain `String` that CloudKit sync writes into directly. A
+    /// record from a future or corrupted build could carry a `|` and defeat exactly the
+    /// guarantee this type exists to provide.
     public static func entry(code: ReliefCode,
+                             year: Int,
                              amountSen: Int,
                              day: String,
-                             vendor: String) -> String {
-        hex(of: "\(code.rawValue)|\(amountSen)|\(day)|\(vendor)")
+                             vendor: String,
+                             claimant: Claimant,
+                             dependentID: UUID?) -> String {
+        hex(of: encode([code.rawValue,
+                        String(year),
+                        String(amountSen),
+                        day,
+                        vendor,
+                        claimant.rawValue,
+                        dependentID?.uuidString ?? ""]))
+    }
+
+    /// `["ab", "c"]` becomes `"2:ab|1:c"`. The byte count preceding each component makes
+    /// the boundary unambiguous no matter what the component contains.
+    private static func encode(_ components: [String]) -> String {
+        components
+            .map { "\($0.utf8.count):\($0)" }
+            .joined(separator: "|")
     }
 
     /// SHA-256 of a file's bytes — catches the same photo imported on two devices with
@@ -2330,9 +2421,12 @@ Add to the internals section:
     /// stale, and a flag `#Predicate` needs because it cannot call the engine.
     private func refreshDerivedFields(on row: ReliefEntry) {
         row.dedupeKey = DedupeKey.entry(code: row.reliefCode,
+                                        year: row.taxYear?.year ?? 0,
                                         amountSen: row.amountSen,
                                         day: Normalisation.day(row.spentOn),
-                                        vendor: Normalisation.vendor(row.vendor))
+                                        vendor: Normalisation.vendor(row.vendor),
+                                        claimant: row.claimant,
+                                        dependentID: row.dependentID)
         row.needsDocument = missingRequiredDocument(for: row)
     }
 
@@ -2396,6 +2490,23 @@ git commit -m "feat: compute dedupe keys, content hashes and the needs-document 
   - `struct MergeReport: Hashable, Sendable` — `dedupeKey`, `survivorID`, `mergedIDs`.
   - `TaxStore.reconcile() throws -> [MergeReport]`.
   - `TaxStore.unmerge(entryID:) throws` — reverses one merge.
+  - `TaxStore.reconcileYears() throws -> Int` — collapses duplicate `TaxYear` rows,
+    returning how many were merged away. Called by `reconcile()` before entries.
+
+**Added to this task's scope by a Task 4 ruling.** Task 4's review found that two devices
+first launching offline produce two live `TaxYear` rows for the same year, and that
+`yearFacts` picked one arbitrarily. Task 4 made the *selection* deterministic, which stops
+the nondeterministic-income bug; collapsing the duplicate belongs here, with the rest of
+duplicate handling.
+
+`reconcileYears()` keeps the newest row (ties on `id.uuidString`, the same total order as
+everything else here), re-points every loser's entries at the survivor, and soft-deletes
+the losers. **Facts merge by filling gaps, never by overwriting:** for each optional fact,
+the survivor keeps its own value and adopts the loser's only where its own is `nil`. A
+`nil` means "not answered yet" throughout this app, so filling a gap cannot lose an
+answer, and refusing to overwrite means a newer device's answer always wins. Discarding
+the loser's facts outright would silently throw away income the user entered on their
+other phone.
 
 **The sweep must be deterministic, and that is the whole design.** Spec §6.4 says every
 device runs it independently and they all converge. Nothing coordinates them, so the
@@ -2417,7 +2528,91 @@ would merge unrelated entries. Skipping is the safe direction.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TaxDataTests/ReconciliationTests.swift`:
+Create `Tests/TaxDataTests/ReconciliationTests.swift`.
+
+Include this suite alongside the entry suite below:
+
+```swift
+@Suite("Year reconciliation") struct YearReconciliationTests {
+
+    @Test("two TaxYear rows for one year collapse, keeping the newest")
+    func duplicateYearsCollapse() async throws {
+        let store = try await StoreFixture.store()
+        // The collision CloudKit can produce but one device cannot: two live TaxYear
+        // rows for 2025, created offline on two devices before the first sync.
+        var older = YearFacts()
+        older.grossIncome = Money(ringgit: 100_000)
+        try await store.saveYearFacts(older, for: 2025)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+
+        #expect(try await store.liveYearRowCount(2025) == 2)
+        #expect(try await store.reconcileYears() == 1)
+        #expect(try await store.liveYearRowCount(2025) == 1)
+        #expect(try await store.yearFacts(for: 2025).grossIncome == Money(ringgit: 128_000))
+    }
+
+    @Test("the survivor adopts facts it does not have, and never overwrites its own")
+    func factsMergeByFillingGaps() async throws {
+        let store = try await StoreFixture.store()
+        var older = YearFacts()
+        older.grossIncome = Money(ringgit: 100_000)
+        older.maritalStatus = .married          // the newer row will not have this
+        try await store.saveYearFacts(older, for: 2025)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        _ = try await store.reconcileYears()
+
+        let facts = try await store.yearFacts(for: 2025)
+        // Newer answer wins where both answered...
+        #expect(facts.grossIncome == Money(ringgit: 128_000))
+        // ...and an answer the user gave on their other phone is adopted, not discarded.
+        // nil means "not answered yet" everywhere in this app, so filling a gap cannot
+        // lose an answer.
+        #expect(facts.maritalStatus == .married)
+    }
+
+    @Test("entries on a losing row are re-pointed, not orphaned")
+    func entriesFollowTheSurvivor() async throws {
+        let store = try await StoreFixture.store()
+        _ = try await store.save(StoreFixture.entry("LIFESTYLE", 1_820))
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+        _ = try await store.reconcileYears()
+
+        // The entry was attached to the row that lost. If it were not re-pointed it would
+        // hang off a soft-deleted year and vanish from the user's own records.
+        let drafts = try await store.entryDrafts(forYear: 2025)
+        #expect(drafts.count == 1)
+        #expect(drafts.first?.code == ReliefCode("LIFESTYLE"))
+    }
+
+    @Test("running year reconciliation twice changes nothing the second time")
+    func yearSweepIsIdempotent() async throws {
+        let store = try await StoreFixture.store()
+        try await store.saveYearFacts(YearFacts(), for: 2025)
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+
+        #expect(try await store.reconcileYears() == 1)
+        #expect(try await store.reconcileYears() == 0)
+    }
+
+    @Test("distinct years are left alone")
+    func distinctYearsSurvive() async throws {
+        let store = try await StoreFixture.store()
+        try await store.saveYearFacts(YearFacts(), for: 2024)
+        try await store.saveYearFacts(YearFacts(), for: 2025)
+        #expect(try await store.reconcileYears() == 0)
+        #expect(try await store.liveYears() == [2024, 2025])
+    }
+}
+```
+
+Then the entry-level suite:
 
 ```swift
 import Testing
@@ -2608,6 +2803,10 @@ extension TaxStore {
     /// change to every other device.
     @discardableResult
     public func reconcile() throws -> [MergeReport] {
+        // Years first: the entry key includes the year, so an entry re-pointed at the
+        // surviving year must be re-keyed before the entry pass groups on it.
+        try reconcileYears()
+
         let live = try modelContext.fetch(
             FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.deletedAt == nil }))
 
@@ -2642,6 +2841,10 @@ extension TaxStore {
             // Dropping a loser's documents would turn a complete claim into one failing
             // its requirement check. The merge must never destroy evidence.
             survivor.documents = documents.sorted { $0.id.uuidString < $1.id.uuidString }
+            // The union changed this entry's attached document kinds, and `needsDocument`
+            // caches exactly that. Without this the survivor keeps reporting a missing
+            // document while holding the certificate it just inherited.
+            refreshDerivedFields(on: survivor)
             survivor.updatedAt = stamp
 
             reports.append(MergeReport(dedupeKey: key,
@@ -2654,18 +2857,88 @@ extension TaxStore {
     }
 
     /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
+    ///
+    /// **Known limitation:** the restored row is a duplicate again, so the next
+    /// `reconcile()` re-merges it. Resolving that needs a "the user decided these are
+    /// different" marker, which belongs with the merge UI in a later plan.
+    ///
+    /// `updatedAt` is deliberately NOT stamped. Stamping it would make the restored loser
+    /// newer than the survivor, so the next sweep would not merely re-merge — it would
+    /// INVERT which row survives, and the user would watch a different entry disappear.
     public func unmerge(entryID: UUID) throws {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
         guard let row = try modelContext.fetch(descriptor).first, row.mergedInto != nil else { return }
         row.mergedInto = nil
         row.deletedAt = nil
-        row.updatedAt = now()
         try modelContext.save()
     }
 
     public func mergedInto(entryID: UUID) throws -> UUID? {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == entryID })
         return try modelContext.fetch(descriptor).first?.mergedInto
+    }
+
+    /// Collapses duplicate `TaxYear` rows, returning how many were merged away.
+    ///
+    /// Two devices first launching offline each create their own row for the same year.
+    /// Task 4 made the *selection* deterministic so both devices at least agree; this
+    /// removes the duplicate.
+    ///
+    /// Facts merge by filling gaps and never by overwriting: `nil` means "not answered
+    /// yet" everywhere in this app, so adopting a loser's value where the survivor has
+    /// none cannot lose an answer, while refusing to overwrite means the newer device's
+    /// answer always wins. Discarding the loser's facts would silently throw away income
+    /// the user entered on their other phone.
+    @discardableResult
+    public func reconcileYears() throws -> Int {
+        let live = try modelContext.fetch(
+            FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+
+        var merged = 0
+        let stamp = now()
+
+        for (_, group) in Dictionary(grouping: live, by: \.year) where group.count > 1 {
+            // `TaxStore.isNewer` is the one home for the TaxYear ordering, shared with
+            // `fetchOrCreateYear` and `yearFacts`. If a second copy drifted, this sweep
+            // would soft-delete the row those two consider authoritative.
+            let ordered = group.sorted(by: TaxStore.isNewer)
+            guard let survivor = ordered.first else { continue }
+
+            for loser in ordered.dropFirst() {
+                Self.fillGaps(on: survivor, from: loser)
+                // Re-point rather than orphan: an entry left hanging off a soft-deleted
+                // year would vanish from the user's own records.
+                // Snapshot first: reassigning `entry.taxYear` mutates the inverse of
+                // the very collection being walked, and a skipped element would orphan
+                // an entry on a soft-deleted year.
+                for entry in Array(loser.entries ?? []) {
+                    entry.taxYear = survivor
+                    entry.updatedAt = stamp
+                }
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                merged += 1
+            }
+            survivor.updatedAt = stamp
+        }
+
+        if merged > 0 { try modelContext.save() }
+        return merged
+    }
+
+    /// Copies every fact the survivor has not answered from the loser. Never overwrites.
+    private static func fillGaps(on survivor: TaxYear, from loser: TaxYear) {
+        if survivor.grossIncomeSen == nil { survivor.grossIncomeSen = loser.grossIncomeSen }
+        if survivor.epfSen == nil { survivor.epfSen = loser.epfSen }
+        if survivor.socsoSen == nil { survivor.socsoSen = loser.socsoSen }
+        if survivor.maritalStatusRaw == nil { survivor.maritalStatusRaw = loser.maritalStatusRaw }
+        if survivor.spouseHasIncome == nil { survivor.spouseHasIncome = loser.spouseHasIncome }
+        if survivor.assessmentTypeRaw == nil { survivor.assessmentTypeRaw = loser.assessmentTypeRaw }
+        if survivor.employmentTypeRaw == nil { survivor.employmentTypeRaw = loser.employmentTypeRaw }
+        if survivor.genderRaw == nil { survivor.genderRaw = loser.genderRaw }
+        if survivor.propertyPriceSen == nil { survivor.propertyPriceSen = loser.propertyPriceSen }
+        if survivor.selfIsDisabled == nil { survivor.selfIsDisabled = loser.selfIsDisabled }
+        if survivor.spouseIsDisabled == nil { survivor.spouseIsDisabled = loser.spouseIsDisabled }
     }
 }
 
@@ -2675,6 +2948,23 @@ extension TaxStore {
 
     /// Attaches a bare document of a given kind. The real pipeline is a later plan; the
     /// sweep only needs the links to exist.
+    /// Creates the second live `TaxYear` row for a year that only two devices syncing
+    /// can otherwise produce.
+    func insertDuplicateYearForTesting(_ year: Int, grossIncome: Money?) throws {
+        let row = TaxYear(year: year)
+        row.grossIncome = grossIncome
+        row.updatedAt = now()
+        modelContext.insert(row)
+        try modelContext.save()
+    }
+
+    func liveYearRowCount(_ year: Int) throws -> Int {
+        try modelContext
+            .fetch(FetchDescriptor<TaxYear>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.year == year }
+            .count
+    }
+
     func attachDocumentForTesting(kind: DocumentKind, toEntry id: UUID) throws {
         let descriptor = FetchDescriptor<ReliefEntry>(predicate: #Predicate { $0.id == id })
         guard let row = try modelContext.fetch(descriptor).first else { return }
@@ -2701,7 +2991,7 @@ merge UI must add the marker at the same time.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter Reconciliation`
-Expected: PASS — 7 tests.
+Expected: PASS — 12 tests in 2 suites.
 
 The order-independence test must be observed failing for the right reason before you
 trust it. Temporarily delete the `id.uuidString` tie-break line, re-run, and confirm the
@@ -2790,11 +3080,12 @@ import TaxKit
         #expect(AgeCalculator.age(bornOn: newYearsEve, atEndOf: 2025) == 15)
     }
 
-    @Test("a child born after the year end has no age yet")
-    func unbornIsNegativeFree() {
+    @Test("age is negative before birth")
+    func ageIsNegativeBeforeBirth() {
         let born2027 = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
-        // Rather than a negative age reaching the engine's dependentAge predicate, where
-        // min/max comparisons would produce nonsense, an unborn dependent projects as nil.
+        // AgeCalculator is the honest primitive and reports the real signed difference.
+        // Turning that into "unknown" is the projection's job, not this one's — see
+        // `unbornDependentHasNoAge` in the projection suite.
         #expect(AgeCalculator.age(bornOn: born2027, atEndOf: 2025) < 0)
     }
 }
@@ -2920,6 +3211,32 @@ import TaxKit
         #expect(projected.snapshot.lastClaimedYear[ReliefCode("LIFESTYLE_PC")] == nil)
     }
 
+    @Test("a dependent born after the year end has no age, not a negative one")
+    func unbornDependentHasNoAge() async throws {
+        let store = try await StoreFixture.store()
+        var unborn = DependentDraft(name: "Not yet")
+        unborn.dateOfBirth = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
+        _ = try await store.save(unborn)
+
+        let projected = try await store.project(year: 2025)
+        // The engine's dependentAge(max:) tests `age > max`, so a negative age passes an
+        // "under 18" check and the household would be granted RM 2,000 of child relief
+        // for a dependent who does not exist yet.
+        #expect(projected.snapshot.dependents.first?.ageAtYearEnd == nil)
+    }
+
+    @Test("dependents project in a stable order")
+    func dependentsAreOrdered() async throws {
+        let store = try await StoreFixture.store()
+        for name in ["Farah", "Aisyah", "Danish"] {
+            _ = try await store.save(DependentDraft(id: UUID(), name: name))
+        }
+        let first = try await store.project(year: 2025).snapshot.dependents.map(\.id)
+        let second = try await store.project(year: 2025).snapshot.dependents.map(\.id)
+        #expect(first == second)
+        #expect(first == first.sorted { $0.uuidString < $1.uuidString })
+    }
+
     @Test("projection is ordered deterministically")
     func projectionIsOrdered() async throws {
         let store = try await StoreFixture.store()
@@ -3035,7 +3352,14 @@ extension TaxStore {
         return DependentSnapshot(
             id: draft.id,
             name: draft.name,
-            ageAtYearEnd: draft.dateOfBirth.map { AgeCalculator.age(bornOn: $0, atEndOf: year) },
+            // A negative age means the recorded birth date is after the year end — bad
+            // data, or a placeholder. It must not reach the engine: `dependentAge(max:)`
+            // tests `age > max`, so -1 passes a "under 18" check and a not-yet-born
+            // dependent would be granted child relief. nil reaches the engine as an
+            // unanswered question, so the relief prompts instead of being granted.
+            ageAtYearEnd: draft.dateOfBirth
+                .map { AgeCalculator.age(bornOn: $0, atEndOf: year) }
+                .flatMap { $0 >= 0 ? $0 : nil },
             // nil, not `.none`: an unrecorded education level is an unanswered question,
             // and the engine renders it as a prompt rather than as ineligibility.
             educationLevel: status?.educationLevel,
@@ -3966,11 +4290,20 @@ public final class YearContext {
                               year: projected.snapshot,
                               entries: projected.entries)
             status = .ready
-        } catch is RuleSetLoadingError {
-            // Not an error state. Every January until the Budget ships, the current year
-            // has no rulebook, and the user's entries for it still exist and still matter.
+        } catch let error as RuleSetLoadingError {
             result = nil
-            status = .unavailable("Rules for \(year) aren't available yet.")
+            switch error {
+            case .noRulesForYear:
+                // Not an error state. Every January until the Budget ships, the current
+                // year has no rulebook, and the user's entries for it still exist and
+                // still matter.
+                status = .unavailable("Rules for \(year) aren't available yet.")
+            case .malformed:
+                // A file bundled inside the app failed to decode. Saying "not available
+                // yet" here would have the user waiting for a Budget that already
+                // happened, while every figure silently shows nothing.
+                status = .unavailable("The rulebook for \(year) could not be read.")
+            }
         } catch {
             result = nil
             status = .unavailable("Could not load \(year): \(error.localizedDescription)")
@@ -3982,6 +4315,10 @@ public final class YearContext {
     }
 
     public func switchYear(to newYear: Int) async {
+        // A no-op switch would still churn `updatedAt` on the UserPreferences singleton,
+        // which the reconciliation sweep and CloudKit's newest-write-wins both key off.
+        // `.ready` is part of the guard so a retry after a failure still reloads.
+        if newYear == year, status == .ready { return }
         year = newYear
         await load()
         await rememberYear(newYear)
@@ -4121,24 +4458,65 @@ import TaxData
     }
 
     @Test("an ineligible relief never appears, however large its headroom")
-    func ineligibleIsExcluded() async throws {
-        let store = try await PresentationFixture.store()
-        try await PresentationFixture.seedTypicalHousehold(store)
-        let model = await Self.model(store)
-
-        let result = try #require(model.context.result)
-        let ineligible = result.assessments.filter {
-            if case .ineligible = $0.eligibility { return true }
-            return false
-        }
-        #expect(!ineligible.isEmpty, "the fixture must contain one, or this proves nothing")
-
+    func ineligibleIsExcluded() {
+        // Tested directly against the ranking function rather than through a seeded
+        // household. Verified during pre-flight: YA2025 yields 19 eligible, 5 needsInfo
+        // and ZERO ineligible reliefs for a plain household, so a fixture-driven version
+        // of this test could only ever pass by accident of what a Budget happens to say.
+        //
         // An ineligible relief reports headroom equal to its cap while `allowed` is zero.
         // Ranking on headroom alone would put reliefs the user cannot claim at the top of
         // the one screen that exists to tell them what to do next.
-        for assessment in ineligible {
-            #expect(!model.opportunities.contains { $0.code == assessment.code })
+        let ranked = HomeViewModel.rankedCandidates(in: Self.syntheticResult)
+        #expect(ranked.map(\.code) == [ReliefCode("RICH"), ReliefCode("ASK")])
+        #expect(!ranked.contains { $0.code == ReliefCode("REFUSED") })
+    }
+
+    @Test("a needsInfo relief stays in the ranking, rendered as a question")
+    func needsInfoStaysRanked() {
+        // Plan 1 settled this: a .needsInfo relief is money the user may recover by
+        // answering one question, so excluding it would make the headline understate the
+        // upside and bury the prompt.
+        let ranked = HomeViewModel.rankedCandidates(in: Self.syntheticResult)
+        let asked = try? #require(ranked.first { $0.code == ReliefCode("ASK") })
+        #expect(asked??.needsAnswer == true)
+    }
+
+    /// Three reliefs with identical headroom and differing eligibility, so the filter and
+    /// the ordering are both observable without depending on any shipped rulebook.
+    static var syntheticResult: EvaluationResult {
+        func assessment(_ code: String,
+                        eligibility: Eligibility,
+                        taxSaved: Money?) -> ReliefAssessment {
+            ReliefAssessment(code: ReliefCode(code),
+                             name: code.capitalized,
+                             cap: Money(ringgit: 10_000),
+                             claimed: .zero,
+                             allowed: .zero,
+                             headroom: Money(ringgit: 10_000),
+                             eligibility: eligibility,
+                             requirements: [],
+                             taxSaved: taxSaved,
+                             unverified: false,
+                             sourceURL: URL(string: "https://www.hasil.gov.my/")!,
+                             notes: nil,
+                             children: [])
         }
+
+        return EvaluationResult(
+            yearOfAssessment: 2025,
+            assessments: [
+                assessment("REFUSED", eligibility: .ineligible(reasons: ["Not you"]),
+                           taxSaved: Money(ringgit: 9_999)),
+                assessment("ASK", eligibility: .needsInfo(questions: []),
+                           taxSaved: Money(ringgit: 100)),
+                assessment("RICH", eligibility: .eligible,
+                           taxSaved: Money(ringgit: 500))
+            ],
+            unresolved: [],
+            chargeableIncome: Money(ringgit: 100_000),
+            estimatedTax: Money(ringgit: 10_000),
+            totalOpportunity: Money(ringgit: 600))
     }
 
     @Test("ordering is stable across identical evaluations")
@@ -4367,13 +4745,12 @@ public final class HomeViewModel {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter HomeViewModel`
-Expected: PASS — 10 tests.
+Expected: PASS — 11 tests.
 
-**If `ineligibleIsExcluded` fails its own precondition** ("the fixture must contain one"),
-the seeded household is eligible for everything in YA2025. Add a fact that makes one
-relief definitively ineligible — for example set `maritalStatus = .single`, which refuses
-the spouse relief — rather than deleting the assertion. A test that cannot observe the
-thing it guards is decoration.
+**`EvaluationResult` and `ReliefAssessment` use memberwise initialisers.** If the
+synthetic fixture will not compile because a property order or label differs, read
+`Sources/TaxKit/Engine/ReliefAssessment.swift` and match the real signatures — do not
+change the assertions to fit a broken fixture.
 
 - [ ] **Step 5: Commit**
 
@@ -5290,12 +5667,9 @@ struct ReliefDetailView: View {
     }
 }
 
-/// Navigation value for one entry, distinct from `ReliefCode` so the stack can tell
-/// "show this relief" from "edit this entry".
-struct EntryRoute: Hashable {
-    let entryID: UUID
-}
 ```
+
+`EntryRoute` is referenced here but declared in `Support/Routes.swift` (Step 3).
 
 `model.yearOfAssessment` does not exist yet — add it to `ReliefDetailViewModel`:
 
@@ -5303,7 +5677,8 @@ struct EntryRoute: Hashable {
     public var yearOfAssessment: Int { context.year }
 ```
 
-and widen `context` from `private let` to `let` so the property can read it.
+`context` stays `private let`: the computed property is declared on the same type, where
+private is already visible.
 
 - [ ] **Step 3: Wire navigation into the shell**
 
@@ -5329,12 +5704,18 @@ and make each opportunity row tappable:
                 }
 ```
 
-Add to `App/TaxTracker/Support/MoneyText.swift` or a new `Routes.swift`:
+Create `App/TaxTracker/Support/Routes.swift`, and move `EntryRoute` here out of
+`ReliefDetailView.swift` so both navigation values have one home:
 
 ```swift
+import Foundation
+
 /// Navigation value for the full reliefs list.
 struct ReliefsRoute: Hashable {}
+
 ```
+
+`EntryRoute` is referenced here but declared in `Support/Routes.swift` (Step 3).
 
 In `RootView`, attach the destinations to the Home `NavigationStack`:
 
@@ -5400,6 +5781,22 @@ teaching the engine to report a discard, the editor does not let the entry be cr
 those codes are filtered out of `availableCodes`, and an entry that somehow already
 exists against one opens read-only with an explanation. The user is directed to the
 household facts, which is where that relief is actually controlled.
+
+**A claim's claimant comes from the rulebook, not from a default.** Four manually-loggable
+YA2025 reliefs carry a `.claimant(in:)` predicate: PARENTS_MEDICAL (parent, grandparent),
+MEDICAL_SERIOUS (child, spouse), LIFESTYLE (child, spouse) and LIFESTYLE_SPORTS (child,
+parent, spouse). **PARENTS_MEDICAL does not admit `.individual` at all**, so an entry saved
+with the default claimant is refused outright by the engine — a silent RM 8,000 loss on a
+claim the user entered correctly. The editor therefore offers a claimant picker populated
+from the rule's admitted set, and refuses to save when the rule excludes the current
+choice.
+
+**There is no per-dependent relief to require a dependent for.** Every `.perDependent`
+relief in every shipped year is also `automatic: true` (the five CHILD_* codes), and
+automatic reliefs are filtered out of the picker, so a cap-kind-derived "requires a
+dependent" flag would be unreachable code. The dependent field is an *optional annotation*
+instead, offered for reliefs that admit a child, parent or grandparent claimant. The engine
+ignores `dependentID` for a fixed cap; this is for the user's own record.
 
 **A same-session duplicate warns at entry time.** Spec §6.5 catches duplicates here, one
 layer before the reconciliation sweep. It warns rather than blocks: two identical receipts
@@ -5573,22 +5970,79 @@ import TaxData
         #expect(!model.canSave)
     }
 
-    @Test("a per-dependent relief requires a dependent")
-    func dependentIsRequiredWhereItMatters() async throws {
+    @Test("a relief that excludes the taxpayer forces a claimant choice")
+    func claimantIsRequiredWhereTheRuleExcludesSelf() async throws {
+        let store = try await PresentationFixture.store()
+        var mother = DependentDraft(id: UUID(), name: "Mother")
+        mother.kind = .parent
+        _ = try await store.save(mother)
+
+        let model = await Self.editor(store)
+        model.selectedCode = ReliefCode("PARENTS_MEDICAL")
+        model.amountText = "1200"
+
+        // PARENTS_MEDICAL admits only .parent and .grandparent. Saved with the default
+        // .individual it is refused by the engine and the user loses the claim with no
+        // explanation, so the editor refuses first and says why.
+        #expect(model.admittedClaimants == [.parent, .grandparent])
+        #expect(model.claimant == .individual)
+        #expect(!model.canSave)
+        #expect(model.validationError != nil)
+
+        model.claimant = .parent
+        #expect(model.canSave)
+    }
+
+    @Test("a relief that admits the taxpayer saves without touching the claimant")
+    func claimantDefaultsWhereTheRuleAdmitsSelf() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = ReliefCode("LIFESTYLE")
+        model.amountText = "320"
+        // LIFESTYLE admits self, spouse and child. The default is already valid, so the
+        // picker must not become a speed bump on the commonest entry in the app.
+        #expect(model.admittedClaimants.contains(.individual))
+        #expect(model.canSave)
+    }
+
+    @Test("a dependent may be named but is never required")
+    func dependentIsOptionalAnnotation() async throws {
         let store = try await PresentationFixture.store()
         var farah = DependentDraft(id: UUID(), name: "Farah")
         farah.dateOfBirth = Date(timeIntervalSince1970: 1_253_491_200)
         _ = try await store.save(farah)
 
         let model = await Self.editor(store)
-        model.selectedCode = ReliefCode("CHILDCARE")
-        model.amountText = "1200"
+        model.selectedCode = ReliefCode("LIFESTYLE")
+        model.amountText = "320"
+        model.claimant = .child
 
-        #expect(model.requiresDependent)
-        #expect(!model.canSave, "a childcare claim with no child named is not a claim")
-        model.dependentID = farah.id
-        #expect(model.canSave)
+        // Every per-dependent relief is automatic and therefore not offerable, so no
+        // entry the user can create needs a dependent for the engine's sake. Naming one
+        // is for their own record.
+        #expect(model.allowsDependent)
+        #expect(model.canSave, "no dependent named, and that is fine")
         #expect(model.availableDependents.contains { $0.id == farah.id })
+
+        model.dependentID = farah.id
+        #expect(await model.save())
+        let saved = try await store.entryDrafts(forYear: 2025).first { $0.dependentID == farah.id }
+        #expect(saved?.claimant == .child)
+    }
+
+    @Test("no offerable relief has a per-dependent cap")
+    func noOfferableReliefIsPerDependent() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        let ruleSet = try BundledRuleSetLoader().ruleSet(for: 2025)
+        // Pins the fact this design rests on. If a future Budget ships a manually-logged
+        // per-dependent relief, this fails and the dependent field must become required
+        // for it.
+        for option in model.availableCodes {
+            if case .perDependent = ruleSet.relief(for: option.code)?.cap {
+                Issue.record("\(option.code) is offerable and per-dependent")
+            }
+        }
     }
 
     @Test("a same-session duplicate warns but does not block")
@@ -5715,7 +6169,9 @@ import TaxData
 public struct ReliefOption: Hashable, Sendable, Identifiable {
     public var code: ReliefCode
     public var name: String
-    public var requiresDependent: Bool
+    /// Claimants the rulebook admits for this relief. Empty means it places no
+    /// restriction, so the taxpayer's own claim is fine.
+    public var admittedClaimants: [Claimant]
     public var id: ReliefCode { code }
 }
 
@@ -5763,12 +6219,10 @@ public final class EntryEditorViewModel {
             availableCodes = result.allAssessments
                 .filter { !Self.isAutomatic($0.code, in: context) }
                 .map { assessment in
-                    // `ReliefAssessment.cap` is a resolved `Money`, not the `Cap` enum,
-                    // so the cap *kind* has to come from the rulebook.
                     ReliefOption(code: assessment.code,
                                  name: assessment.name,
-                                 requiresDependent: Self.needsDependent(
-                                     context.rule(for: assessment.code)?.cap))
+                                 admittedClaimants: Self.admittedClaimants(
+                                     context.rule(for: assessment.code)))
                 }
                 .sorted { $0.name < $1.name }
         }
@@ -5791,9 +6245,17 @@ public final class EntryEditorViewModel {
         }
     }
 
-    public var requiresDependent: Bool {
-        guard let selectedCode else { return false }
-        return availableCodes.first { $0.code == selectedCode }?.requiresDependent ?? false
+    /// Claimants the selected relief admits. Empty means no restriction.
+    public var admittedClaimants: [Claimant] {
+        guard let selectedCode else { return [] }
+        return availableCodes.first { $0.code == selectedCode }?.admittedClaimants ?? []
+    }
+
+    /// Whether naming a dependent is meaningful for this relief. Never required — no
+    /// offerable relief has a per-dependent cap, so the engine ignores `dependentID`.
+    public var allowsDependent: Bool {
+        !admittedClaimants.isEmpty
+            && !Set(admittedClaimants).isDisjoint(with: [.child, .parent, .grandparent])
     }
 
     public var validationError: String? {
@@ -5802,7 +6264,13 @@ public final class EntryEditorViewModel {
             return amountText.isEmpty ? "Enter an amount." : "That is not an amount."
         }
         if amount <= .zero { return "The amount must be more than RM 0.00." }
-        if requiresDependent && dependentID == nil { return "Choose who this is for." }
+        let admitted = admittedClaimants
+        if !admitted.isEmpty && !admitted.contains(claimant) {
+            // PARENTS_MEDICAL admits only .parent and .grandparent. Left at the default
+            // .individual it is refused by the engine, and the user loses the claim with
+            // no explanation. Refusing here, with a reason, is the whole point.
+            return "Choose who this claim is for."
+        }
         return nil
     }
 
@@ -5847,7 +6315,7 @@ public final class EntryEditorViewModel {
                                code: code,
                                amount: amount,
                                claimant: claimant,
-                               dependentID: requiresDependent ? dependentID : nil,
+                               dependentID: allowsDependent ? dependentID : nil,
                                vendor: vendor.trimmingCharacters(in: .whitespaces),
                                spentOn: spentOn,
                                note: note)
@@ -5877,10 +6345,24 @@ public final class EntryEditorViewModel {
         await context.reload()
     }
 
-    static func needsDependent(_ cap: Cap?) -> Bool {
-        guard let cap else { return false }
-        if case .perDependent = cap { return true }
-        return false
+    /// Walks a rule's eligibility predicate for the claimants it admits.
+    ///
+    /// The rulebook is the authority on who a relief may be claimed for, and the closed
+    /// predicate language makes this a total function over the tree rather than a guess.
+    static func admittedClaimants(_ rule: ReliefRule?) -> [Claimant] {
+        guard let predicate = rule?.eligibility else { return [] }
+
+        func walk(_ node: EligibilityPredicate) -> [Claimant] {
+            switch node {
+            case .claimant(let admitted): return admitted
+            case .all(let children), .any(let children): return children.flatMap(walk)
+            case .not(let inner): return walk(inner)
+            default: return []
+            }
+        }
+        // Order preserved from the rulebook so the picker is stable between launches.
+        var seen: Set<Claimant> = []
+        return walk(predicate).filter { seen.insert($0).inserted }
     }
 
     static func isAutomatic(_ code: ReliefCode, in context: YearContext) -> Bool {
@@ -5912,9 +6394,9 @@ extension Money {
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `swift test --filter "EntryEditor|MoneyParsing"`
-Expected: PASS — 14 tests in 2 suites.
+Expected: PASS — 17 tests in 2 suites.
 
-`Cap` as shipped has exactly three cases — `.fixed(Money)`, `.perDependent(Money)` and
+Note that `.claimant(in:)` is the only predicate case consulted here. `Cap` as shipped has exactly three cases — `.fixed(Money)`, `.perDependent(Money)` and
 `.tiered(on:tiers:)`. There is no `sharedPool` or `none`; a shared pool is modelled as a
 parent relief with children, and an uncapped relief does not exist in any shipped year.
 
@@ -6033,9 +6515,17 @@ struct EntryEditorView: View {
                             .monospacedDigit()
                     }
 
-                    if model.requiresDependent {
-                        Picker("For", selection: $model.dependentID) {
-                            Text("Choose…").tag(UUID?.none)
+                    if !model.admittedClaimants.isEmpty {
+                        Picker("Claimed for", selection: $model.claimant) {
+                            ForEach(model.admittedClaimants, id: \.self) { who in
+                                Text(who.rawValue.capitalized).tag(who)
+                            }
+                        }
+                    }
+
+                    if model.allowsDependent, !model.availableDependents.isEmpty {
+                        Picker("Which person", selection: $model.dependentID) {
+                            Text("Not specified").tag(UUID?.none)
                             ForEach(model.availableDependents) { dependent in
                                 Text(dependent.name).tag(UUID?.some(dependent.id))
                             }
@@ -6662,7 +7152,12 @@ import TaxKit
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
-                guard text.contains("\"RM") || text.contains("RM \\(") else { continue }
+                // Flags a display string built by hand: the prefix immediately followed
+                // by an interpolation, or the prefix with its trailing space. A bare
+                // "RM" with no space is stripping, not building — MoneyParsing does
+                // exactly that — so `replacingOccurrences` lines are skipped.
+                guard text.contains("RM \\(") || text.contains("\"RM ") else { continue }
+                guard !text.contains("replacingOccurrences") else { continue }
                 #expect(text.contains("//"),
                         "\(file.lastPathComponent):\(number + 1) builds an RM string by hand — use Money.formatted()")
             }
@@ -6803,9 +7298,14 @@ one knows to pick it up:
    bundle contents, so adding a rulebook means editing two places. Deferred from Plan 1.
 4. **A missing bundle resource reports `.noRulesForYear`**, indistinguishable from an
    unshipped year. Only reachable via a build defect. Deferred from Plan 1.
-5. **`Document`, `DocumentFile` and `ChatMessage` are models with no producer.** They are
+5. **`recomputeAllDedupeKeys()` has no caller.** The dedupe key's shape changed twice
+   during this plan's execution, so any row persisted under an earlier shape would keep a
+   stale key and be unmatchable against new ones — which silently breaks the sweep.
+   Harmless today because nothing has shipped, but the migration hook must be wired to run
+   once on launch after a key-format change before first release.
+6. **`Document`, `DocumentFile` and `ChatMessage` are models with no producer.** They are
    in schema V1 because the schema must be complete on the first commit; the pipelines
    that fill them are the Documents and Assistant plans.
-6. **Documents tab and Ask tab are placeholders.** Spec §15 items 5 and 7.
-7. **The Compare screen is not built**, though `counterfactual` and `diff` have shipped
+7. **Documents tab and Ask tab are placeholders.** Spec §15 items 5 and 7.
+8. **The Compare screen is not built**, though `counterfactual` and `diff` have shipped
    and are tested since Plan 1. Spec §15 item 6.

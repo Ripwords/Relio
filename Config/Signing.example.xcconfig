@@ -1,0 +1,15 @@
+// Copy to Config/Signing.xcconfig and fill in to enable CloudKit.
+//
+// Leave both empty to build and run without an Apple Developer team. The app is fully
+// functional in that mode — data is local only, which spec §6 requires anyway for a user
+// signed out of iCloud.
+//
+// With a paid team:
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   TAXTRACKER_ENTITLEMENTS = App/TaxTracker/TaxTracker.entitlements
+//   TAXTRACKER_STORAGE_MODE = cloudKit
+
+DEVELOPMENT_TEAM =
+TAXTRACKER_ENTITLEMENTS =
+TAXTRACKER_STORAGE_MODE = local
+CODE_SIGN_STYLE = Automatic

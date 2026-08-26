@@ -1,0 +1,216 @@
+import Testing
+import Foundation
+import TaxKit
+import TaxData
+@testable import TaxPresentation
+
+@Suite("ReliefsListViewModel") @MainActor struct ReliefsListViewModelTests {
+
+    static func model(_ store: TaxStore) async -> ReliefsListViewModel {
+        let context = PresentationFixture.context(store)
+        await context.load()
+        let model = ReliefsListViewModel(context: context)
+        model.refresh()
+        return model
+    }
+
+    @Test("sections appear in action order, not alphabetical order")
+    func sectionOrder() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store)
+
+        let titles = model.sections.map(\.title)
+        let expected = ["Needs an answer", "Still claimable", "Fully claimed", "Not applicable to you"]
+        // Alphabetical order would bury the two groups the user can act on.
+        #expect(titles == expected.filter(titles.contains))
+        #expect(titles == titles.sorted { expected.firstIndex(of: $0)! < expected.firstIndex(of: $1)! })
+    }
+
+    @Test("every top-level relief in the year appears exactly once")
+    func everyReliefAppears() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store)
+
+        let listed = model.sections.flatMap(\.rows).map(\.code)
+        let expected = try #require(model.context.result).assessments.map(\.code)
+        #expect(Set(listed) == Set(expected))
+        #expect(listed.count == expected.count, "no relief listed twice")
+    }
+
+    @Test("a relief with no room left is fully claimed, not still claimable")
+    func exhaustedReliefIsSeparated() async throws {
+        let store = try await PresentationFixture.store()
+        var facts = YearFacts()
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
+        try await store.saveYearFacts(facts, for: 2025)
+        // Well past the RM 2,500 lifestyle cap.
+        var draft = EntryDraft(id: UUID(), year: 2025,
+                               code: ReliefCode("LIFESTYLE"), amount: Money(ringgit: 9_000))
+        draft.vendor = "Popular"
+        _ = try await store.save(draft)
+        let model = await Self.model(store)
+
+        let row = try #require(model.sections.flatMap(\.rows).first { $0.code == ReliefCode("LIFESTYLE") })
+        #expect(row.state == .exhausted)
+        #expect(row.usedPercent == 100)
+        #expect(row.headroom == Money.zero)
+    }
+
+    @Test("search filters by name and by code")
+    func search() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store)
+
+        model.searchText = "lifestyle"
+        model.refresh()
+        let byName = model.sections.flatMap(\.rows).map(\.code)
+        #expect(byName.contains(ReliefCode("LIFESTYLE")))
+        #expect(byName.allSatisfy {
+            $0.rawValue.lowercased().contains("lifestyle")
+                || (model.context.result?.assessment(for: $0)?.name.lowercased().contains("lifestyle") ?? false)
+        })
+
+        model.searchText = ""
+        model.refresh()
+        #expect(model.sections.flatMap(\.rows).count > byName.count)
+    }
+
+    @Test("an unavailable year yields no sections and does not throw")
+    func unavailableYear() async throws {
+        let store = try await PresentationFixture.store()
+        let context = PresentationFixture.context(store, year: 2026)
+        await context.load()
+        let model = ReliefsListViewModel(context: context)
+        model.refresh()
+        #expect(model.sections.isEmpty)
+    }
+}
+
+@Suite("ReliefDetailViewModel") @MainActor struct ReliefDetailViewModelTests {
+
+    @Test("detail shows claimed and allowed separately when a cap binds")
+    func claimedAndAllowedDiffer() async throws {
+        let store = try await PresentationFixture.store()
+        var facts = YearFacts()
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
+        try await store.saveYearFacts(facts, for: 2025)
+        var draft = EntryDraft(id: UUID(), year: 2025,
+                               code: ReliefCode("LIFESTYLE"), amount: Money(ringgit: 9_000))
+        draft.vendor = "Popular"
+        _ = try await store.save(draft)
+
+        let context = PresentationFixture.context(store)
+        await context.load()
+        let model = ReliefDetailViewModel(context: context, store: store, code: ReliefCode("LIFESTYLE"))
+        await model.refresh()
+
+        let assessment = try #require(model.assessment)
+        // Showing only `allowed` hides that the claim was trimmed; showing only
+        // `claimed` overstates what LHDN would permit. The screen shows both.
+        #expect(assessment.claimed == Money(ringgit: 9_000))
+        #expect(assessment.allowed < assessment.claimed)
+    }
+
+    @Test("detail lists only this relief's entries")
+    func entriesAreScoped() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store)
+        await context.load()
+        let model = ReliefDetailViewModel(context: context, store: store, code: ReliefCode("LIFESTYLE"))
+        await model.refresh()
+
+        #expect(!model.entries.isEmpty)
+        #expect(model.entries.allSatisfy { $0.code == ReliefCode("LIFESTYLE") })
+    }
+
+    @Test("detail surfaces the LHDN source and any sub-limits")
+    func sourceAndSubLimits() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store)
+        await context.load()
+        let model = ReliefDetailViewModel(context: context, store: store,
+                                          code: ReliefCode("MEDICAL_SERIOUS"))
+        await model.refresh()
+
+        // Spec success criterion 2: every figure traces to a rulebook value carrying an
+        // LHDN source URL, and the detail screen is where the user sees it.
+        #expect(model.sourceURL?.host()?.contains("hasil.gov.my") == true)
+        #expect(!model.subLimits.isEmpty, "MEDICAL_SERIOUS has sub-limits in YA2025")
+    }
+
+    @Test("a code the year does not know clears the screen it had already filled")
+    func unknownCode() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+
+        // A fresh model pointed at a bad code proves nothing on its own: every field is
+        // already empty, so "the guard clears state" and "the guard never runs" look
+        // identical. Each case below fills the screen first, then takes the code away.
+
+        // 1. The code is real, but not in the year the user switched to.
+        //    HOUSING_LOAN_INTEREST is new in YA2025 and absent from YA2023, while the
+        //    2023 evaluation itself succeeds — so this is genuinely "this rulebook has
+        //    never heard of that code", not "there is no rulebook".
+        var loanInterest = EntryDraft(id: UUID(), year: 2025,
+                                      code: ReliefCode("HOUSING_LOAN_INTEREST"),
+                                      amount: Money(ringgit: 5_000))
+        loanInterest.vendor = "Maybank"
+        _ = try await store.save(loanInterest)
+
+        let context = PresentationFixture.context(store)
+        await context.load()
+        let model = ReliefDetailViewModel(context: context, store: store,
+                                          code: ReliefCode("HOUSING_LOAN_INTEREST"))
+        await model.refresh()
+        #expect(model.assessment != nil)
+        #expect(!model.entries.isEmpty)
+        #expect(model.sourceURL != nil)
+        #expect(model.notes != nil, "HOUSING_LOAN_INTEREST carries a note in YA2025")
+
+        await context.switchYear(to: 2023)
+        #expect(context.result != nil, "2023 still evaluates; only the code is unknown there")
+        await model.refresh()
+        #expect(model.assessment == nil)
+        #expect(model.entries.isEmpty)
+        #expect(model.subLimits.isEmpty)
+        #expect(model.requirements.isEmpty)
+        #expect(model.sourceURL == nil)
+        #expect(model.notes == nil)
+
+        // 2. The whole year is unavailable. Same guard, and MEDICAL_SERIOUS fills the
+        //    two fields HOUSING_LOAN_INTEREST cannot: sub-limits and requirements.
+        let medicalContext = PresentationFixture.context(store)
+        await medicalContext.load()
+        let medical = ReliefDetailViewModel(context: medicalContext, store: store,
+                                            code: ReliefCode("MEDICAL_SERIOUS"))
+        _ = try await store.save(EntryDraft(id: UUID(), year: 2025,
+                                            code: ReliefCode("MEDICAL_SERIOUS"),
+                                            amount: Money(ringgit: 6_500)))
+        await medicalContext.reload()
+        await medical.refresh()
+        #expect(!medical.subLimits.isEmpty)
+        #expect(!medical.requirements.isEmpty)
+        #expect(!medical.entries.isEmpty)
+
+        await medicalContext.switchYear(to: 2026)
+        await medical.refresh()
+        #expect(medical.assessment == nil)
+        #expect(medical.entries.isEmpty)
+        #expect(medical.subLimits.isEmpty)
+        #expect(medical.requirements.isEmpty)
+        #expect(medical.sourceURL == nil)
+        #expect(medical.notes == nil)
+
+        // 3. And a code no year has ever shipped still yields an empty screen, not a crash.
+        let nonsense = ReliefDetailViewModel(context: medicalContext, store: store,
+                                             code: ReliefCode("NOT_A_REAL_CODE"))
+        await nonsense.refresh()
+        #expect(nonsense.assessment == nil)
+        #expect(nonsense.entries.isEmpty)
+    }
+}
