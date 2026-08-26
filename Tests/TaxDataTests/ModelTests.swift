@@ -10,7 +10,7 @@ import TaxKit
     func freshYearIsEmpty() {
         let year = TaxYear(year: 2025)
         #expect(year.year == 2025)
-        #expect(year.grossIncome == nil)
+        #expect(year.grossIncomeOverride == nil)
         #expect(year.maritalStatus == nil)
         #expect(year.deletedAt == nil)
         // distantPast, not Date(): "never stamped" must be detectable, and a default
@@ -22,9 +22,9 @@ import TaxKit
     func accessorsRoundTrip() {
         let year = TaxYear(year: 2025)
 
-        year.grossIncome = Money(ringgit: 128_000)
-        #expect(year.grossIncomeSen == 12_800_000)
-        #expect(year.grossIncome == Money(ringgit: 128_000))
+        year.grossIncomeOverride = Money(ringgit: 128_000)
+        #expect(year.grossIncomeOverrideSen == 12_800_000)
+        #expect(year.grossIncomeOverride == Money(ringgit: 128_000))
 
         year.maritalStatus = .married
         #expect(year.maritalStatusRaw == "married")
@@ -37,8 +37,8 @@ import TaxKit
         #expect(year.employmentType == .privateSector)
         #expect(year.gender == .female)
 
-        year.grossIncome = nil
-        #expect(year.grossIncomeSen == nil)
+        year.grossIncomeOverride = nil
+        #expect(year.grossIncomeOverrideSen == nil)
     }
 
     @Test("an unrecognised raw value reads as nil rather than trapping")

@@ -43,7 +43,7 @@ import TaxData
     func exhaustedReliefIsSeparated() async throws {
         let store = try await PresentationFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         try await store.saveYearFacts(facts, for: 2025)
         // Well past the RM 2,500 lifestyle cap.
         var draft = EntryDraft(id: UUID(), year: 2025,
@@ -95,7 +95,7 @@ import TaxData
     func claimedAndAllowedDiffer() async throws {
         let store = try await PresentationFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         try await store.saveYearFacts(facts, for: 2025)
         var draft = EntryDraft(id: UUID(), year: 2025,
                                code: ReliefCode("LIFESTYLE"), amount: Money(ringgit: 9_000))

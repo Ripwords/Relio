@@ -8,6 +8,14 @@ struct RootView: View {
     let store: TaxStore
     @State private var context: YearContext
     @State private var home: HomeViewModel
+    /// Held here for the same reason `home` is: `IncomeView` is rebuilt every time the
+    /// destination closure runs, and a model built inside that closure would hand the
+    /// pushed screen a brand-new empty one on every re-render, after its `.task` had
+    /// already fired.
+    @State private var income: IncomeViewModel
+    /// The year menu pushes Income, and a menu item cannot be a `NavigationLink`, so the
+    /// stack needs a path to append to.
+    @State private var path = NavigationPath()
     @State private var editingEntry: EntryEditorViewModel?
     @State private var showUndo = false
     @State private var lastDeleted: EntryEditorViewModel?
@@ -28,6 +36,7 @@ struct RootView: View {
                                   year: BundledRuleSetLoader().availableYears.last ?? 2025)
         _context = State(initialValue: context)
         _home = State(initialValue: HomeViewModel(context: context, store: store))
+        _income = State(initialValue: IncomeViewModel(context: context, store: store))
     }
 
     var body: some View {
@@ -71,7 +80,7 @@ struct RootView: View {
 
     private var tabs: some View {
         TabView {
-            NavigationStack {
+            NavigationStack(path: $path) {
                 content
                     .navigationBarTitleDisplayMode(.inline)
                     // Every destination builds its view model at the call site but hands
@@ -89,6 +98,9 @@ struct RootView: View {
                                                                       code: code),
                                          context: context)
                     }
+                    .navigationDestination(for: IncomeRoute.self) { _ in
+                        IncomeView(model: income)
+                    }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
@@ -105,6 +117,9 @@ struct RootView: View {
                                         Task {
                                             await context.switchYear(to: year)
                                             await home.refresh()
+                                            // Income is per-year too, and its model
+                                            // outlives the switch.
+                                            await income.refresh()
                                         }
                                     } label: {
                                         // The check marks the current year; Compare joins
@@ -116,6 +131,12 @@ struct RootView: View {
                                             Text("YA \(String(year))")
                                         }
                                     }
+                                }
+                                Divider()
+                                Button {
+                                    path.append(IncomeRoute())
+                                } label: {
+                                    Label("Income", systemImage: "banknote")
                                 }
                             } label: {
                                 HStack(spacing: 4) {

@@ -19,7 +19,7 @@ import TaxKit
 
     static func seed(_ store: TaxStore) async throws {
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         facts.maritalStatus = .married
         facts.spouseHasIncome = false
         facts.assessmentType = .separate

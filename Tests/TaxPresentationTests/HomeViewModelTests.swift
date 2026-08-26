@@ -132,7 +132,7 @@ import TaxData
     func needsInfoPrompt() async throws {
         let store = try await PresentationFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         // Marital status left unanswered: spouse relief becomes .needsInfo, not refused.
         try await store.saveYearFacts(facts, for: 2025)
         let model = await Self.model(store)

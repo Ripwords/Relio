@@ -50,7 +50,7 @@ import TaxKit
     func yearFactsProject() async throws {
         let store = try await StoreFixture.store()
         var facts = YearFacts()
-        facts.grossIncome = Money(ringgit: 128_000)
+        facts.grossIncomeOverride = Money(ringgit: 128_000)
         facts.maritalStatus = .married
         facts.spouseHasIncome = false
         facts.assessmentType = .separate
@@ -209,5 +209,131 @@ import TaxKit
         let second = try await store.project(year: 2025).snapshot.dependents.map(\.id)
         #expect(first == second)
         #expect(first == first.sorted { $0.uuidString < $1.uuidString })
+    }
+}
+
+@Suite("Income projection") struct IncomeProjectionTests {
+
+    static func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var c = DateComponents(); c.year = y; c.month = m; c.day = d; c.hour = 12
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Kuala_Lumpur")!
+        return cal.date(from: c)!
+    }
+
+    static func seedSalary(_ store: TaxStore, _ ringgit: Decimal) async throws {
+        let sourceID = try await store.save(IncomeSourceDraft(name: "Main job"))
+        var rate = IncomeRecordDraft(sourceID: sourceID)
+        rate.amount = Money(ringgit: ringgit)
+        rate.effectiveFrom = date(2025, 1, 1)
+        _ = try await store.save(rate)
+    }
+
+    @Test("with no override, the projection uses the derived figure")
+    func derivedReachesTheEngine() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        let projected = try await store.project(year: 2025)
+        #expect(projected.snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("an override wins over the derived figure")
+    func overrideWins() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        var facts = try await store.yearFacts(for: 2025)
+        // The EA form is authoritative: it includes benefits-in-kind and allowances Relio
+        // never saw. When the user says the real total, that is the total.
+        facts.grossIncomeOverride = Money(ringgit: 101_500)
+        try await store.saveYearFacts(facts, for: 2025)
+
+        let projected = try await store.project(year: 2025)
+        #expect(projected.snapshot.grossIncome == Money(ringgit: 101_500))
+    }
+
+    @Test("clearing the override returns to the derived figure")
+    func clearingOverrideReverts() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        var facts = try await store.yearFacts(for: 2025)
+        facts.grossIncomeOverride = Money(ringgit: 101_500)
+        try await store.saveYearFacts(facts, for: 2025)
+        facts.grossIncomeOverride = nil
+        try await store.saveYearFacts(facts, for: 2025)
+
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("no income at all still projects nil, not zero")
+    func noIncomeIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        // nil means "not known", which the engine renders as no tax figures at all. Zero
+        // would mean "earned nothing", which is a claim nobody made and which would show a
+        // confident RM 0.00 tax bill.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("an override of zero is respected as a real answer")
+    func explicitZeroIsRespected() async throws {
+        let store = try await StoreFixture.store()
+        // Seeded with a real timeline, so this proves an explicit zero beats a *non-zero*
+        // derived figure — the sharpest form of the precedence rule.
+        try await Self.seedSalary(store, 8_000)
+        var facts = try await store.yearFacts(for: 2025)
+        facts.grossIncomeOverride = .zero
+        try await store.saveYearFacts(facts, for: 2025)
+        // A user who genuinely earned nothing this year has said so. That is different
+        // from not having told us.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money.zero)
+    }
+
+    @Test("a source with no records yet still projects nil, not zero")
+    func sourceWithoutRecordsIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        // Creating a source and saving its first rate are two writes. Between them the
+        // household has named a job and told us nothing about what it pays.
+        _ = try await store.save(IncomeSourceDraft(name: "Main job"))
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("a timeline that only covers 2025 projects nil for 2024")
+    func earlierYearIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        try await Self.seedSalary(store, 8_000)
+        // Switching the year menu back a year must not report a confident RM 0.00 income
+        // for a year the timeline says nothing about.
+        #expect(try await store.project(year: 2024).snapshot.grossIncome == nil)
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money(ringgit: 96_000))
+    }
+
+    @Test("a source that ended in a past year projects nil for a later one")
+    func endedSourceIsUnknown() async throws {
+        let store = try await StoreFixture.store()
+        var job = IncomeSourceDraft(name: "Old job")
+        job.endedOn = Self.date(2024, 6, 30)
+        let sourceID = try await store.save(job)
+        var rate = IncomeRecordDraft(sourceID: sourceID)
+        rate.amount = Money(ringgit: 8_000)
+        rate.effectiveFrom = Self.date(2024, 1, 1)
+        _ = try await store.save(rate)
+
+        #expect(try await store.project(year: 2024).snapshot.grossIncome == Money(ringgit: 48_000))
+        // The source still exists; it just stopped paying before this year began.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == nil)
+    }
+
+    @Test("a zero-amount one-off inside the year projects zero, not nil")
+    func zeroOneOffIsKnown() async throws {
+        let store = try await StoreFixture.store()
+        let sourceID = try await store.save(IncomeSourceDraft(name: "Side business"))
+        var payment = IncomeRecordDraft(sourceID: sourceID)
+        payment.shape = .oneOff
+        payment.amount = .zero
+        payment.effectiveFrom = Self.date(2025, 5, 1)
+        _ = try await store.save(payment)
+
+        // A record dated inside the year says something about the year, even when what it
+        // says is RM 0. That is an answer; nil is the absence of one.
+        #expect(try await store.project(year: 2025).snapshot.grossIncome == Money.zero)
     }
 }

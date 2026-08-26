@@ -1,5 +1,6 @@
 import SwiftUI
 import TaxKit
+import TaxData
 import TaxPresentation
 
 struct OnboardingView: View {
@@ -12,7 +13,15 @@ struct OnboardingView: View {
     @State private var model: OnboardingViewModel
     let onFinished: () -> Void
 
-    @State private var incomeText = ""
+    /// The typed salary lives here rather than on the model because `Money` is not a
+    /// string and half-typed text is not a `Money`. It is committed on Done.
+    @State private var salaryText = ""
+    @State private var startedPartWay = false
+    /// Set when the salary the user asked for did not save. The step stays open and says
+    /// so — same construction as `IncomeRecordEditor`'s `saveError`. Finishing anyway
+    /// would strand them on Home with no tax figures, no explanation, and no second run of
+    /// the only screen that asks for a salary.
+    @State private var finishError: String?
 
     init(model: OnboardingViewModel, onFinished: @escaping () -> Void) {
         _model = State(initialValue: model)
@@ -29,8 +38,8 @@ struct OnboardingView: View {
             VStack(spacing: 12) {
                 Button(model.isLastStep ? "Done" : "Continue") {
                     if model.isLastStep {
-                        model.facts.grossIncome = MoneyParsing.money(from: incomeText)
-                        Task { await model.finish(); onFinished() }
+                        model.monthlySalary = MoneyParsing.money(from: salaryText)
+                        Task { await finish() }
                     } else {
                         model.advance()
                     }
@@ -39,12 +48,23 @@ struct OnboardingView: View {
                 .controlSize(.large)
 
                 Button("Skip for now") {
+                    // Unchanged: skipping asks for no income, so nothing can fail to save.
                     Task { await model.skip(); onFinished() }
                 }
                 .font(.subheadline)
             }
             .padding(24)
         }
+    }
+
+    /// Leaves onboarding only when the writes the user asked for actually happened.
+    private func finish() async {
+        finishError = nil
+        guard await model.finish() == .finished else {
+            finishError = "Relio could not save your salary, so it has not finished setting up. Nothing was lost — tap Done to try again, or turn the toggle off to carry on without it."
+            return
+        }
+        onFinished()
     }
 
     @ViewBuilder
@@ -100,18 +120,49 @@ struct OnboardingView: View {
                 Section {
                     Toggle("Show what relief saves me", isOn: $model.incomeEnabled)
                     if model.incomeEnabled {
-                        LabeledContent("Annual income") {
-                            TextField("0.00", text: $incomeText)
+                        // A month and a start date, not a year total: those are the two
+                        // things a person knows on the day they install the app. The
+                        // annual figure is arithmetic Relio should be doing for them.
+                        LabeledContent("Income a month") {
+                            TextField("0.00", text: $salaryText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .monospacedDigit()
                         }
+                        Toggle("Say when this started", isOn: $startedPartWay)
+                        if startedPartWay {
+                            // Bounded above by the year being onboarded, and defaulting
+                            // to its first day: a date after that year derives RM 0 for
+                            // it, which is exactly what today's date would have given a
+                            // user onboarding the previous assessment year.
+                            DatePicker("Since",
+                                       selection: Binding(get: { model.salaryStartedOn ?? IncomeCalendar.startOfYear(model.year) },
+                                                          set: { model.salaryStartedOn = $0 }),
+                                       in: ...IncomeCalendar.endOfYear(model.year),
+                                       displayedComponents: .date)
+                        }
                     }
                 } footer: {
-                    Text("Optional. Without it Relio still tracks every relief and cap — it just cannot tell you what they are worth in tax.")
+                    Text(model.incomeEnabled
+                         ? "Relio works out the year from this, and you can add raises and bonuses later. Leave the date off if you have earned this all year."
+                         : "Optional. Without it Relio still tracks every relief and cap — it just cannot tell you what they are worth in tax.")
+                }
+
+                if let finishError {
+                    Section {
+                        Text(finishError)
+                            .foregroundStyle(.orange)
+                            .font(.footnote)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
+            // Turning the toggle back off must clear the date, or a start date the user
+            // has visibly retracted would still shorten the year they are onboarding.
+            .onChange(of: startedPartWay) { _, isOn in
+                if !isOn { model.salaryStartedOn = nil }
+            }
         }
     }
 }

@@ -2576,3 +2576,27 @@ git commit -m "test: pin the engine and golden persona as unchanged by the incom
    are real, so this stays explicit.
 4. Everything already carried from Plan 2, including that `reconcile()` and
    `recomputeAllDedupeKeys()` still have no production caller.
+5. **No restore path for income.** `TaxStore` has `softDeleteIncomeSource`/
+   `softDeleteIncomeRecord` but no restore, so the Income screen's deletions are
+   unrecoverable from the UI — unlike relief entries, which have `undoDelete()` and an undo
+   toast. The source delete is confirmed by an alert; per-record swipe-delete is not.
+6. **Records that do not contribute to the viewed year are not marked.** They render
+   identically to contributing ones beneath a year-scoped subtotal. Marking them by date
+   would be wrong — a recurring rate dated 1 April 2024 with no successor legitimately
+   contributes to YA2025 — so doing this correctly needs per-record contribution data from
+   `IncomeDerivation`. The data is closer now: `IncomeYearSummary` carries the same
+   known/unknown answer the projection uses up to the view model, so what is left is
+   exposing `IncomeDerivation.contributions` per record rather than walking the timeline a
+   second time in the presentation layer.
+7. **A user in a time zone east of UTC+8** who picks a date stores an instant that can
+   still be the previous day in Kuala Lumpur, so it reads back a day earlier. This is a
+   pre-existing, codebase-wide property affecting `Dependent.dateOfBirth` and relief-entry
+   dates identically; this plan neither introduces nor worsens it.
+8. **No dedupe or reconciliation for `IncomeSource`.** `reconcile()` covers years, entries,
+   dependents and preferences; income sources are not in it, and nothing keys them by
+   anything but their `id`. Onboarding hard-codes a source named "Main job" with a fresh
+   UUID per view model, so if onboarding ever ran twice against a live CloudKit store — a
+   second device, a reinstall — the user would end up with two "Main job" sources and
+   double-counted income for every year, with both rows looking entirely correct. The
+   id is now stable within one view model, which covers a retry after a failed write; it
+   does not cover a second install.

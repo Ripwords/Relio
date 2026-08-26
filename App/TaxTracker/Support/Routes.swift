@@ -11,3 +11,6 @@ struct ReliefsRoute: Hashable {}
 struct EntryRoute: Hashable {
     let entryID: UUID
 }
+
+/// Navigation value for the income timeline.
+struct IncomeRoute: Hashable {}

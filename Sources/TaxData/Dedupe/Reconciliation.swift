@@ -206,9 +206,7 @@ extension TaxStore {
             survivor[keyPath: keyPath] = value
             copied = true
         }
-        fill(\.grossIncomeSen)
-        fill(\.epfSen)
-        fill(\.socsoSen)
+        fill(\.grossIncomeOverrideSen)
         fill(\.maritalStatusRaw)
         fill(\.spouseHasIncome)
         fill(\.assessmentTypeRaw)
@@ -227,9 +225,9 @@ extension TaxStore {
 
     /// Creates the second live `TaxYear` row for a year that only two devices syncing
     /// can otherwise produce.
-    func insertDuplicateYearForTesting(_ year: Int, grossIncome: Money?) throws {
+    func insertDuplicateYearForTesting(_ year: Int, grossIncomeOverride: Money?) throws {
         let row = TaxYear(year: year)
-        row.grossIncome = grossIncome
+        row.grossIncomeOverride = grossIncomeOverride
         row.updatedAt = now()
         modelContext.insert(row)
         try modelContext.save()

@@ -11,33 +11,33 @@ import TaxKit
         // The collision CloudKit can produce but one device cannot: two live TaxYear
         // rows for 2025, created offline on two devices before the first sync.
         var older = YearFacts()
-        older.grossIncome = Money(ringgit: 100_000)
+        older.grossIncomeOverride = Money(ringgit: 100_000)
         try await store.saveYearFacts(older, for: 2025)
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: Money(ringgit: 128_000))
 
         #expect(try await store.liveYearRowCount(2025) == 2)
         #expect(try await store.reconcileYears() == 1)
         #expect(try await store.liveYearRowCount(2025) == 1)
-        #expect(try await store.yearFacts(for: 2025).grossIncome == Money(ringgit: 128_000))
+        #expect(try await store.yearFacts(for: 2025).grossIncomeOverride == Money(ringgit: 128_000))
     }
 
     @Test("the survivor adopts facts it does not have, and never overwrites its own")
     func factsMergeByFillingGaps() async throws {
         let store = try await StoreFixture.store()
         var older = YearFacts()
-        older.grossIncome = Money(ringgit: 100_000)
+        older.grossIncomeOverride = Money(ringgit: 100_000)
         older.maritalStatus = .married          // the newer row will not have this
         try await store.saveYearFacts(older, for: 2025)
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: Money(ringgit: 128_000))
         _ = try await store.reconcileYears()
 
         let facts = try await store.yearFacts(for: 2025)
         // Newer answer wins where both answered...
-        #expect(facts.grossIncome == Money(ringgit: 128_000))
+        #expect(facts.grossIncomeOverride == Money(ringgit: 128_000))
         // ...and an answer the user gave on their other phone is adopted, not discarded.
         // nil means "not answered yet" everywhere in this app, so filling a gap cannot
         // lose an answer.
@@ -56,7 +56,7 @@ import TaxKit
         _ = try await store.save(StoreFixture.entry("MEDICAL_SERIOUS", 6_500, vendor: "Hospital"))
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: nil)
         _ = try await store.reconcileYears()
 
         // All three entries were attached to the row that lost. If they were not
@@ -74,12 +74,12 @@ import TaxKit
         let instant = StoreFixture.epoch
 
         let deviceOne = try await StoreFixture.store()
-        try await deviceOne.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncome: nil)
-        try await deviceOne.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncome: nil)
+        try await deviceOne.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncomeOverride: nil)
+        try await deviceOne.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncomeOverride: nil)
 
         let deviceTwo = try await StoreFixture.store()
-        try await deviceTwo.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncome: nil)
-        try await deviceTwo.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncome: nil)
+        try await deviceTwo.insertDuplicateYearForTesting(id: idB, year: 2025, updatedAt: instant, grossIncomeOverride: nil)
+        try await deviceTwo.insertDuplicateYearForTesting(id: idA, year: 2025, updatedAt: instant, grossIncomeOverride: nil)
 
         #expect(try await deviceOne.reconcileYears() == 1)
         #expect(try await deviceTwo.reconcileYears() == 1)
@@ -98,7 +98,7 @@ import TaxKit
         let store = try await StoreFixture.store()
         try await store.saveYearFacts(YearFacts(), for: 2025)
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: nil)
 
         #expect(try await store.reconcileYears() == 1)
         #expect(try await store.reconcileYears() == 0)
@@ -126,7 +126,7 @@ import TaxKit
         ]
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: Money(ringgit: 128_000))
 
         let entryStampsBefore = try await Self.entryStamps(store, entryIDs)
         let survivorID = try #require(try await store.liveYearIdsForTesting(year: 2025).first)
@@ -166,12 +166,12 @@ import TaxKit
     func survivorIsStampedWhenItAdoptsAFact() async throws {
         let store = try await StoreFixture.store()
         var older = YearFacts()
-        older.grossIncome = Money(ringgit: 100_000)
+        older.grossIncomeOverride = Money(ringgit: 100_000)
         older.maritalStatus = .married          // the newer row will not have this
         try await store.saveYearFacts(older, for: 2025)
 
         await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: Money(ringgit: 128_000))
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: Money(ringgit: 128_000))
         let survivorID = try #require(try await store.liveYearIdsForTesting(year: 2025).first)
 
         let sweepInstant = StoreFixture.epoch.addingTimeInterval(3_600)
@@ -336,7 +336,7 @@ import TaxKit
         _ = try await Self.save(store, StoreFixture.entry("LIFESTYLE", 1_820), at: Self.t0)
 
         await store.useClock { Self.t1 }
-        try await store.insertDuplicateYearForTesting(2025, grossIncome: nil)
+        try await store.insertDuplicateYearForTesting(2025, grossIncomeOverride: nil)
 
         let outcome = try await store.reconcile()
         // The sweep soft-deleted a row and re-pointed an entry — it wrote to disk. A
