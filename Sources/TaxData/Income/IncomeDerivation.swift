@@ -1,6 +1,35 @@
 import Foundation
 import TaxKit
 
+/// Where a slice of a year came from.
+///
+/// The two never share a wage base. A recurring rate is a monthly wage, which is what EPF
+/// and SOCSO are assessed on; a one-off could be a bonus (EPF wages but not SOCSO wages),
+/// overtime (the reverse) or a travel allowance (neither), and Relio has no way to tell
+/// them apart. Naming the origin lets a consumer that needs a statutory wage leave the
+/// ambiguous slices out without having to re-walk the timeline to find them.
+public enum WageOrigin: Hashable, Sendable {
+    case recurringRate
+    case oneOff
+}
+
+/// One slice of a source's contribution to a year, labelled with the month it belongs to.
+///
+/// The label is the whole point: the slices of a month are emitted already rounded, so
+/// grouping by `month` and summing recovers that month's wage exactly. A mid-month raise
+/// gives April two slices that add back to 8,800.00, not to 8,799.99.
+public struct MonthlyContribution: Hashable, Sendable {
+    public let month: WageMonth
+    public let amount: Money
+    public let origin: WageOrigin
+
+    public init(month: WageMonth, amount: Money, origin: WageOrigin) {
+        self.month = month
+        self.amount = amount
+        self.origin = origin
+    }
+}
+
 /// Turns an income timeline into one year's gross.
 ///
 /// Pure: no SwiftData, no actor, no clock. The year is a parameter, exactly as it is for
@@ -52,11 +81,25 @@ public enum IncomeDerivation {
     /// Every amount this source contributes to `year`: one element per monthly slice of a
     /// recurring rate in force, and one per one-off dated inside the year.
     ///
-    /// The single span walk, so "does this source say anything about the year" and "what
-    /// does it say" can never disagree — the year is known exactly when this is non-empty,
-    /// and its sum is the figure. A second copy of this logic could drift.
+    /// The label dropped from the single span walk. Deliberately not a second walk: the
+    /// year is known exactly when this is non-empty and its sum is the figure, so "does
+    /// this source say anything about the year", "what does it say" and "which months did
+    /// it say it about" all come from one traversal and cannot drift apart.
     private static func contributions(for year: Int,
                                       from source: IncomeSourceSnapshot) -> [Money] {
+        monthlyContributions(for: year, from: source).map(\.amount)
+    }
+
+    /// Every amount this source contributes to `year`, each named by the month it falls in.
+    ///
+    /// Slices are rounded per month, not once at the end, and are emitted already rounded.
+    /// So grouping by `month` and summing gives that month's wage to the sen — which is
+    /// what EPF and SOCSO are assessed on, and what a mid-month raise otherwise loses.
+    ///
+    /// Ordered by the walk rather than by month: every slice of a rate in calendar order,
+    /// rate by rate, then the one-offs. A consumer that wants months groups by `month`.
+    public static func monthlyContributions(for year: Int,
+                                            from source: IncomeSourceSnapshot) -> [MonthlyContribution] {
         let yearStart = IncomeCalendar.startOfYear(year)
         let yearEnd = IncomeCalendar.endOfYear(year)
 
@@ -69,7 +112,7 @@ public enum IncomeDerivation {
         }
 
         let rates = ordered.filter { $0.shape == .recurring }
-        var amounts: [Money] = []
+        var slices: [MonthlyContribution] = []
 
         for (index, rate) in rates.enumerated() {
             // The next rate takes effect on its own date, so this one is paid through the
@@ -83,21 +126,26 @@ public enum IncomeDerivation {
             }
             let spanStart = max(rate.effectiveFrom, yearStart)
 
-            for span in IncomeCalendar.monthSpans(from: spanStart, through: spanEnd) {
+            for labelled in IncomeCalendar.labelledMonthSpans(from: spanStart, through: spanEnd) {
                 // A full month yields exactly the rate: days == daysInMonth makes the
                 // factor 1 and `applying` returns the amount unchanged. Only partial
                 // months round, and they round per month rather than once at the end.
+                let span = labelled.span
                 let factor = Decimal(span.days) / Decimal(span.daysInMonth)
-                amounts.append(rate.amount.applying(factor, rounding: .halfUp))
+                slices.append(MonthlyContribution(month: labelled.month,
+                                                  amount: rate.amount.applying(factor, rounding: .halfUp),
+                                                  origin: .recurringRate))
             }
         }
 
         for oneOff in ordered where oneOff.shape == .oneOff {
             if IncomeCalendar.year(of: oneOff.effectiveFrom) == year {
-                amounts.append(oneOff.amount)
+                slices.append(MonthlyContribution(month: WageMonth(containing: oneOff.effectiveFrom),
+                                                  amount: oneOff.amount,
+                                                  origin: .oneOff))
             }
         }
 
-        return amounts
+        return slices
     }
 }
