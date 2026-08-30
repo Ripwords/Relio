@@ -92,15 +92,30 @@ import TaxKit
         #expect(SchemaV1.versionIdentifier == Schema.Version(1, 0, 0))
     }
 
-    @Test("the migration plan names V1 and has no stages yet")
+    @Test("SchemaV2 is version 2.0.0")
+    func schemaV2Version() {
+        #expect(SchemaV2.versionIdentifier == Schema.Version(2, 0, 0))
+    }
+
+    @Test("the migration plan joins V1 to V2 with one lightweight stage")
     func migrationPlan() {
-        #expect(TaxMigrationPlan.schemas.count == 1)
-        #expect(TaxMigrationPlan.stages.isEmpty)
+        #expect(TaxMigrationPlan.schemas.count == 2)
+        #expect(TaxMigrationPlan.stages.count == 1)
+
+        guard case .lightweight(let from, let to) = TaxMigrationPlan.stages.first else {
+            Issue.record("""
+                The single stage must be lightweight. A custom stage runs code against \
+                every shipped store on migration, which is not what this plan declares.
+                """)
+            return
+        }
+        #expect(ObjectIdentifier(from) == ObjectIdentifier(SchemaV1.self))
+        #expect(ObjectIdentifier(to) == ObjectIdentifier(SchemaV2.self))
     }
 
     @Test("every model in the shipped schema is CloudKit-mirroring-safe")
     func shippedSchemaIsMirroringSafe() {
-        let problems = SchemaInvariants.violations(in: Schema(SchemaV1.models))
+        let problems = SchemaInvariants.violations(in: Schema(SchemaV2.models))
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 

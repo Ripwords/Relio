@@ -85,7 +85,7 @@ import TaxKit
 
     @Test("both new models are CloudKit-mirroring-safe")
     func mirroringSafe() {
-        let problems = SchemaInvariants.violations(in: Schema(SchemaV1.models))
+        let problems = SchemaInvariants.violations(in: Schema(SchemaV2.models))
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 

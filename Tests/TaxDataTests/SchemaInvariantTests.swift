@@ -34,10 +34,15 @@ enum SchemaInvariants {
 
 @Suite("Schema invariants") struct SchemaInvariantTests {
 
-    /// The shipped schema is the single source of truth. A model that is not in
-    /// `SchemaV1.models` does not exist as far as the container is concerned, so testing
-    /// any other list would test something the app never opens.
-    static let allModels: [any PersistentModel.Type] = SchemaV1.models
+    /// The schema the container opens is the single source of truth. A model that is not
+    /// in `SchemaV2.models` does not exist as far as the container is concerned, so
+    /// testing any other list would test something the app never opens.
+    ///
+    /// This tracked `SchemaV1.models` until V2 shipped. Leaving it there would now check
+    /// V1's frozen `UserPreferences` copy, which no live code writes to, and stop checking
+    /// the live one, which is the entity that just gained attributes. The check would
+    /// still pass and would still be measuring nothing.
+    static let allModels: [any PersistentModel.Type] = SchemaV2.models
 
     @Test("every model is CloudKit-mirroring-safe")
     func modelsAreMirroringSafe() {
