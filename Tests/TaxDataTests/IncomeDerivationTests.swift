@@ -367,40 +367,57 @@ import TaxKit
         }
     }
 
-    @Test("the derivation path contains no Double")
-    func noDoubleInDerivation() throws {
+    @Test("no source file in the package uses Double or Float")
+    func noBinaryFloatingPointInSources() throws {
         // This is a calculation path feeding chargeable income. `Double` here would
         // reintroduce exactly the representation error `Money` exists to prevent, at the
         // point where a user's salary becomes a tax figure.
         //
-        // Every money path under TaxData, not just the one that first needed the rule.
-        // The contribution floors take a rate to a wage and are the same hazard, so the
-        // check grew to cover them rather than the rule being written down twice.
+        // The whole of `Sources/`, walked recursively, rather than a list of the money
+        // paths known when the rule was written. A list fails open: it named
+        // TaxData/Income and TaxData/Contributions, so `TaxPresentation` grew a money
+        // path of its own that nothing checked, and the rule had to be restated in prose
+        // instead of being enforced. There is nothing to keep updating now, and a module
+        // added tomorrow is covered the day it exists.
+        //
+        // One exemption, by name. `Money.lossyDoubleForCharting` is the single deliberate
+        // crossing into `Double` in the package, and it is named that loudly precisely so
+        // it can be spelled out here and nowhere else. Any other line is a mistake.
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let files = try ["Sources/TaxData/Income", "Sources/TaxData/Contributions"]
-            .flatMap { path in
-                try FileManager.default
-                    .contentsOfDirectory(at: root.appending(path: path),
-                                         includingPropertiesForKeys: nil)
-            }
-            .filter { $0.pathExtension == "swift" }
+        let files = try swiftFiles(under: root.appending(path: "Sources"))
         #expect(!files.isEmpty)
 
         for file in files {
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
-                guard text.contains("Double") else { continue }
+                guard text.contains("Double") || text.contains("Float") else { continue }
                 // Checking the whole line lets a real `Double` through as long as the line
                 // also has a `//` anywhere on it — `let x: Double = 0 // temp` contains both
                 // substrings. Only the code before the first `//` can be a genuine `Double`;
                 // an occurrence after the marker is inside the comment itself and must still
                 // pass, so the check is scoped to the code segment, not the raw line.
                 let code = text.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0]
-                #expect(!code.contains("Double"),
-                        "\(file.lastPathComponent):\(number + 1) uses Double on the derivation path")
+                guard !code.contains("lossyDoubleForCharting") else { continue }
+                #expect(!code.contains("Double") && !code.contains("Float"),
+                        "\(file.lastPathComponent):\(number + 1) uses Double or Float on a money path")
             }
         }
+    }
+
+    /// All `.swift` files under `directory`, recursing into subdirectories.
+    private func swiftFiles(under directory: URL) throws -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var files: [URL] = []
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            files.append(url)
+        }
+        return files
     }
 }
