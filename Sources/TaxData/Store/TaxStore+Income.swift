@@ -150,19 +150,23 @@ extension TaxStore {
 
     // MARK: - Reads
 
+    /// One draft per identity, not per row. Two rows CloudKit delivered for one source are
+    /// one source here, before any sweep has run and whether or not one ever does.
     public func incomeSourceDrafts() throws -> [IncomeSourceDraft] {
-        try liveSources().map(draft(of:))
+        try resolvedSources().map(draft(of:))
     }
 
     public func incomeRecordDrafts(forSource sourceID: UUID) throws -> [IncomeRecordDraft] {
-        guard let source = try liveSources().first(where: { $0.id == sourceID }) else { return [] }
-        return recordDrafts(of: source)
+        guard let resolved = try resolvedSources().first(where: { $0.id == sourceID }) else {
+            return []
+        }
+        return recordDrafts(of: resolved)
     }
 
     /// The value types the derivation works on. This is the whole bridge between SwiftData
     /// and the pure function — there is no arithmetic here.
     public func incomeSnapshots() throws -> [IncomeSourceSnapshot] {
-        try liveSources().map(snapshot(of:))
+        try resolvedSources().map(snapshot(of:))
     }
 
     public func derivedGrossIncome(for year: Int) throws -> Money {
@@ -178,7 +182,7 @@ extension TaxStore {
     /// subtotals, the sources' own fields, the records and the known/unknown answer all
     /// come off one `liveSources()` fetch, so they cannot describe different stores.
     public func incomeSummary(for year: Int) throws -> IncomeYearSummary {
-        let sources = try liveSources()
+        let sources = try resolvedSources()
         let snapshots = sources.map(snapshot(of:))
 
         // `knownAnnualGross`, not the sum of the subtotals: the same call the projection
@@ -186,7 +190,12 @@ extension TaxStore {
         // known at all. A year the timeline never reaches is `nil` here and RM 0.00 there.
         let known = IncomeDerivation.knownAnnualGross(for: year, from: snapshots)
 
-        var byID: [UUID: IncomeSource] = [:]
+        // Keyed on resolved identities, so a source CloudKit delivered twice yields one
+        // row. Keying on physical rows kept only one of them here while
+        // `IncomeDerivation.totals` returned a subtotal per snapshot, and the `compactMap`
+        // below then emitted two rows carrying the same source and the same records with
+        // different subtotals.
+        var byID: [UUID: ResolvedIncomeSource] = [:]
         for source in sources { byID[source.id] = source }
 
         // Ordered by `totals`, which sorts by name then id — stable between launches and
@@ -202,45 +211,51 @@ extension TaxStore {
 
     // MARK: - Row conversions
 
-    private func draft(of row: IncomeSource) -> IncomeSourceDraft {
-        var draft = IncomeSourceDraft(id: row.id, name: row.name, kind: row.kind,
-                                      deductsEPF: row.deductsEPF,
-                                      deductsSOCSO: row.deductsSOCSO,
-                                      endedOn: row.endedOn)
-        draft.updatedAt = row.updatedAt
+    private func draft(of resolved: ResolvedIncomeSource) -> IncomeSourceDraft {
+        var draft = IncomeSourceDraft(id: resolved.id,
+                                      name: resolved.survivor.name,
+                                      kind: resolved.survivor.kind,
+                                      deductsEPF: resolved.deductsEPF,
+                                      deductsSOCSO: resolved.deductsSOCSO,
+                                      endedOn: resolved.endedOn)
+        draft.updatedAt = resolved.survivor.updatedAt
         return draft
     }
 
-    private func recordDrafts(of source: IncomeSource) -> [IncomeRecordDraft] {
-        source.liveRecords
-            .sorted { left, right in
-                if left.effectiveFrom != right.effectiveFrom {
-                    return left.effectiveFrom < right.effectiveFrom
-                }
-                return left.id.uuidString < right.id.uuidString
-            }
-            .map { row in
-                var draft = IncomeRecordDraft(id: row.id, sourceID: source.id, shape: row.shape,
-                                              amount: row.amount,
-                                              effectiveFrom: row.effectiveFrom, note: row.note)
-                draft.updatedAt = row.updatedAt
-                return draft
-            }
+    private func recordDrafts(of resolved: ResolvedIncomeSource) -> [IncomeRecordDraft] {
+        resolved.records.map { row in
+            var draft = IncomeRecordDraft(id: row.id, sourceID: resolved.id, shape: row.shape,
+                                          amount: row.amount,
+                                          effectiveFrom: row.effectiveFrom, note: row.note)
+            draft.updatedAt = row.updatedAt
+            return draft
+        }
     }
 
-    private func snapshot(of row: IncomeSource) -> IncomeSourceSnapshot {
+    private func snapshot(of resolved: ResolvedIncomeSource) -> IncomeSourceSnapshot {
         IncomeSourceSnapshot(
-            id: row.id, name: row.name, kind: row.kind, endedOn: row.endedOn,
-            records: row.liveRecords.map {
+            id: resolved.id, name: resolved.survivor.name, kind: resolved.survivor.kind,
+            endedOn: resolved.endedOn,
+            records: resolved.records.map {
                 IncomeRecordSnapshot(id: $0.id, shape: $0.shape,
                                      amount: $0.amount, effectiveFrom: $0.effectiveFrom)
             })
     }
 
-    private func liveSources() throws -> [IncomeSource] {
+    // MARK: - Internals
+
+    /// Every live row, unresolved. Only `resolvedSources()` and the sweep want this — a
+    /// caller working from physical rows is a caller that will double-count.
+    func liveSourceRows() throws -> [IncomeSource] {
         try modelContext
             .fetch(FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.deletedAt == nil }))
-            .sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    /// One resolved source per identity, ordered by `id.uuidString` as the raw fetch used
+    /// to be. The store's only view of income: reads project these, writes target their
+    /// survivors, and the sweep persists them.
+    func resolvedSources() throws -> [ResolvedIncomeSource] {
+        ResolvedIncomeSource.resolving(try liveSourceRows())
     }
 }
 
@@ -251,5 +266,50 @@ extension TaxStore {
         try modelContext
             .fetch(FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == id }))
             .first?.updatedAt
+    }
+
+    /// The collision only two devices syncing can produce: a second physical row asserting
+    /// an existing identity, carrying its own row for the same rate identity. Nothing in
+    /// the app can write one `id` twice, and CloudKit cannot be asked to prevent it.
+    func insertDuplicateIncomeSourceForTesting(id: UUID = WellKnownID.primaryEmployment,
+                                               name: String,
+                                               monthlyRate: Money,
+                                               effectiveFrom: Date) throws {
+        let stamp = now()
+        let source = IncomeSource(id: id, name: name)
+        source.updatedAt = stamp
+        modelContext.insert(source)
+
+        let rate = IncomeRecord(
+            id: WellKnownID.openingRate(forSource: id, effectiveFrom: effectiveFrom))
+        rate.shape = .recurring
+        rate.amount = monthlyRate
+        rate.effectiveFrom = effectiveFrom
+        rate.updatedAt = stamp
+        rate.source = source
+        modelContext.insert(rate)
+
+        try modelContext.save()
+    }
+
+    func liveIncomeSourceRowCountForTesting(id: UUID) throws -> Int {
+        try liveSourceRows().filter { $0.id == id }.count
+    }
+
+    func liveIncomeRecordRowCountForTesting(id: UUID) throws -> Int {
+        try modelContext
+            .fetch(FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.id == id }
+            .count
+    }
+
+    /// Every `IncomeSource` row's `updatedAt` for one identity, live or soft-deleted, keyed
+    /// by `persistentModelID` — so a test can prove the sweep left a row it did not change
+    /// untouched. `id` cannot key this dictionary: it is the thing they share.
+    func incomeSourceStampsForTesting(id: UUID) throws -> [PersistentIdentifier: Date] {
+        let rows = try modelContext
+            .fetch(FetchDescriptor<IncomeSource>())
+            .filter { $0.id == id }
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.persistentModelID, $0.updatedAt) })
     }
 }

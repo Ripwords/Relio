@@ -214,4 +214,43 @@ import TaxKit
         #expect(try await store.incomeSourceDrafts().isEmpty)
         #expect(try await store.incomeRecordDrafts(forSource: phantomSourceID).isEmpty)
     }
+
+    // MARK: - A source CloudKit delivered twice
+
+    /// Two live rows asserting `WellKnownID.primaryEmployment`, each with its own row for
+    /// the same rate identity — what a second device's onboarding puts on disk. Nothing
+    /// has swept, and nothing needs to have.
+    private static func storeWithADuplicatedMainJob() async throws -> TaxStore {
+        let store = try await StoreFixture.store()
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        return store
+    }
+
+    @Test("a year's derived gross does not double while a duplicate source is still on disk")
+    func duplicateSourceDoesNotDoubleTheYear() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 2)
+
+        // The read resolves the identity group. The sweep has not run and is not what
+        // makes this figure right — which is why the user's number is correct on a build
+        // where nothing ever calls `reconcile()`.
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+        #expect(try await store.incomeSourceDrafts().count == 1)
+    }
+
+    @Test("a duplicated source's records are read as one timeline, not one row's half")
+    func duplicateSourceRecordsAreUnioned() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let records = try await store.incomeRecordDrafts(forSource: WellKnownID.primaryEmployment)
+        // Both physical rows carry the same rate identity, so the timeline shows one rate.
+        #expect(records.count == 1)
+        #expect(records.first?.amount == Money(ringgit: 8_000))
+    }
 }
