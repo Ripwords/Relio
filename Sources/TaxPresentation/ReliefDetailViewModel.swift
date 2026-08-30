@@ -14,6 +14,9 @@ public final class ReliefDetailViewModel {
     public private(set) var requirements: [RequirementCheck] = []
     public private(set) var sourceURL: URL?
     public private(set) var notes: String?
+    public private(set) var advice: ContributionAdvice = .none
+    /// Everything this screen still needs answered, from both owners, in one list.
+    public private(set) var questions: [AnswerableQuestion] = []
 
     private let context: YearContext
     private let store: TaxStore
@@ -37,6 +40,8 @@ public final class ReliefDetailViewModel {
             requirements = []
             sourceURL = nil
             notes = nil
+            advice = .none
+            questions = []
             return
         }
 
@@ -57,5 +62,77 @@ public final class ReliefDetailViewModel {
                 }
                 return left.id.uuidString < right.id.uuidString
             }
+
+        // After `entries`: what the user has already logged is half of what the advice
+        // decides.
+        advice = await contributionAdvice(for: found)
+        questions = Self.merged(eligibility: found.eligibility, advice: advice)
+    }
+
+    /// Writes the offered figure as an ordinary relief entry.
+    ///
+    /// The row carries `suggestion.entryID`, a well-known id derived from the scheme and
+    /// the year, and that makes acceptance idempotent: a second tap, a retry, or a racing
+    /// tap on another device lands on the same row instead of inserting a second one the
+    /// evaluator would sum. It also revives the row if the user had deleted it, because the
+    /// ordinary write path fetches by id regardless of `deletedAt`.
+    ///
+    /// The well-known id does nothing else. Once the row exists it is an ordinary user
+    /// entry: Relio never rewrites its amount when the income timeline changes, never soft
+    /// deletes it, and never reconciles it.
+    ///
+    /// Do not add a background reconciler. It would be a second writer of a CloudKit-synced
+    /// row under newest-write-wins, which is how a stale device resurrects a figure the
+    /// user has already replaced — the exact double-count this whole design exists to
+    /// prevent.
+    ///
+    /// - Returns: whether the entry was written.
+    @discardableResult
+    public func acceptSuggestion() async -> Bool {
+        guard case .offer(let suggestion) = advice else { return false }
+        do {
+            try await store.save(EntryDraft(id: suggestion.entryID,
+                                            year: context.year,
+                                            code: code,
+                                            amount: suggestion.amount))
+        } catch {
+            return false
+        }
+        await context.reload()
+        await refresh()
+        return true
+    }
+
+    /// The contribution card for this screen, when this screen is a contribution screen.
+    ///
+    /// The scheme lookup comes first so that the great majority of relief screens, which
+    /// are not contribution screens, never reach the store at all.
+    private func contributionAdvice(for assessment: ReliefAssessment) async -> ContributionAdvice {
+        guard let scheme = ContributionScheme.allCases.first(where: { $0.reliefCode == code }),
+              let estimate = try? await store.contributionEstimate(scheme: scheme,
+                                                                   year: context.year) else {
+            return .none
+        }
+        return ContributionAdvice.advise(estimate: estimate,
+                                         assessment: assessment,
+                                         loggedEntries: entries)
+    }
+
+    /// Both owners' unanswered questions, the rulebook's first.
+    ///
+    /// The split behind them is real and stays real: `ProfileQuestion` is TaxKit's
+    /// vocabulary of eligibility predicates and `ContributionQuestion` is TaxData's
+    /// vocabulary of payroll facts, and neither module should learn the other's. It just
+    /// stops here, because the screen has one list to render and one sheet to open.
+    private static func merged(eligibility: Eligibility,
+                               advice: ContributionAdvice) -> [AnswerableQuestion] {
+        var questions: [AnswerableQuestion] = []
+        if case .needsInfo(let profile) = eligibility {
+            questions += profile.map(AnswerableQuestion.profile)
+        }
+        if case .answer(let contribution, _) = advice {
+            questions += contribution.map(AnswerableQuestion.contribution)
+        }
+        return questions
     }
 }
