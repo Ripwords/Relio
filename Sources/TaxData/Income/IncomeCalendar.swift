@@ -34,6 +34,12 @@ public enum IncomeCalendar {
         calendar.component(.year, from: date)
     }
 
+    /// The sibling of `year(of:)`, and for the same reason: which month a wage belongs to
+    /// decides which statutory rate applies to it, so it must not depend on the device.
+    public static func month(of date: Date) -> Int {
+        calendar.component(.month, from: date)
+    }
+
     public static func startOfDay(_ date: Date) -> Date {
         calendar.startOfDay(for: date)
     }
