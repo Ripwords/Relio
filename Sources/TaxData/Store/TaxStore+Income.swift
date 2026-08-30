@@ -132,14 +132,16 @@ extension TaxStore {
     /// - An existing live source with this identity is left alone. `name` seeds a new row
     ///   and is ignored otherwise — the user may have renamed it, and a re-seed must not
     ///   rename it back or null the deduction answers they gave.
-    /// - A soft-deleted one is revived, as `save(_: IncomeSourceDraft)` and `restoreEntry`
-    ///   both do. Inserting a second row instead would manufacture the exact duplicate
-    ///   this method exists to prevent.
     /// - An existing rate for this source and this calendar year is left alone, amount and
     ///   `effectiveFrom` both: the first answer given wins, and a re-seed is not a new
     ///   answer. A user who mistyped their salary corrects it on the Income screen, where
     ///   every other income edit happens; letting a stale second device overwrite would
     ///   undo that correction.
+    /// - A soft-deleted source or rate is revived, as `save(_: IncomeSourceDraft)` and
+    ///   `restoreEntry` both do, keeping whatever answer it already carried. Inserting a
+    ///   second row instead would manufacture the exact duplicate this method exists to
+    ///   prevent, and skipping the revival would let a seed report success while leaving
+    ///   the user with no income at all.
     ///
     /// A true no-op when there is nothing to write: nothing is re-stamped, per
     /// `softDeleteEntry`'s discipline.
@@ -175,7 +177,13 @@ extension TaxStore {
         }
 
         let rateID = WellKnownID.openingRate(forSource: identity, effectiveFrom: effectiveFrom)
-        if try authoritativeRecordRow(rateID) == nil {
+        if let existing = try authoritativeRecordRow(rateID) {
+            if existing.deletedAt != nil {
+                existing.deletedAt = nil
+                existing.updatedAt = stamp
+                wroteAnything = true
+            }
+        } else {
             let rate = IncomeRecord(id: rateID)
             rate.shape = .recurring
             rate.amount = monthlyRate
@@ -257,7 +265,7 @@ extension TaxStore {
     /// those reads dropped a row from the list while its amount still counted toward the
     /// total — the screen then showed a derivation that visibly did not add up. Here the
     /// subtotals, the sources' own fields, the records and the known/unknown answer all
-    /// come off one `liveSources()` fetch, so they cannot describe different stores.
+    /// come off one `resolvedSources()` fetch, so they cannot describe different stores.
     public func incomeSummary(for year: Int) throws -> IncomeYearSummary {
         let sources = try resolvedSources()
         let snapshots = sources.map(snapshot(of:))

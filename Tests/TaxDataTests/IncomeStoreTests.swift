@@ -415,14 +415,40 @@ import TaxKit
         #expect(try await store.liveIncomeSourceRowCountForTesting(
             id: WellKnownID.primaryEmployment) == 1)
         #expect(try await store.incomeSourceDrafts().count == 1)
+        // With its rate, and the amount it already carried. A seed that reported success
+        // and left the user with no income would be worse than one that refused.
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("seeding revives a rate the user had deleted rather than reporting a silent no-op")
+    func seedingRevivesTheRate() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        try await store.softDeleteIncomeRecord(
+            id: WellKnownID.openingRate(forSource: WellKnownID.primaryEmployment,
+                                        effectiveFrom: Self.date(2025, 1, 1)))
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        // A different salary, because the revived row keeps the answer it already had.
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 12_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        #expect(try await store.incomeRecordDrafts(
+            forSource: WellKnownID.primaryEmployment).count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
     }
 
     @Test("a failed rate write seeds nothing at all, not even the source")
     func aFailedSeedWritesNothing() async throws {
         let store = try await StoreFixture.store()
-        await store.failIncomeRecordWrites(with: IncomeStoreError.unknownIncomeSource(UUID()))
+        let failure = IncomeStoreError.unknownIncomeSource(UUID())
+        await store.failIncomeRecordWrites(with: failure)
 
-        await #expect(throws: (any Error).self) {
+        await #expect(throws: failure) {
             try await store.seedPrimaryEmployment(name: "Main job",
                                                   monthlyRate: Money(ringgit: 8_000),
                                                   effectiveFrom: Self.date(2025, 1, 1))
