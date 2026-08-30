@@ -259,6 +259,13 @@ extension TaxStore {
             .fetch(FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.deletedAt == nil }))
     }
 
+    /// Every live record row across every source. Only the sweep's record pass wants this:
+    /// a record's identity is scoped to nothing, so the group is global.
+    func liveRecordRows() throws -> [IncomeRecord] {
+        try modelContext
+            .fetch(FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.deletedAt == nil }))
+    }
+
     /// One resolved source per identity, ordered by `id.uuidString` as the raw fetch used
     /// to be. The store's only view of income: reads project these, writes target their
     /// survivors, and the sweep persists them.

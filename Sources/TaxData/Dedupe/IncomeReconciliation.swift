@@ -160,3 +160,96 @@ extension ResolvedIncomeSource {
                                       effectiveFrom: row.effectiveFrom, note: row.note)
     }
 }
+
+/// What one income sweep collapsed.
+///
+/// Counts, not `MergeReport`s. A `MergeReport` carries a `dedupeKey`, and there is no
+/// dedupe key here — the group *is* an id. Reporting a fabricated one would tell a reader
+/// this pass works like the entry pass, which is the misreading this design most needs to
+/// prevent. `IncomeSource` also has no `mergedInto` column, so unlike an entry merge this
+/// one is not individually auditable; only the certainty of the key makes that acceptable.
+public struct IncomeMergeCount: Hashable, Sendable {
+    public var sourcesMerged: Int
+    public var recordsMerged: Int
+
+    public var changedAnything: Bool { sourcesMerged > 0 || recordsMerged > 0 }
+
+    public init(sourcesMerged: Int = 0, recordsMerged: Int = 0) {
+        self.sourcesMerged = sourcesMerged
+        self.recordsMerged = recordsMerged
+    }
+}
+
+extension TaxStore {
+
+    /// Collapses live `IncomeSource` rows that share an `id`, and the duplicate
+    /// `IncomeRecord` rows that come with them.
+    ///
+    /// Housekeeping, not the fix. The reads already resolve these groups, so the user's
+    /// figure is correct before this runs and does not move when it does. What this buys
+    /// is that the duplicate rows do not accumulate forever.
+    ///
+    /// One method, not two: a caller cannot correctly reconcile records without first
+    /// re-pointing them onto a surviving source, so exposing the two stages separately
+    /// would make every caller re-derive the ordering. The record pass runs second for the
+    /// reason `reconcile()` runs years before entries — a record's group is only complete
+    /// once every row of its source's identity hangs off one source.
+    ///
+    /// Only rows sharing an `id` are touched, and only when the group has a total order —
+    /// see `ResolvedIncomeSource.isSafeToCollapse`.
+    ///
+    /// Idempotent: a second run reports zero and writes nothing. Housekeeping is never
+    /// stamped, and a re-point changes no field any resolver keys off; stamping it would
+    /// let an idle phone's sweep outrank a real edit on another device under
+    /// newest-write-wins.
+    @discardableResult
+    public func reconcileIncomeSources() throws -> IncomeMergeCount {
+        var count = IncomeMergeCount()
+        let stamp = now()
+
+        for resolved in try resolvedSources()
+        where resolved.group.count > 1 && resolved.isSafeToCollapse {
+            let survivor = resolved.survivor
+            var survivorGainedAnAnswer = false
+            if survivor.deductsEPF == nil, let adopted = resolved.deductsEPF {
+                survivor.deductsEPF = adopted
+                survivorGainedAnAnswer = true
+            }
+            if survivor.deductsSOCSO == nil, let adopted = resolved.deductsSOCSO {
+                survivor.deductsSOCSO = adopted
+                survivorGainedAnAnswer = true
+            }
+
+            for loser in resolved.group.dropFirst() {
+                // Snapshotted into an array first: `record.source = survivor` mutates the
+                // inverse side of the very relationship being walked. Soft-deleted records
+                // travel too, or restoring one later would revive it onto a dead source.
+                for record in Array(loser.records ?? []) {
+                    record.source = survivor
+                }
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                count.sourcesMerged += 1
+            }
+            // Same rule as `reconcileYears`: the survivor is stamped only when it actually
+            // adopted an answer it did not have.
+            if survivorGainedAnAnswer { survivor.updatedAt = stamp }
+        }
+
+        for (_, group) in Dictionary(grouping: try liveRecordRows(), by: \.id)
+        where group.count > 1 {
+            let ordered = group
+                .map { (row: $0, content: ResolvedIncomeSource.contentKey(of: $0)) }
+                .sorted(by: ResolvedIncomeSource.precedes)
+            guard !ResolvedIncomeSource.hasATie(ordered) else { continue }
+            for loser in ordered.dropFirst().map(\.row) {
+                loser.deletedAt = stamp
+                loser.updatedAt = stamp
+                count.recordsMerged += 1
+            }
+        }
+
+        if count.changedAnything { try modelContext.save() }
+        return count
+    }
+}

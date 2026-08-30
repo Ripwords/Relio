@@ -22,12 +22,19 @@ public struct ReconciliationOutcome: Hashable, Sendable {
     public var yearsMerged: Int
     /// One report per collapsed group of duplicate entries.
     public var entryMerges: [MergeReport]
+    /// Duplicate income rows collapsed. Counts, for the reason `IncomeMergeCount` documents.
+    public var income: IncomeMergeCount
 
-    public var changedAnything: Bool { yearsMerged > 0 || !entryMerges.isEmpty }
+    public var changedAnything: Bool {
+        yearsMerged > 0 || !entryMerges.isEmpty || income.changedAnything
+    }
 
-    public init(yearsMerged: Int, entryMerges: [MergeReport]) {
+    public init(yearsMerged: Int,
+                entryMerges: [MergeReport],
+                income: IncomeMergeCount = IncomeMergeCount()) {
         self.yearsMerged = yearsMerged
         self.entryMerges = entryMerges
+        self.income = income
     }
 }
 
@@ -103,7 +110,12 @@ extension TaxStore {
         }
 
         if !reports.isEmpty { try modelContext.save() }
-        return ReconciliationOutcome(yearsMerged: yearsMerged, entryMerges: reports)
+
+        // Last, and unlike years-before-entries the placement is free: no income group
+        // depends on a year or an entry, and no entry key depends on income.
+        let income = try reconcileIncomeSources()
+
+        return ReconciliationOutcome(yearsMerged: yearsMerged, entryMerges: reports, income: income)
     }
 
     /// Reverses one merge, bringing a soft-deleted loser back as its own entry.
