@@ -100,7 +100,7 @@ struct ContributionQuestionsSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .navigationTitle("A few quick answers")
+            .navigationTitle("Quick answers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

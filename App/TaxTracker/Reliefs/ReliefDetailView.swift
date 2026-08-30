@@ -169,11 +169,23 @@ struct ReliefDetailView: View {
         }
     }
 
+    /// `ViewThatFits` rather than a bare `HStack`, the same way `IncomeView` builds its
+    /// source headers. At the largest Dynamic Type sizes the label and the figure cannot
+    /// share a line, and both lose: "Still claimable" breaks to "Still claim-able" and
+    /// the amount beside it breaks to "RM 4,000." over "00". These four rows are the
+    /// figures the whole screen is about.
     private func labelled(_ title: String, _ amount: Money) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            MoneyText(amount: amount, font: .body, weight: .medium)
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                Text(title)
+                Spacer()
+                MoneyText(amount: amount, font: .body, weight: .medium)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                MoneyText(amount: amount, font: .body, weight: .medium)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
