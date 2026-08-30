@@ -372,11 +372,18 @@ import TaxKit
         // This is a calculation path feeding chargeable income. `Double` here would
         // reintroduce exactly the representation error `Money` exists to prevent, at the
         // point where a user's salary becomes a tax figure.
+        //
+        // Every money path under TaxData, not just the one that first needed the rule.
+        // The contribution floors take a rate to a wage and are the same hazard, so the
+        // check grew to cover them rather than the rule being written down twice.
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let income = root.appending(path: "Sources/TaxData/Income")
-        let files = try FileManager.default
-            .contentsOfDirectory(at: income, includingPropertiesForKeys: nil)
+        let files = try ["Sources/TaxData/Income", "Sources/TaxData/Contributions"]
+            .flatMap { path in
+                try FileManager.default
+                    .contentsOfDirectory(at: root.appending(path: path),
+                                         includingPropertiesForKeys: nil)
+            }
             .filter { $0.pathExtension == "swift" }
         #expect(!files.isEmpty)
 
