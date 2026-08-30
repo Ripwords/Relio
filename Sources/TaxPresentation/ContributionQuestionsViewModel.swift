@@ -14,12 +14,22 @@ import TaxData
 public final class ContributionQuestionsViewModel {
 
     public struct SourceQuestion: Identifiable, Hashable, Sendable {
+
+        /// A row is identified by the pair, never by the source alone. Two rows can name
+        /// the same source, one asking about EPF and one about SOCSO, so a bare source id
+        /// is not unique among them, and a `ForEach` keyed on one would collapse the two
+        /// rows and route both pickers at whichever survived.
+        public struct ID: Hashable, Sendable {
+            public let sourceID: UUID
+            public let scheme: ContributionScheme
+        }
+
         /// The whole draft, never just a name and an id.
         public var draft: IncomeSourceDraft
         public let scheme: ContributionScheme
         public let prompt: String
         public var answer: Bool?
-        public var id: UUID { draft.id }
+        public var id: ID { ID(sourceID: draft.id, scheme: scheme) }
     }
 
     public private(set) var asksDateOfBirth: Bool
@@ -62,6 +72,32 @@ public final class ContributionQuestionsViewModel {
         self.pendingSources = pendingSources
     }
 
+    /// Whether every question this sheet put to the user has an answer.
+    ///
+    /// The sheet's Save button hangs off this. Without it the sheet would have to invent a
+    /// default for a question the user never touched, and `save()` deliberately refuses to
+    /// do that: an untouched row writes nothing, so a half-answered save looks to the user
+    /// like it landed and leaves the screen still asking.
+    /// Whether Save has anything to write.
+    ///
+    /// `isComplete` is vacuously true when this sheet asks nothing, which happens if every
+    /// source it was going to ask about has gone by the time `load()` runs. Saving then
+    /// writes nothing, reports success and dismisses onto a card that still says the same
+    /// thing, so the button has to be dead rather than merely useless.
+    public var canSave: Bool { asksSomething && isComplete }
+
+    private var asksSomething: Bool {
+        asksDateOfBirth || asksNationality || !sourceQuestions.isEmpty
+    }
+
+    public var isComplete: Bool {
+        if asksDateOfBirth, dateOfBirth == nil { return false }
+        if asksNationality, nationality == nil { return false }
+        // `sourceQuestions` holds only the rows this sheet is asking about, so every one
+        // of them counts.
+        return sourceQuestions.allSatisfy { $0.answer != nil }
+    }
+
     public func load() async {
         let drafts = (try? await store.incomeSourceDrafts()) ?? []
         var byID: [UUID: IncomeSourceDraft] = [:]
@@ -81,9 +117,13 @@ public final class ContributionQuestionsViewModel {
                                   answer: nil)
         }
 
+        // Seeds only what is still unanswered. This runs from the sheet's `.task`, which
+        // is after the first render, so a tap can land while the store read is in flight;
+        // assigning unconditionally would throw that answer away, which is the one thing
+        // this sheet is built not to do.
         let profile = (try? await store.contributorProfile()) ?? ContributorProfile()
-        dateOfBirth = profile.dateOfBirth
-        nationality = profile.nationality
+        if dateOfBirth == nil { dateOfBirth = profile.dateOfBirth }
+        if nationality == nil { nationality = profile.nationality }
     }
 
     /// Writes every answer this sheet collected, and reports whether all of them landed.

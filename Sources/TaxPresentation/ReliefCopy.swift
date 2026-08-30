@@ -111,6 +111,13 @@ extension ReliefCopy {
         }
     }
 
+    /// Shown under the date of birth question while it is still unanswered.
+    ///
+    /// The sheet cannot seed this control the way it seeds nothing else: a date picker
+    /// opens on some date whether or not the user chose it, and this says out loud that
+    /// the one on screen is not an answer until they make it one.
+    public static let dateOfBirthFooter = "Relio will not fill this in for you. Pick your own date of birth, so the rate it quotes comes from your age rather than from a default."
+
     public static let questionsFooter = "Relio keeps these on your device. They decide "
         + "which statutory rate applies to each month of your salary, and nothing else."
 
