@@ -48,9 +48,6 @@ public final class UserPreferences {
     /// The other half of the rate lookup. At 60 or over a permanent resident still
     /// contributes 5.5% where a citizen contributes nothing, so age alone cannot decide
     /// it. `nil` means "not asked yet", on the same terms as `dateOfBirthRaw`.
-    // TODO: the typed `NationalityClass` accessor lands with the contributions unit, which
-    // owns that enum. It is deliberately not declared here, so the two units do not both
-    // define the same type and collide on merge.
     public var nationalityRaw: String?
 
     public var updatedAt: Date = Date.distantPast
@@ -74,6 +71,17 @@ extension UserPreferences {
     public var dateOfBirth: Date? {
         get { dateOfBirthRaw }
         set { dateOfBirthRaw = newValue }
+    }
+
+    /// A value no case matches degrades to `nil`, which is "not asked yet".
+    ///
+    /// `captureQuality` falls back to `.balanced` because a rendering preference has a
+    /// harmless default. This one has none: every contributor class carries a different
+    /// statutory rate, so a raw nobody in this build can read must prove nothing rather
+    /// than pick one of them.
+    public var nationality: NationalityClass? {
+        get { nationalityRaw.flatMap(NationalityClass.init(rawValue:)) }
+        set { nationalityRaw = newValue?.rawValue }
     }
 
     public var isLive: Bool { deletedAt == nil }
