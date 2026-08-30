@@ -148,3 +148,34 @@ private enum ProfileFixture {
                 == .blocked(missing: [.nationality]))
     }
 }
+
+@Suite("Accepted contribution identity") struct AcceptedContributionIdentityTests {
+
+    @Test("the identity is a pure function of the scheme and the year")
+    func identityIsDerived() {
+        let epf2025 = WellKnownID.acceptedContribution(scheme: .employeesProvidentFund,
+                                                       year: 2025)
+        #expect(epf2025 == WellKnownID.acceptedContribution(scheme: .employeesProvidentFund,
+                                                            year: 2025))
+        #expect(epf2025 != WellKnownID.acceptedContribution(scheme: .socialSecurity,
+                                                            year: 2025))
+        #expect(epf2025 != WellKnownID.acceptedContribution(scheme: .employeesProvidentFund,
+                                                            year: 2024))
+    }
+
+    @Test("the derived identity is a well-formed version 4 UUID")
+    func identityIsWellFormed() {
+        let derived = WellKnownID.acceptedContribution(scheme: .socialSecurity, year: 2025)
+        #expect(derived.uuid.6 & 0xF0 == 0x40)
+        #expect(derived.uuid.8 & 0xC0 == 0x80)
+    }
+
+    @Test("an estimate names the identity an accepted entry must carry")
+    func estimateExposesTheIdentity() {
+        let estimate = ContributionEstimate(scheme: .socialSecurity, year: 2024,
+                                            annualFloor: nil, missing: [], basis: [],
+                                            sourceURLs: [])
+        #expect(estimate.acceptedEntryID
+                == WellKnownID.acceptedContribution(scheme: .socialSecurity, year: 2024))
+    }
+}

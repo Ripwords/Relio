@@ -56,6 +56,16 @@ public struct ContributionEstimate: Hashable, Sendable {
         self.sourceURLs = sourceURLs
     }
 
+    /// The identity an accepted entry for this scheme and year must carry.
+    ///
+    /// Named to a caller outside `TaxData` — the one case where that is right — because
+    /// acceptance is idempotent by identity. The write goes through the ordinary
+    /// `TaxStore.save(_ draft: EntryDraft)`, which updates the row already carrying this id
+    /// rather than inserting a second one the evaluator would sum.
+    public var acceptedEntryID: UUID {
+        WellKnownID.acceptedContribution(scheme: scheme, year: year)
+    }
+
     /// The floor read against a cap.
     ///
     /// The cap is a parameter, taken from an evaluated `ReliefAssessment`, and is never
