@@ -253,4 +253,66 @@ import TaxKit
         #expect(records.count == 1)
         #expect(records.first?.amount == Money(ringgit: 8_000))
     }
+
+    @Test("a duplicated source shows one row on the Income screen, not two")
+    func duplicateSourceShowsOneSummaryRow() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let summary = try await store.incomeSummary(for: 2025)
+        // Two phantom rows carrying the same source and the same records with different
+        // subtotals is what the screen used to render, and neither of them added up.
+        #expect(summary.rows.count == 1)
+        #expect(summary.rows.first?.total == Money(ringgit: 96_000))
+        #expect(summary.rows.first?.records.count == 1)
+        #expect(summary.knownTotal == Money(ringgit: 96_000))
+    }
+
+    @Test("an edit lands on the row the read path considers authoritative")
+    func editsTargetTheSurvivor() async throws {
+        let store = try await StoreFixture.store()
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        // The second row arrives from a phone whose clock runs an hour ahead of this one.
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        var draft = try #require(try await store.incomeSourceDrafts().first)
+        draft.name = "Day job"
+        draft.deductsEPF = true
+        try await store.save(draft)
+
+        // Writing to an arbitrary row and stamping it with the slower clock leaves the
+        // edit ranked below the other phone's row, so the user's rename simply vanishes
+        // on the next read.
+        let read = try #require(try await store.incomeSourceDrafts().first)
+        #expect(read.name == "Day job")
+        #expect(read.deductsEPF == true)
+    }
+
+    @Test("deleting a duplicated source deletes every row sharing its id")
+    func deletingRemovesTheWholeIdentity() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        try await store.softDeleteIncomeSource(id: WellKnownID.primaryEmployment)
+
+        // Deleting one of two leaves the other live and the read resolves to it: the user
+        // deletes their job and watches it come back.
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 0)
+        #expect(try await store.incomeSourceDrafts().isEmpty)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+    }
+
+    @Test("deleting a duplicated record deletes every row sharing its id")
+    func deletingRemovesTheWholeRecordIdentity() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let rateID = WellKnownID.openingRate(forSource: WellKnownID.primaryEmployment,
+                                             effectiveFrom: Self.date(2025, 1, 1))
+        try await store.softDeleteIncomeRecord(id: rateID)
+
+        #expect(try await store.liveIncomeRecordRowCountForTesting(id: rateID) == 0)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+    }
 }

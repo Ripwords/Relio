@@ -60,9 +60,7 @@ extension TaxStore {
     public func save(_ draft: IncomeSourceDraft) throws -> UUID {
         let stamp = now()
         let identifier = draft.id
-        let existing = try modelContext.fetch(
-            FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == identifier })
-        ).first
+        let existing = try authoritativeSourceRow(identifier)
 
         let row = existing ?? IncomeSource(id: identifier)
         if existing == nil { modelContext.insert(row) }
@@ -88,17 +86,13 @@ extension TaxStore {
         let identifier = draft.id
         let sourceID = draft.sourceID
 
-        let existing = try modelContext.fetch(
-            FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.id == identifier })
-        ).first
+        let existing = try authoritativeRecordRow(identifier)
         // Deliberately not filtered to `deletedAt == nil`: a source that resolves but is
-        // soft-deleted still attaches. That self-heals — `liveSources()` filters the
-        // record out just as it would a deleted record, and it reappears correctly if
-        // the source is revived, since `save(_ draft: IncomeSourceDraft)` clears
-        // `deletedAt`. Only a source that does not exist at all is a problem.
-        let source = try modelContext.fetch(
-            FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == sourceID })
-        ).first
+        // soft-deleted still attaches. That self-heals — the read path filters the record
+        // out just as it would a deleted record, and it reappears correctly if the source
+        // is revived, since `save(_ draft: IncomeSourceDraft)` clears `deletedAt`. Only a
+        // source that does not exist at all is a problem.
+        let source = try authoritativeSourceRow(sourceID)
 
         // Every record insists its source resolve, new or not. Nothing is written before
         // this check: an unresolvable `sourceID` here would otherwise save successfully
@@ -127,24 +121,38 @@ extension TaxStore {
         return identifier
     }
 
+    /// Deletes **every** live row sharing this identity, not an arbitrary one of them.
+    ///
+    /// Deleting one of two leaves the other live, and the read then resolves to it: the
+    /// user deletes their job and watches it come back. A delete has to converge to the
+    /// same end state however many rows CloudKit delivered.
+    ///
     /// Idempotent, like every other delete here: deleting an absent or already-deleted id
     /// is a no-op, and an already-deleted row is not re-stamped — a replayed delete must
     /// not outrank a genuine concurrent edit under newest-write-wins.
     public func softDeleteIncomeSource(id: UUID) throws {
-        let descriptor = FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == id })
-        guard let row = try modelContext.fetch(descriptor).first, row.deletedAt == nil else { return }
+        let live = try modelContext.fetch(FetchDescriptor<IncomeSource>(
+            predicate: #Predicate { $0.id == id && $0.deletedAt == nil }))
+        guard !live.isEmpty else { return }
         let stamp = now()
-        row.deletedAt = stamp
-        row.updatedAt = stamp
+        for row in live {
+            row.deletedAt = stamp
+            row.updatedAt = stamp
+        }
         try modelContext.save()
     }
 
+    /// Same rule as `softDeleteIncomeSource`: a duplicated rate left half-deleted still
+    /// pays out on the next read.
     public func softDeleteIncomeRecord(id: UUID) throws {
-        let descriptor = FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.id == id })
-        guard let row = try modelContext.fetch(descriptor).first, row.deletedAt == nil else { return }
+        let live = try modelContext.fetch(FetchDescriptor<IncomeRecord>(
+            predicate: #Predicate { $0.id == id && $0.deletedAt == nil }))
+        guard !live.isEmpty else { return }
         let stamp = now()
-        row.deletedAt = stamp
-        row.updatedAt = stamp
+        for row in live {
+            row.deletedAt = stamp
+            row.updatedAt = stamp
+        }
         try modelContext.save()
     }
 
@@ -256,6 +264,28 @@ extension TaxStore {
     /// survivors, and the sweep persists them.
     func resolvedSources() throws -> [ResolvedIncomeSource] {
         ResolvedIncomeSource.resolving(try liveSourceRows())
+    }
+
+    /// The row a write for this identity must land on: the one the read path resolves to.
+    ///
+    /// Not `.first`. Two rows can share an id, and a write to the other one is ranked
+    /// below whatever a device with a faster clock last wrote — so the user's edit saves
+    /// successfully and is invisible on the very next read.
+    ///
+    /// A live row always outranks a soft-deleted one, and a write to a wholly deleted
+    /// identity revives its authoritative row rather than adding a second.
+    private func authoritativeSourceRow(_ id: UUID) throws -> IncomeSource? {
+        let rows = try modelContext.fetch(
+            FetchDescriptor<IncomeSource>(predicate: #Predicate { $0.id == id }))
+        let live = rows.filter { $0.deletedAt == nil }
+        return ResolvedIncomeSource.resolving(live.isEmpty ? rows : live).first?.survivor
+    }
+
+    private func authoritativeRecordRow(_ id: UUID) throws -> IncomeRecord? {
+        let rows = try modelContext.fetch(
+            FetchDescriptor<IncomeRecord>(predicate: #Predicate { $0.id == id }))
+        let live = rows.filter { $0.deletedAt == nil }
+        return ResolvedIncomeSource.authoritative(among: live.isEmpty ? rows : live)
     }
 }
 

@@ -105,6 +105,14 @@ extension ResolvedIncomeSource {
         return resolved.sorted { $0.id.uuidString < $1.id.uuidString }
     }
 
+    /// The record row a write must land on, under the same total order sources use.
+    ///
+    /// Records need only the winner, not a merged group: unlike a source they carry no
+    /// three-valued answers to gap-fill and no relationship to union.
+    static func authoritative(among rows: [IncomeRecord]) -> IncomeRecord? {
+        rows.map { (row: $0, content: contentKey(of: $0)) }.sorted(by: precedes).first?.row
+    }
+
     /// One row per record `id`, resolved by the same total order the sources use, so a
     /// duplicate rate delivered twice contributes once.
     private static func unionedRecords(of sources: [IncomeSource]) -> [IncomeRecord] {
