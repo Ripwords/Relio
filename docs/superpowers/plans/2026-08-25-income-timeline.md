@@ -2566,10 +2566,33 @@ git commit -m "test: pin the engine and golden persona as unchanged by the incom
 
 ## Carried forward
 
-1. **Deriving EPF and SOCSO relief from salary.** Spec §3. The data is now in place —
-   `deductsEPF` and `deductsSOCSO` per source — so the work can know which sources
-   contributed instead of assuming every ringgit was subject to an 11% deduction. Needs the
-   statutory rate by age band and the interaction with the RM 4,000 cap.
+1. ~~**Deriving EPF and SOCSO relief from salary.**~~ **Resolved** on
+   `feat/contribution-floors`. Relio proves a *lower bound* and never claims a point
+   estimate. The framing is what made it tractable: the EPF Third Schedule pays
+   `ceil(rate × band_upper)` and a band's upper limit is at or above every wage in it, so a
+   flat rate on the actual wage cannot climb past the printed amount. Once a year's floor
+   reaches the relief cap the relief *is* the cap — exactly, not approximately, because
+   every figure at or above the floor clamps to the same number. So the dominant case is
+   exact with no band table at all, and the approximation is confined to where it cannot
+   change an outcome.
+
+   The figure never reaches the engine on its own. The derivation makes an **offer**; one
+   tap writes an ordinary `ReliefEntry` through the ordinary path, which is why there is no
+   synthesized `EntrySnapshot`, no provenance field, no per-code override, and no change to
+   `Sources/TaxKit`. Double-counting a user's own logged entry is structurally impossible
+   rather than merely guarded, and an existing entry turns the offer into a one-directional
+   cross-check: a floor can prove an under-claim and can never prove an over-claim.
+
+   The plan's own framing of this item was wrong in three ways, all found by research
+   against primary sources. EPF is a **band table**, not a percentage — KWSP states
+   employers may not use exact percentages except above RM 20,000/month. SOCSO and EIS are
+   different tables again, keyed to a statutory *assumed wage* (the band midpoint), with an
+   insured-wage ceiling that stepped RM 5,000 → RM 6,000 on **1 October 2024**, mid-YA — which
+   is why the tables live in `Sources/TaxData/Contributions/` keyed to a wage month rather
+   than in the YA-keyed rulebook. And **age dominates everything**: a Malaysian citizen aged
+   60+ contributes 0% EPF and no employee SOCSO, so an 11% assumption fabricates the full
+   RM 4,000, about RM 960 of understated tax. Relio did not know the user's age, which is
+   what forced `SchemaV2`.
 2. **Editing a past year's income** offers no warning that the user may already have filed
    on the old figure. Spec §12.
 3. **`endedOn` is never inferred** when a new employment source starts. Two concurrent jobs
@@ -2624,3 +2647,45 @@ git commit -m "test: pin the engine and golden persona as unchanged by the incom
    arriving while the app is open reads correctly straight away and is collapsed at the
    next foregrounding. A real `NSPersistentCloudKitContainer` remote-change event would be
    better and is its own unit of work.
+
+## Carried forward from the contribution floors
+
+13. **The relief is legally on contributions actually paid**, never on a derived figure.
+   ITA s.49(1)(b) says *"made or suffered by that individual"*; PR 6/2023 §6.21.3 says a
+   premium is not deemed paid until it is. So what Relio proves is *evidence for* a claim,
+   not the statutory amount, which is why the design offers rather than fills in. LHDN
+   already prefills EPF and SOCSO into e-BE from the employer's CP8D (fields 17 and 22),
+   raw and uncapped, and the taxpayer may amend it — so an app estimate is never silently
+   overwritten. That changes from YA2026, when LHDN pilots prefilling reliefs from
+   e-invoice data.
+14. **One-off income is excluded from every statutory wage base.** A one-off could be a
+   bonus (EPF wages but *not* SOCSO wages), overtime (the exact reverse), a service charge,
+   or a travel allowance (neither), and nothing in `IncomeRecord` distinguishes them.
+   Dropping them lowers the floor, which is safe; guessing could raise it, which is not.
+   Closing this needs the shape to carry what a payment *was*, which is a model change.
+15. **EPF's basis year is genuinely unsettled and the derivation takes the minimum over
+   both readings.** para 46(1)(n) says SOCSO is *"made or suffered in that basis year"*;
+   Act 812's 2019 redraft of s.49(1) dropped the equivalent clause. January wages are
+   remitted in February and the member statement records by credit month, so the readings
+   differ by one month at each year boundary. A steady twelve-month salary pays nothing for
+   the caution; a January start is reported as eleven proved months, not twelve. Settling
+   this needs LHDN confirmation, not more code.
+16. **A `.other` nationality proves no social-security floor at all.** Nothing established
+   whether EIS covers a non-Malaysian, and the combined SOCSO+EIS ladder overstates if it
+   does not. A second ladder recovers it.
+17. **`missing` is scanned over the wage months of the year itself**, so a question that
+   only arises in the December before can go unasked. It costs an unasked question, never
+   an overstated floor.
+18. **CloudKit production needs `dateOfBirthRaw` and `nationalityRaw` deployed before
+   release.** The development environment auto-creates new fields; production does not, and
+   no test in this package can reach that.
+19. **`SchemaV1` was never actually frozen, and this is independent of the feature.**
+   `SchemaV1.models` named the *live* `@Model` classes, so the "frozen" record mirrored
+   whatever the live models had since become and `schemaV1AttributesAreFrozen` passed only
+   because nothing had changed yet. The first added column would have made V1 describe a
+   shape no device holds, and `MigrationStage(fromVersion: SchemaV1.self, ...)` compute from
+   it. Fixed by a frozen copy in `SchemaV1FrozenModels.swift`; every other entity needs the
+   same treatment the first time its shape moves, and the V2 pin test is what forces it.
+   Note also that the `MigrationStage` is **not** what makes this migration work — SwiftData
+   infers additive-optional deltas unaided, and deleting the stage leaves the on-disk test
+   green. It is a correct declaration and a guard for the first delta that is not inferable.

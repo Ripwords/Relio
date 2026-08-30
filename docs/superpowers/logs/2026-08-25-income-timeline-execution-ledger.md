@@ -260,3 +260,61 @@ per spec §9) without a version bump, so any build predating this work must be d
 simulator or device first. `SchemaV1` is now frozen by a test that fails loudly with the
 bump-and-migrate remedy in its message; after first release, the same edits require a
 `SchemaV2` plus a `MigrationStage`.
+
+---
+
+## Update, after `feat/contribution-floors`
+
+Carried-forward item 1 is resolved. 564 tests pass, up from 441 at the last handoff.
+`git diff master..HEAD -- Sources/TaxKit` is empty across all 27 commits: the engine, the
+rulebook, the 32-code pin and the three byte-compared goldens are untouched, and no golden
+needed re-recording. The `PersistedGoldenTests` persona has no `IncomeSource` rows, so the
+estimate is `noWageRecords` and inert for it, which is what kept the fixtures valid.
+
+**Not pushed.** `master` is still ahead of `origin/master` and `feat/contribution-floors` is
+ahead of `master`; both are the user's call.
+
+### The two rulings this work turned on
+
+**Prove a bound, do not estimate.** Every approximation rounds down, drops ambiguous income,
+and resolves each unsettled statutory question toward the smaller figure, so the true
+contribution is always at least what Relio reports. This is not caution for its own sake: it
+is what makes the answer *exact* once the floor reaches the cap, and it is what made a
+rounding breach fail loudly instead of shipping. Half-up rounding leaves each pro-rated slice
+up to half a sen high, so a month split by a raise could carry the summed wage a sen over what
+was paid — enough to cross a SOCSO band and claim RM 21.00 where the schedule prints RM 20.65.
+A design that merely estimated would have shipped that and nobody would have seen it.
+
+**Offer, do not inject.** The derived figure never reaches the engine by itself. A tap writes
+an ordinary `ReliefEntry`, so it appears in the Entries list and owes its `epfStatement` like
+any other claim — which is what the phantom-entry approach was failing to be. There is
+deliberately **no background reconciler**: a second writer of a CloudKit row under
+newest-write-wins is how a stale device resurrects a figure the user replaced.
+
+### Where to pick up
+
+`## Carried forward` in the plan is authoritative — items 13 through 19 are new. The three
+that matter most, in order:
+
+1. **Deploy `dateOfBirthRaw` and `nationalityRaw` to the CloudKit production schema before
+   release** (item 18). Development auto-creates them; production does not. No test reaches
+   this, and it is the only item here that breaks a shipped build rather than costing
+   accuracy.
+2. **Give every remaining entity its frozen V1 copy** (item 19). `UserPreferences` has one;
+   the other eight do not, and each needs it the first time its shape moves. The V2 pin test
+   forces the issue but only for the entity being changed.
+3. **One-off income cannot feed a statutory wage base** (item 14) because nothing records
+   what a payment *was*, and bonus and overtime count oppositely under the two Acts.
+
+Unchanged and still open from earlier: iCloud sync has never been verified end to end, which
+needs two signed-in devices; and `endedOn` is still not gap-filled across an identity group.
+
+### Environment notes, added to the ones above
+
+- Two simulators share the name "Relio Test Phone", which makes name-based `simctl` calls
+  ambiguous. Pin the UDID rather than deleting a device.
+- The AX5 discipline paid again, and again the defect was not in the new code. The four
+  Cap/Claimed/Allowed/Still-claimable rows on `ReliefDetailView` pair a label and an amount
+  across a bare `HStack`, and at AX5 they broke mid-word: "Claime/d", "Al-/lowed",
+  "RM 4,000." over "00". `ViewThatFits` fixes it as `IncomeView` already does. Those rows
+  predate this branch.
