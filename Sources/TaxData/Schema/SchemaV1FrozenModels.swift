@@ -7,9 +7,9 @@ extension SchemaV1 {
     ///
     /// `SchemaV1.models` used to name the live `UserPreferences` class, which meant the
     /// "frozen" V1 record was really a mirror of whatever the live model had since become.
-    /// Every later edit to the live class silently rewrote history: V1 claimed to describe
-    /// the store on a user's device while describing the store the current code would
-    /// create. A migration stage computed from that is a stage from the wrong shape.
+    /// Every later edit to the live class silently rewrote history. V1 claimed to describe
+    /// the store on a user's device while actually describing the store the current code
+    /// would create. A migration stage computed from that is a stage from the wrong shape.
     ///
     /// This copy is the real V1 shape. It is never edited, it has no relationships and no
     /// typed accessors, and nothing but migration reads it, so there is no reason for a

@@ -41,7 +41,7 @@ public final class UserPreferences {
     /// "fix" this by dropping the field or by holding it outside the synced store.
     ///
     /// `nil` means "not asked yet", never a default. `IncomeSource.deductsEPF` draws the
-    /// same line: defaulting an unanswered question asserts something no user said, and
+    /// same line. Defaulting an unanswered question asserts something no user said, and
     /// here the default that looks harmless is the one that overstates relief.
     public var dateOfBirthRaw: Date?
 

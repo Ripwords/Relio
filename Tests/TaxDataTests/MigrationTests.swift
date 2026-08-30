@@ -89,10 +89,11 @@ import TaxKit
 
     /// The same contract as the V1 test above, for the schema the container now opens.
     ///
-    /// V1's test can no longer see a live model. It reads the frozen copies, so every
-    /// future edit to a live model sails straight past it. This is the test that notices,
-    /// and the one that will force a `SchemaV3` plus a frozen copy of the live
-    /// `UserPreferences` the next time that entity changes.
+    /// V1's test is now blind to one entity. `UserPreferences` is a frozen copy there, so
+    /// edits to the live class sail straight past it, and that blind spot grows by an
+    /// entity every time a model changes and gets frozen. This test is what keeps watching
+    /// the live classes, and the one that will force a `SchemaV3` plus a frozen copy of
+    /// today's `UserPreferences` the next time that entity changes.
     @Test("SchemaV2's attributes are frozen, entity by entity")
     func schemaV2AttributesAreFrozen() {
         // Sorted, exact, and per entity. A superset check would let an added property
@@ -141,8 +142,9 @@ import TaxKit
             SchemaV2 is what the container opens. Do NOT edit this expectation to match \
             the code: renaming, removing or retyping a stored property drops its column, \
             and the user's data in it, with no error. The remedy is a frozen copy of the \
-            V2 entity beside SchemaV1's copies, a new `SchemaV3` in \
-            Sources/TaxData/Schema/, and a further `MigrationStage` in `TaxMigrationPlan`.
+            V2 entity nested in `SchemaV2`, the way `SchemaV1` already holds its own, plus \
+            a new `SchemaV3` in Sources/TaxData/Schema/ and a further `MigrationStage` in \
+            `TaxMigrationPlan`.
             """
 
         let entities = Schema(SchemaV2.models).entities
@@ -257,7 +259,9 @@ import TaxKit
         context.insert(preferences)
         try context.save()
 
-        let fetched = try context.fetch(FetchDescriptor<UserPreferences>())
+        // A second context, so the fetch reaches the store instead of being answered from
+        // the inserting context's identity map.
+        let fetched = try ModelContext(container).fetch(FetchDescriptor<UserPreferences>())
         #expect(fetched.count == 1)
         #expect(fetched.first?.dateOfBirth == birthDate)
         #expect(fetched.first?.dateOfBirthRaw == birthDate)
@@ -282,10 +286,12 @@ import TaxKit
 
     /// The only check here that opens a real store rather than describing a schema.
     ///
-    /// Everything else in this suite inspects `Schema` objects assembled in memory, so all
-    /// of it would stay green even if V2 could not open a store that V1 wrote. That
-    /// failure surfaces on a user's device, on the update that ships V2, with their data
-    /// behind it.
+    /// Everything above compares `Schema` objects assembled in memory, which says nothing
+    /// about whether SwiftData can carry a V1 store forward. SwiftData does infer the
+    /// current delta of two added optional columns on its own, so this does not prove the
+    /// stage is what moves it. What it proves is that a store written as V1 opens at V2
+    /// with its row and every one of its values intact, which is the claim that fails on a
+    /// user's device rather than in CI when a future delta is not inferable.
     @Test("a V1 store on disk opens at V2 with its row intact and the new facts nil")
     func v1StoreMigratesToV2() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -294,6 +300,9 @@ import TaxKit
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let storeURL = directory.appending(path: "store.sqlite")
+        let identifier = UUID()
+        let touchedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let removedAt = Date(timeIntervalSince1970: 1_700_086_400)
 
         do {
             let schema = Schema(versionedSchema: SchemaV1.self)
@@ -303,9 +312,19 @@ import TaxKit
             let container = try ModelContainer(for: schema, configurations: configuration)
             let context = ModelContext(container)
 
-            let preferences = SchemaV1.UserPreferences()
+            // Every V1 column is seeded, and seeded away from its default, because a
+            // dropped column reads back as its default. Match the default and a rename
+            // that silently loses the user's value is indistinguishable from a clean
+            // migration, which is the exact failure the pin tables above only describe.
+            let preferences = SchemaV1.UserPreferences(id: identifier)
             preferences.accentName = "teal"
+            preferences.assistantEnabled = false
+            preferences.captureQualityRaw = CaptureQuality.original.rawValue
+            preferences.incomeModuleEnabled = true
+            preferences.hasCompletedOnboarding = true
             preferences.lastViewedYear = 2024
+            preferences.updatedAt = touchedAt
+            preferences.deletedAt = removedAt
             context.insert(preferences)
             try context.save()
         }
@@ -315,10 +334,18 @@ import TaxKit
         let fetched = try reopenedContext.fetch(FetchDescriptor<UserPreferences>())
 
         #expect(fetched.count == 1)
-        #expect(fetched.first?.accentName == "teal")
-        #expect(fetched.first?.lastViewedYear == 2024)
-        #expect(fetched.first?.dateOfBirthRaw == nil)
-        #expect(fetched.first?.nationalityRaw == nil)
+        let migrated = try #require(fetched.first)
+        #expect(migrated.id == identifier)
+        #expect(migrated.accentName == "teal")
+        #expect(migrated.assistantEnabled == false)
+        #expect(migrated.captureQualityRaw == CaptureQuality.original.rawValue)
+        #expect(migrated.incomeModuleEnabled == true)
+        #expect(migrated.hasCompletedOnboarding == true)
+        #expect(migrated.lastViewedYear == 2024)
+        #expect(migrated.updatedAt == touchedAt)
+        #expect(migrated.deletedAt == removedAt)
+        #expect(migrated.dateOfBirthRaw == nil)
+        #expect(migrated.nationalityRaw == nil)
     }
 
     @Test("chat history caps at the most recent 200 messages")

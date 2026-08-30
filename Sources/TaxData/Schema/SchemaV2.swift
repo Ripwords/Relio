@@ -7,8 +7,8 @@ import SwiftData
 /// EPF and SOCSO employee rates step down at fixed ages and differ for a permanent
 /// resident, so relief derived from salary alone is wrong for anyone past those ages.
 ///
-/// The stage is lightweight: both attributes are optional, so every existing row gains
-/// two columns that read `nil`, and nothing has to be computed or backfilled. `nil` is
+/// The stage is lightweight because both attributes are optional. Every existing row
+/// gains two columns that read `nil`, and nothing has to be computed or backfilled. `nil` is
 /// also the correct value for those rows, since nobody has been asked yet.
 ///
 /// The nine entities are V1's, in V1's order. `UserPreferences` here is the live class;
