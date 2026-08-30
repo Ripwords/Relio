@@ -126,7 +126,13 @@ public enum ContributionDerivation {
 
         let inYear = Set(StatutoryContributionFloors.wageMonths(inYear: year,
                                                                 reading: .wagesInYear))
+        // Only employment pays a statutory employee share. Rent and business profit are
+        // not wages, and a voluntary contribution is whatever the member chose to pay, so
+        // a rate on either would be a percentage of something the schedules never touch.
+        // The deduction flags sit on every source regardless of kind, so the refusal has
+        // to happen here rather than being left to whoever set them.
         let speaking = wages
+            .filter { $0.source.kind == .employment }
             .filter { $0.byMonth.keys.contains(where: inYear.contains) }
             .map { ($0.source, $0.byMonth) }
         guard !speaking.isEmpty else {

@@ -26,11 +26,12 @@ import TaxKit
 
     static func source(_ name: String,
                        id: UUID = UUID(),
+                       kind: IncomeKind = .employment,
                        epf: Bool? = nil,
                        socso: Bool? = nil,
                        endedOn: Date? = nil,
                        _ records: [IncomeRecordSnapshot]) -> IncomeSourceSnapshot {
-        IncomeSourceSnapshot(id: id, name: name, kind: .employment,
+        IncomeSourceSnapshot(id: id, name: name, kind: kind,
                              deductsEPF: epf, deductsSOCSO: socso,
                              endedOn: endedOn, records: records)
     }
@@ -289,6 +290,30 @@ import TaxKit
         ], scheme: .socialSecurity)
         #expect(found.annualFloor == Money(sen: 2_030))
         #expect(found.annualFloor! <= Money(sen: 2_065))
+    }
+
+    @Test("only employment pays a statutory employee share")
+    func onlyEmploymentDeducts() {
+        // Rent is not a wage, and a voluntary contribution is whatever the member chose to
+        // pay, so 11% of a rental rate is a percentage of something the schedules never
+        // touch. The flags sit on every source regardless of kind, so the flag being set
+        // must not be enough on its own.
+        let rentalOnly = Self.estimate([
+            Self.source("Shoplot", kind: .rental, epf: true,
+                        [Self.rate(5_000, from: Self.date(2023, 1, 1))]),
+        ])
+        #expect(rentalOnly.annualFloor == nil)
+        #expect(rentalOnly.certainty(against: Self.epfCap) == .noWageRecords)
+
+        // Nor is it worth asking whether a shoplot deducts EPF.
+        let mixed = Self.estimate([
+            Self.source("Acme", epf: true, [Self.rate(2_200, from: Self.date(2023, 1, 1))]),
+            Self.source("Shoplot", kind: .rental, epf: nil,
+                        [Self.rate(5_000, from: Self.date(2023, 1, 1))]),
+        ])
+        #expect(mixed.annualFloor == Money(ringgit: 2_904))
+        #expect(mixed.missing.isEmpty)
+        #expect(mixed.basis.map(\.name) == ["Acme"])
     }
 
     @Test("a part-month wage is still a floor")
