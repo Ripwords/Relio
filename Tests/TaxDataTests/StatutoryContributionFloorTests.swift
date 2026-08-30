@@ -62,16 +62,41 @@ import TaxKit
         return (hundredthsOfARinggit + 9_999) / 10_000 * 100
     }
 
-    /// Every social security band, lowest first, in sen.
+    /// Every band's upper limit in ringgit, written out rather than generated.
+    ///
+    /// Transcribed from Act 800's Second Schedule and Act 4's Fourth Schedule. Rebuilding
+    /// the list with the shipped table's own widths expression would let a slip in that
+    /// expression pass by agreeing with itself, which is the one thing this oracle exists
+    /// not to do.
+    static let printedBandUpperLimits = [
+        30, 50, 70, 100, 140, 200, 300, 400, 500, 600, 700, 800, 900, 1_000, 1_100, 1_200,
+        1_300, 1_400, 1_500, 1_600, 1_700, 1_800, 1_900, 2_000, 2_100, 2_200, 2_300, 2_400,
+        2_500, 2_600, 2_700, 2_800, 2_900, 3_000, 3_100, 3_200, 3_300, 3_400, 3_500, 3_600,
+        3_700, 3_800, 3_900, 4_000, 4_100, 4_200, 4_300, 4_400, 4_500, 4_600, 4_700, 4_800,
+        4_900, 5_000, 5_100, 5_200, 5_300, 5_400, 5_500, 5_600, 5_700, 5_800, 5_900, 6_000,
+    ]
+
+    /// Every social security band up to a ceiling, lowest first, in sen.
     ///
     /// The band's assumed wage is its midpoint, except the first, which the Fourth
     /// Schedule fixes at RM20 rather than at the RM15 a midpoint would give.
     static func bands(ceilingRinggit: Int) -> [(lower: Int, upper: Int, assumed: Int)] {
-        let limits = [0, 30, 50, 70, 100, 140]
-            + Array(stride(from: 200, to: ceilingRinggit, by: 100))
-        return limits.enumerated().map { index, lower in
-            let upper = index + 1 < limits.count ? limits[index + 1] : ceilingRinggit
-            return (lower * 100, upper * 100, index == 0 ? 2_000 : (lower + upper) * 50)
+        let uppers = printedBandUpperLimits.prefix { $0 <= ceilingRinggit }
+        let lowers = [0] + uppers.dropLast()
+        return zip(lowers, uppers).enumerated().map { index, band in
+            (band.0 * 100, band.1 * 100, index == 0 ? 2_000 : (band.0 + band.1) * 50)
+        }
+    }
+
+    @Test("the shipped ladder has a rung at each printed band and nowhere else")
+    func ladderMatchesThePrintedBands() {
+        for (era, ceiling) in zip(StatutoryContributionFloors.socialSecurityLadders,
+                                  [5_000, 6_000]) {
+            guard case let .stepLadder(steps) = era.basis else {
+                Issue.record("era \(ceiling) is not a step ladder"); continue
+            }
+            #expect(steps.map(\.monthlyWageAtLeast.sen)
+                    == Self.bands(ceilingRinggit: ceiling).map { $0.lower + 1 })
         }
     }
 
