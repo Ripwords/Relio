@@ -320,6 +320,9 @@ extension TaxStore {
     private func snapshot(of resolved: ResolvedIncomeSource) -> IncomeSourceSnapshot {
         IncomeSourceSnapshot(
             id: resolved.id, name: resolved.survivor.name, kind: resolved.survivor.kind,
+            // Gap-filled across the identity group, as `draft(of:)` takes them: an answer
+            // given on another device survives losing the newest-write-wins race.
+            deductsEPF: resolved.deductsEPF, deductsSOCSO: resolved.deductsSOCSO,
             endedOn: resolved.endedOn,
             records: resolved.records.map {
                 IncomeRecordSnapshot(id: $0.id, shape: $0.shape,
