@@ -199,13 +199,16 @@ public enum StatutoryContributionFloors {
     /// RM0.425 down to RM0.40 while EIS rounds RM0.17 up to RM0.20 — so a generated figure
     /// can still land above a printed one.
     ///
-    /// What is safe is the rate on the band's *lower* limit. The printed amounts are
-    /// granular to five sen, so each is at least its exact value less five sen, and the
-    /// pair is at least `0.7% × assumed wage − 10 sen`; every band is at least RM20 wide,
-    /// so `0.7%` of the lower limit sits at least 4 sen below that. The top rung is the
-    /// insured-wage ceiling instead, where the published figure is exact and holds for
-    /// every higher wage: RM24.75 plus RM9.90 at the RM5,000 ceiling, RM29.75 plus RM11.90
-    /// at RM6,000. `StatutoryContributionFloorTests` asserts both across the whole range.
+    /// What is safe is the rate on the band's *lower* limit, which the assumed wage always
+    /// sits above. That is not a general inequality: the printed amounts are granular to
+    /// five sen, and in the narrowest bands the rounding loss eats more than the gap
+    /// between the lower limit and the midpoint gains. So `StatutoryContributionFloorTests`
+    /// checks it band by band across the whole wage range, against the least either
+    /// schedule can print, rather than the claim being asserted in prose here.
+    ///
+    /// The top rung is the insured-wage ceiling instead, where the published figure is
+    /// exact and holds for every higher wage: RM24.75 plus RM9.90 at the RM5,000 ceiling,
+    /// RM29.75 plus RM11.90 at RM6,000.
     private static func ladder(ceilingRinggit: Int,
                                atCeiling: Money) -> [ContributionFloorTable.Step] {
         // The schedules widen the bands as the wage rises — RM30, then RM20, RM30, RM40,

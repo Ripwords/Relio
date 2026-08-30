@@ -118,9 +118,8 @@ public enum ContributionDerivation {
             return left.id.uuidString < right.id.uuidString
         }
 
-        // One walk per source, over every month either basis-year reading can reach. The
-        // slices arrive already rounded, so summing them recovers the month's wage to the
-        // sen — which is what a mid-month raise otherwise loses.
+        // The slices arrive already rounded, so summing a month's recovers that month's
+        // wage to the sen — which is what a mid-month raise otherwise loses.
         let wages = ordered.map { source in
             (source: source, byMonth: recurringWages(for: year, from: source))
         }
@@ -168,7 +167,7 @@ public enum ContributionDerivation {
         return byMonth
     }
 
-    private struct Walk {
+    private struct Tally {
         var total = Money.zero
         var basis: [ContributionBasis] = []
         var sourceURLs: [URL] = []
@@ -178,33 +177,34 @@ public enum ContributionDerivation {
                              year: Int,
                              reading: StatutoryContributionFloors.BasisYearReading,
                              profile: ContributorProfile,
-                             wages: [(IncomeSourceSnapshot, [WageMonth: Money])]) -> Walk {
+                             wages: [(IncomeSourceSnapshot, [WageMonth: Money])]) -> Tally {
         let window = Set(StatutoryContributionFloors.wageMonths(inYear: year, reading: reading))
-        var walk = Walk()
+        var tally = Tally()
 
         for (source, byMonth) in wages where scheme.deduction(in: source) == true {
             var floor = Money.zero
             var proving: [WageMonth] = []
 
-            for month in byMonth.keys.filter(window.contains).sorted() {
+            for (month, wage) in byMonth.sorted(by: { $0.key < $1.key })
+                where window.contains(month) {
                 let rule = StatutoryContributionFloors.floorRule(scheme: scheme,
                                                                  profile: profile, month: month)
-                let monthly = rule.table.employeeFloor(forMonthlyWage: byMonth[month] ?? .zero)
+                let monthly = rule.table.employeeFloor(forMonthlyWage: wage)
                 guard monthly > .zero else { continue }
                 floor = floor + monthly
                 proving.append(month)
-                if let url = rule.table.sourceURL, !walk.sourceURLs.contains(url) {
-                    walk.sourceURLs.append(url)
+                if let url = rule.table.sourceURL, !tally.sourceURLs.contains(url) {
+                    tally.sourceURLs.append(url)
                 }
             }
 
-            walk.total = walk.total + floor
-            walk.basis.append(ContributionBasis(
+            tally.total = tally.total + floor
+            tally.basis.append(ContributionBasis(
                 sourceID: source.id, name: source.name,
                 months: proving.first.flatMap { first in proving.last.map { first...$0 } },
                 floor: floor))
         }
-        return walk
+        return tally
     }
 
     /// The answers that would raise the floor.
