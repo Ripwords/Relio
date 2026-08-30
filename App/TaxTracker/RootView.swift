@@ -114,7 +114,8 @@ struct RootView: View {
                         ReliefDetailView(model: ReliefDetailViewModel(context: context,
                                                                       store: store,
                                                                       code: code),
-                                         context: context)
+                                         context: context,
+                                         store: store)
                     }
                     .navigationDestination(for: IncomeRoute.self) { _ in
                         IncomeView(model: income)
@@ -123,6 +124,13 @@ struct RootView: View {
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
                                                         editing: route.entryID),
+                            presentation: .pushed,
+                            onSaved: handleSaved,
+                            onDeleted: handleDeleted)
+                    }
+                    .navigationDestination(for: PrefilledEntryRoute.self) { route in
+                        EntryEditorView(
+                            model: prefilledEditor(for: route),
                             presentation: .pushed,
                             onSaved: handleSaved,
                             onDeleted: handleDeleted)
@@ -219,6 +227,18 @@ struct RootView: View {
     /// has to say when to copy again, exactly as the delete path already did.
     private func handleSaved() {
         Task { await home.refresh() }
+    }
+
+    /// An editor for a brand-new entry that already holds a relief and a figure.
+    ///
+    /// The prefill is applied at construction, before the destination view hands the model
+    /// to its `@State` and its `.task` calls `load()`. That order is what makes it stick:
+    /// `load()` only assigns the code and the amount when it opened against an existing
+    /// entry, and this one has none.
+    private func prefilledEditor(for route: PrefilledEntryRoute) -> EntryEditorViewModel {
+        let model = EntryEditorViewModel(context: context, store: store, editing: nil)
+        model.prefill(code: route.code, amount: route.amount)
+        return model
     }
 
     private func handleDeleted(_ model: EntryEditorViewModel) {
