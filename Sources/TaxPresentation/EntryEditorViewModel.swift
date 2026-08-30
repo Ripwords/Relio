@@ -107,6 +107,19 @@ public final class EntryEditorViewModel {
         self.editingID = id
     }
 
+    /// Opens a new entry with a relief and a figure already in it.
+    ///
+    /// Set before `load()`, and it survives: `load()` only assigns these two fields when it
+    /// opened against an existing entry, and a prefilled editor has no entry to open.
+    ///
+    /// The formatting happens here rather than at the call site because
+    /// `Money.formattedForEditing()` is internal to this module, and keeping it that way is
+    /// what stops an app-target view growing money formatting of its own.
+    public func prefill(code: ReliefCode, amount: Money) {
+        selectedCode = code
+        amountText = amount.formattedForEditing()
+    }
+
     public func load() async {
         availableDependents = ((try? await store.dependentDrafts()) ?? [])
             .map { DependentOption(id: $0.id, name: $0.name) }
