@@ -226,6 +226,13 @@ store, view-model and projection levels, and was confirmed rendering in the runn
 
 ### Where to pick up
 
+**Update, after `feat/income-identity-dedupe`.** Item 1 below (carried-forward item 8,
+`IncomeSource` dedupe) is **done**, and with it the last carried-forward item that produced a
+wrong number. `reconcile()` now has a production caller too, in `RootView`, so the whole sweep
+— years, entries and income — runs on launch and on foregrounding rather than being dead code.
+iCloud sync itself is still unverified end to end; that still needs two signed-in devices.
+The two remaining items below, EPF/SOCSO relief and the income restore path, are unchanged.
+
 `## Carried forward` in `docs/superpowers/plans/2026-08-25-income-timeline.md` is the
 authoritative list — nine items. The three most consequential, in the order they matter:
 

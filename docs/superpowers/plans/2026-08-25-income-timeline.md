@@ -2592,11 +2592,35 @@ git commit -m "test: pin the engine and golden persona as unchanged by the incom
    still be the previous day in Kuala Lumpur, so it reads back a day earlier. This is a
    pre-existing, codebase-wide property affecting `Dependent.dateOfBirth` and relief-entry
    dates identically; this plan neither introduces nor worsens it.
-8. **No dedupe or reconciliation for `IncomeSource`.** `reconcile()` covers years, entries,
-   dependents and preferences; income sources are not in it, and nothing keys them by
-   anything but their `id`. Onboarding hard-codes a source named "Main job" with a fresh
-   UUID per view model, so if onboarding ever ran twice against a live CloudKit store — a
-   second device, a reinstall — the user would end up with two "Main job" sources and
-   double-counted income for every year, with both rows looking entirely correct. The
-   id is now stable within one view model, which covers a retry after a failed write; it
-   does not cover a second install.
+8. ~~**No dedupe or reconciliation for `IncomeSource`.**~~ **Resolved** on
+   `feat/income-identity-dedupe`. Identity, not resemblance, is the key: only rows sharing
+   an `id` merge, because the merge is irreversible — `IncomeSource` has no `mergedInto`
+   and `SchemaV1` is frozen — and a wrong one *understates* chargeable income, the
+   dangerous direction under ledger ruling 11. Onboarding now calls
+   `TaxStore.seedPrimaryEmployment`, which owns a well-known identity and is create-only,
+   so seeding twice writes one row. Duplicates are resolved at the *read* boundary by
+   `ResolvedIncomeSource.resolving(_:)`, so the figure is correct before any sweep runs;
+   `reconcileIncomeSources()` merely persists the same policy. No `SchemaV2` was needed.
+
+## Carried forward from the identity dedupe
+
+9. **Two sources that merely look alike are never merged.** Same name, same kind, different
+   `id` stays two rows, deliberately — that is the overstating, and therefore conservative,
+   direction, and it is the honest one when nothing can prove the rows are the same job.
+   Closing it needs a merge screen where a person confirms, plus a `mergedInto` column to
+   undo it with, which is a `SchemaV2`. Pinned by `sources with different ids are left
+   alone even when they share a name`.
+10. **A tie anywhere in an identity group blocks the whole group from collapsing**, not
+   only a tie for the survivor. `isSafeToCollapse` refuses when any two adjacent rows share
+   both `updatedAt` and their content key; when the tie is between two losers the collapse
+   would still be deterministic. Over-conservative rather than wrong — the reads resolve
+   the group either way, so the only cost is that the duplicate rows stay on disk.
+11. **`endedOn` is not gap-filled across an identity group**, unlike `deductsEPF` and
+   `deductsSOCSO`. `IncomeRecordEditorViewModel` writes it back to `nil` when the user
+   clears an end date, so `nil` there is a real answer — "still paying" — and adopting a
+   losing row's stale end date would silently re-end a reopened job. If a future build ever
+   stops letting the user clear it, revisit this.
+12. **The sweep runs on launch and on foregrounding, not on sync completion.** A duplicate
+   arriving while the app is open reads correctly straight away and is collapsed at the
+   next foregrounding. A real `NSPersistentCloudKitContainer` remote-change event would be
+   better and is its own unit of work.

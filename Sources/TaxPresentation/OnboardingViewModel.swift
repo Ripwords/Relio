@@ -36,12 +36,6 @@ public final class OnboardingViewModel {
 
     private let store: TaxStore
 
-    /// Fixed for the life of this view model, so a retry after a failed write updates the
-    /// same row rather than inserting a second "Main job". `finish()` can now be tapped
-    /// again — a fresh `UUID()` per attempt would leave one orphaned source per failure,
-    /// and there is no dedupe for `IncomeSource`.
-    private let mainJobSourceID = UUID()
-
     public init(store: TaxStore, year: Int) {
         self.store = store
         self.year = year
@@ -111,23 +105,21 @@ public final class OnboardingViewModel {
 
         if incomeEnabled, let monthlySalary, monthlySalary > .zero {
             do {
-                let sourceID = try await store.save(
-                    IncomeSourceDraft(id: mainJobSourceID, name: "Main job"))
-                var rate = IncomeRecordDraft(sourceID: sourceID)
-                rate.shape = .recurring
-                rate.amount = monthlySalary
-                // Default to the start of the year being onboarded rather than today: a
-                // salary the user has had all year should count for the whole year.
-                rate.effectiveFrom = salaryStartedOn ?? IncomeCalendar.startOfYear(year)
-                try await store.save(rate)
+                // The identity is the store's knowledge, not this screen's. A `UUID()`
+                // minted per view model is how two devices onboarding offline came to
+                // write two "Main job" rows and double-count every year.
+                try await store.seedPrimaryEmployment(
+                    name: "Main job",
+                    monthlyRate: monthlySalary,
+                    // Default to the start of the year being onboarded rather than today:
+                    // a salary the user has had all year counts for the whole year.
+                    effectiveFrom: salaryStartedOn ?? IncomeCalendar.startOfYear(year))
             } catch {
-                // No fabricated source id. `TaxStore.save(_: IncomeRecordDraft)` rejects a
-                // record whose source does not exist, so inventing one here would throw
-                // the user's whole onboarding salary away without a trace; and if it ever
-                // stopped rejecting it, the rate would save against nothing and be
-                // invisible to every read. Writing neither is the only honest outcome.
+                // One call, one transaction: there is no longer a partial state where the
+                // source was written and the rate was not, so a retry has no orphan to
+                // trip over.
                 //
-                // And it is reported, so the screen can stay open and say so. Marking
+                // Reported, not swallowed, so the screen can stay open and say so. Marking
                 // onboarding complete here would strand the user: they asked for a salary,
                 // Relio kept none of it, and the one screen that asks for it never opens
                 // again.

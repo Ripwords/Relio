@@ -61,4 +61,49 @@ public enum DedupeKey {
     private static func hex(of string: String) -> String {
         content(Data(string.utf8))
     }
+
+    /// The raw digest behind `hex`, for the one caller that needs bytes rather than text:
+    /// `WellKnownID.openingRate` folds the first sixteen into a UUID.
+    static func digest(of components: [String]) -> Data {
+        Data(SHA256.hash(data: Data(encode(components).utf8)))
+    }
+}
+
+// MARK: - Income tie-breaks
+
+extension DedupeKey {
+
+    /// **A tie-break, not a grouping key.**
+    ///
+    /// Nothing is ever merged because two sources hash alike. This only decides which of
+    /// two rows *already sharing an `id`* survives when their `updatedAt` also ties, and
+    /// whether the sweep may write at all. Grouping on it would merge two genuinely
+    /// distinct same-named sources, which is irreversible here — `IncomeSource` has no
+    /// `mergedInto` — and understates chargeable income, the dangerous direction.
+    ///
+    /// The tag is what keeps a source's content out of the record pass's comparisons.
+    /// A `nil` answer encodes as `""`, distinctly from `false`: "not asked yet" and
+    /// "confirmed no deductions" are different claims and must not tie.
+    static func incomeSourceContent(name: String,
+                                    kindRaw: String,
+                                    deductsEPF: Bool?,
+                                    deductsSOCSO: Bool?,
+                                    endedOn: Date?) -> String {
+        hex(of: encode(["income.source", name, kindRaw,
+                        flag(deductsEPF), flag(deductsSOCSO), Normalisation.day(endedOn)]))
+    }
+
+    /// Same contract as `incomeSourceContent`, for records.
+    static func incomeRecordContent(shapeRaw: String,
+                                    amountSen: Int,
+                                    effectiveFrom: Date,
+                                    note: String) -> String {
+        hex(of: encode(["income.record", shapeRaw, String(amountSen),
+                        Normalisation.day(effectiveFrom), note]))
+    }
+
+    private static func flag(_ answer: Bool?) -> String {
+        guard let answer else { return "" }
+        return answer ? "1" : "0"
+    }
 }

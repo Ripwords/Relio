@@ -113,6 +113,9 @@ import TaxKit
         #expect(await model.finish() == .incomeNotSaved)
         #expect(try await store.preferences().hasCompletedOnboarding == false)
         #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+        // And nothing at all was written. The seed is one transaction, so there is no
+        // record-less "Main job" for the user to find and fail to explain.
+        #expect(try await store.incomeSourceDrafts().isEmpty)
 
         // The household facts the user did give are still saved. Losing those too would
         // punish them twice for a failure neither of them caused.
@@ -128,16 +131,58 @@ import TaxKit
         model.incomeEnabled = true
         model.monthlySalary = Money(ringgit: 8_000)
         #expect(await model.finish() == .incomeNotSaved)
+        // The failed attempt wrote nothing, so the retry has no half-seeded row to meet.
+        #expect(try await store.incomeSourceDrafts().isEmpty)
 
         await store.failIncomeRecordWrites(with: nil)
         #expect(await model.finish() == .finished)
 
         #expect(try await store.preferences().hasCompletedOnboarding)
         #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
-        // One "Main job", not two. The source id is fixed for the life of the view model,
-        // so the retry updates the row the first attempt wrote; a fresh `UUID()` per
-        // attempt would leave an orphan behind, and nothing dedupes `IncomeSource`.
+        // One "Main job", not two. The identity belongs to the store, so every attempt
+        // names the same row however many times the user taps Finish.
         #expect(try await store.incomeSourceDrafts().count == 1)
+    }
+
+    @Test("completing onboarding twice leaves one main job and one rate")
+    func onboardingTwiceLeavesOneSource() async throws {
+        let store = try await PresentationFixture.store()
+        for _ in 0..<2 {
+            let model = OnboardingViewModel(store: store, year: 2025)
+            model.incomeEnabled = true
+            model.monthlySalary = Money(ringgit: 8_000)
+            await model.finish()
+        }
+
+        // A reinstall, or a second view model on the same store. Before the store owned
+        // the identity this wrote two "Main job" rows and doubled the year.
+        #expect(try await store.incomeSourceDrafts().count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("two devices onboarding offline converge on one source and one rate")
+    func twoDevicesConverge() async throws {
+        let store = try await PresentationFixture.store()
+        let model = OnboardingViewModel(store: store, year: 2025)
+        model.incomeEnabled = true
+        model.monthlySalary = Money(ringgit: 8_000)
+        await model.finish()
+
+        // What the other phone's onboarding delivers once the two stores sync: a second
+        // physical row asserting the same identity.
+        var components = DateComponents()
+        components.year = 2025; components.month = 1; components.day = 1; components.hour = 12
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Kuala_Lumpur")!
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: calendar.date(from: components)!)
+
+        #expect(try await store.incomeSourceDrafts().count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+        _ = try await store.reconcile()
+        #expect(try await store.incomeSourceDrafts().count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
     }
 
     @Test("skipping still completes, even with a salary write that would fail")

@@ -214,4 +214,250 @@ import TaxKit
         #expect(try await store.incomeSourceDrafts().isEmpty)
         #expect(try await store.incomeRecordDrafts(forSource: phantomSourceID).isEmpty)
     }
+
+    // MARK: - A source CloudKit delivered twice
+
+    /// Two live rows asserting `WellKnownID.primaryEmployment`, each with its own row for
+    /// the same rate identity — what a second device's onboarding puts on disk. Nothing
+    /// has swept, and nothing needs to have.
+    private static func storeWithADuplicatedMainJob() async throws -> TaxStore {
+        let store = try await StoreFixture.store()
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        return store
+    }
+
+    @Test("a year's derived gross does not double while a duplicate source is still on disk")
+    func duplicateSourceDoesNotDoubleTheYear() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 2)
+
+        // The read resolves the identity group. The sweep has not run and is not what
+        // makes this figure right — which is why the user's number is correct on a build
+        // where nothing ever calls `reconcile()`.
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+        #expect(try await store.incomeSourceDrafts().count == 1)
+    }
+
+    @Test("a duplicated source's records are read as one timeline, not one row's half")
+    func duplicateSourceRecordsAreUnioned() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let records = try await store.incomeRecordDrafts(forSource: WellKnownID.primaryEmployment)
+        // Both physical rows carry the same rate identity, so the timeline shows one rate.
+        #expect(records.count == 1)
+        #expect(records.first?.amount == Money(ringgit: 8_000))
+    }
+
+    @Test("a duplicated source shows one row on the Income screen, not two")
+    func duplicateSourceShowsOneSummaryRow() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let summary = try await store.incomeSummary(for: 2025)
+        // Two phantom rows carrying the same source and the same records with different
+        // subtotals is what the screen used to render, and neither of them added up.
+        #expect(summary.rows.count == 1)
+        #expect(summary.rows.first?.total == Money(ringgit: 96_000))
+        #expect(summary.rows.first?.records.count == 1)
+        #expect(summary.knownTotal == Money(ringgit: 96_000))
+    }
+
+    @Test("an edit lands on the row the read path considers authoritative")
+    func editsTargetTheSurvivor() async throws {
+        let store = try await StoreFixture.store()
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+        // The second row arrives from a phone whose clock runs an hour ahead of this one.
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(60) }
+        var draft = try #require(try await store.incomeSourceDrafts().first)
+        draft.name = "Day job"
+        draft.deductsEPF = true
+        try await store.save(draft)
+
+        // Writing to an arbitrary row and stamping it with the slower clock leaves the
+        // edit ranked below the other phone's row, so the user's rename simply vanishes
+        // on the next read.
+        let read = try #require(try await store.incomeSourceDrafts().first)
+        #expect(read.name == "Day job")
+        #expect(read.deductsEPF == true)
+    }
+
+    @Test("deleting a duplicated source deletes every row sharing its id")
+    func deletingRemovesTheWholeIdentity() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        try await store.softDeleteIncomeSource(id: WellKnownID.primaryEmployment)
+
+        // Deleting one of two leaves the other live and the read resolves to it: the user
+        // deletes their job and watches it come back.
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 0)
+        #expect(try await store.incomeSourceDrafts().isEmpty)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+    }
+
+    @Test("deleting a duplicated record deletes every row sharing its id")
+    func deletingRemovesTheWholeRecordIdentity() async throws {
+        let store = try await Self.storeWithADuplicatedMainJob()
+        let rateID = WellKnownID.openingRate(forSource: WellKnownID.primaryEmployment,
+                                             effectiveFrom: Self.date(2025, 1, 1))
+        try await store.softDeleteIncomeRecord(id: rateID)
+
+        #expect(try await store.liveIncomeRecordRowCountForTesting(id: rateID) == 0)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+    }
+
+    // MARK: - Seeding the main employment source
+
+    @Test("seeding the main employment source twice writes one source and one rate")
+    func seedingIsIdempotent() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        // One physical row, not two resolved into one: the identity is the store's, so a
+        // second seed on this device finds what the first wrote.
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 1)
+        #expect(try await store.incomeRecordDrafts(
+            forSource: WellKnownID.primaryEmployment).count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("a second seed does not restamp the rows it left alone")
+    func reseedingIsATrueNoOp() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        // A re-stamp would let a reinstall outrank a genuine edit made on another device.
+        #expect(try await store.incomeSourceDrafts().first?.updatedAt == StoreFixture.epoch)
+        #expect(try await store.incomeRecordDrafts(
+            forSource: WellKnownID.primaryEmployment).first?.updatedAt == StoreFixture.epoch)
+    }
+
+    @Test("a second seed does not rename a source the user renamed")
+    func reseedingDoesNotRename() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        var renamed = try #require(try await store.incomeSourceDrafts().first)
+        renamed.name = "Petronas"
+        renamed.deductsEPF = true
+        try await store.save(renamed)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        // Seeding is create-only. Overwriting here would let a stale second device rename
+        // the source back and null the deduction answer the user gave.
+        let read = try #require(try await store.incomeSourceDrafts().first)
+        #expect(read.name == "Petronas")
+        #expect(read.deductsEPF == true)
+    }
+
+    @Test("a second seed does not move a start date or an amount the user already gave")
+    func reseedingDoesNotCorrectTheRate() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        // The other phone's user typed a different salary and a different start date for
+        // the same year. The first answer stands; corrections happen on the Income screen.
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 12_000),
+                                              effectiveFrom: Self.date(2025, 7, 1))
+
+        let records = try await store.incomeRecordDrafts(forSource: WellKnownID.primaryEmployment)
+        #expect(records.count == 1)
+        #expect(records.first?.amount == Money(ringgit: 8_000))
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("seeding revives a source the user had deleted rather than adding a second")
+    func seedingRevivesRatherThanDuplicating() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        try await store.softDeleteIncomeSource(id: WellKnownID.primaryEmployment)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        // Inserting a second row instead would manufacture the exact duplicate this
+        // method exists to prevent.
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 1)
+        #expect(try await store.incomeSourceDrafts().count == 1)
+        // With its rate, and the amount it already carried. A seed that reported success
+        // and left the user with no income would be worse than one that refused.
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("seeding revives a rate the user had deleted rather than reporting a silent no-op")
+    func seedingRevivesTheRate() async throws {
+        let store = try await StoreFixture.store()
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 8_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+        try await store.softDeleteIncomeRecord(
+            id: WellKnownID.openingRate(forSource: WellKnownID.primaryEmployment,
+                                        effectiveFrom: Self.date(2025, 1, 1)))
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money.zero)
+
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        // A different salary, because the revived row keeps the answer it already had.
+        try await store.seedPrimaryEmployment(name: "Main job",
+                                              monthlyRate: Money(ringgit: 12_000),
+                                              effectiveFrom: Self.date(2025, 1, 1))
+
+        #expect(try await store.incomeRecordDrafts(
+            forSource: WellKnownID.primaryEmployment).count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == Money(ringgit: 96_000))
+    }
+
+    @Test("a failed rate write seeds nothing at all, not even the source")
+    func aFailedSeedWritesNothing() async throws {
+        let store = try await StoreFixture.store()
+        let failure = IncomeStoreError.unknownIncomeSource(UUID())
+        await store.failIncomeRecordWrites(with: failure)
+
+        await #expect(throws: failure) {
+            try await store.seedPrimaryEmployment(name: "Main job",
+                                                  monthlyRate: Money(ringgit: 8_000),
+                                                  effectiveFrom: Self.date(2025, 1, 1))
+        }
+
+        // All-or-nothing. A source written without its rate is a record-less "Main job"
+        // the user can see, cannot explain and did not ask for.
+        #expect(try await store.incomeSourceDrafts().isEmpty)
+        #expect(try await store.liveIncomeSourceRowCountForTesting(
+            id: WellKnownID.primaryEmployment) == 0)
+    }
 }
