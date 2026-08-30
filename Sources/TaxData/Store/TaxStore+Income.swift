@@ -121,6 +121,75 @@ extension TaxStore {
         return identifier
     }
 
+    /// Seeds the user's main employment source and its opening monthly rate — once,
+    /// however many times this is called, and on however many devices.
+    ///
+    /// The whole reason this exists rather than two `save` calls: the identity must be the
+    /// store's knowledge. A caller minting a `UUID()` per screen is how the app came to
+    /// write two "Main job" rows and double-count a year's income.
+    ///
+    /// Create-only, precisely:
+    /// - An existing live source with this identity is left alone. `name` seeds a new row
+    ///   and is ignored otherwise — the user may have renamed it, and a re-seed must not
+    ///   rename it back or null the deduction answers they gave.
+    /// - A soft-deleted one is revived, as `save(_: IncomeSourceDraft)` and `restoreEntry`
+    ///   both do. Inserting a second row instead would manufacture the exact duplicate
+    ///   this method exists to prevent.
+    /// - An existing rate for this source and this calendar year is left alone, amount and
+    ///   `effectiveFrom` both: the first answer given wins, and a re-seed is not a new
+    ///   answer. A user who mistyped their salary corrects it on the Income screen, where
+    ///   every other income edit happens; letting a stale second device overwrite would
+    ///   undo that correction.
+    ///
+    /// A true no-op when there is nothing to write: nothing is re-stamped, per
+    /// `softDeleteEntry`'s discipline.
+    ///
+    /// All-or-nothing, in one `save()`: a failure leaves no record-less "Main job" behind.
+    ///
+    /// - Returns: the source's identity, for symmetry with the other writes.
+    @discardableResult
+    public func seedPrimaryEmployment(name: String,
+                                      monthlyRate: Money,
+                                      effectiveFrom: Date) throws -> UUID {
+        // Checked before any insert, not at the record write: the seam still reproduces
+        // "the rate could not be written", and now proves nothing at all was.
+        if let incomeRecordWriteFailure { throw incomeRecordWriteFailure }
+
+        let identity = WellKnownID.primaryEmployment
+        let stamp = now()
+        var wroteAnything = false
+
+        let source: IncomeSource
+        if let existing = try authoritativeSourceRow(identity) {
+            source = existing
+            if source.deletedAt != nil {
+                source.deletedAt = nil
+                source.updatedAt = stamp
+                wroteAnything = true
+            }
+        } else {
+            source = IncomeSource(id: identity, name: name)
+            source.updatedAt = stamp
+            modelContext.insert(source)
+            wroteAnything = true
+        }
+
+        let rateID = WellKnownID.openingRate(forSource: identity, effectiveFrom: effectiveFrom)
+        if try authoritativeRecordRow(rateID) == nil {
+            let rate = IncomeRecord(id: rateID)
+            rate.shape = .recurring
+            rate.amount = monthlyRate
+            rate.effectiveFrom = effectiveFrom
+            rate.updatedAt = stamp
+            rate.source = source
+            modelContext.insert(rate)
+            wroteAnything = true
+        }
+
+        if wroteAnything { try modelContext.save() }
+        return identity
+    }
+
     /// Deletes **every** live row sharing this identity, not an arbitrary one of them.
     ///
     /// Deleting one of two leaves the other live, and the read then resolves to it: the
