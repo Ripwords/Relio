@@ -87,6 +87,76 @@ import TaxKit
         }
     }
 
+    /// The same contract as the V1 test above, for the schema the container now opens.
+    ///
+    /// V1's test can no longer see a live model. It reads the frozen copies, so every
+    /// future edit to a live model sails straight past it. This is the test that notices,
+    /// and the one that will force a `SchemaV3` plus a frozen copy of the live
+    /// `UserPreferences` the next time that entity changes.
+    @Test("SchemaV2's attributes are frozen, entity by entity")
+    func schemaV2AttributesAreFrozen() {
+        // Sorted, exact, and per entity. A superset check would let an added property
+        // through, and an added property is a schema change too.
+        let expected: [String: [String]] = [
+            "ChatMessage": ["createdAt", "deletedAt", "id", "roleRaw", "text", "updatedAt",
+                            "year"],
+            "Dependent": ["dateOfBirth", "deletedAt", "id", "isDisabled", "kindRaw", "name",
+                          "updatedAt", "yearStatuses"],
+            "Document": ["deletedAt", "documentDate", "eInvoiceUUID", "id", "kindRaw",
+                         "ocrText", "thumbnail", "totalSen", "updatedAt", "vendor"],
+            "DocumentFile": ["byteCount", "contentHash", "deletedAt",
+                             "downloadProgressPercent", "downloadStateRaw", "id",
+                             "updatedAt", "uti"],
+            "IncomeRecord": ["amountSen", "deletedAt", "effectiveFrom", "id", "note",
+                             "shapeRaw", "updatedAt"],
+            "IncomeSource": ["deductsEPF", "deductsSOCSO", "deletedAt", "endedOn", "id",
+                             "kindRaw", "name", "updatedAt"],
+            "ReliefEntry": ["amountSen", "claimantRaw", "dedupeKey", "deletedAt",
+                            "dependentID", "id", "mergedInto", "needsDocument", "note",
+                            "reliefCodeRaw", "spentOn", "updatedAt", "vendor"],
+            "TaxYear": ["assessmentTypeRaw", "deletedAt", "employmentTypeRaw", "genderRaw",
+                        "grossIncomeOverrideSen", "id", "maritalStatusRaw",
+                        "propertyPriceSen", "selfIsDisabled", "spouseHasIncome",
+                        "spouseIsDisabled", "updatedAt", "year"],
+            "UserPreferences": ["accentName", "assistantEnabled", "captureQualityRaw",
+                                "dateOfBirthRaw", "deletedAt", "hasCompletedOnboarding",
+                                "id", "incomeModuleEnabled", "lastViewedYear",
+                                "nationalityRaw", "updatedAt"],
+        ]
+
+        // Relationships are stored shape too: renaming one is the same silent data loss.
+        let expectedRelationships: [String: [String]] = [
+            "ChatMessage": [],
+            "Dependent": [],
+            "Document": ["entries", "file"],
+            "DocumentFile": ["document"],
+            "IncomeRecord": ["source"],
+            "IncomeSource": ["records"],
+            "ReliefEntry": ["documents", "taxYear"],
+            "TaxYear": ["entries"],
+            "UserPreferences": [],
+        ]
+
+        let remedy = """
+            SchemaV2 is what the container opens. Do NOT edit this expectation to match \
+            the code: renaming, removing or retyping a stored property drops its column, \
+            and the user's data in it, with no error. The remedy is a frozen copy of the \
+            V2 entity beside SchemaV1's copies, a new `SchemaV3` in \
+            Sources/TaxData/Schema/, and a further `MigrationStage` in `TaxMigrationPlan`.
+            """
+
+        let entities = Schema(SchemaV2.models).entities
+        #expect(Set(entities.map(\.name)) == Set(expected.keys), "\(remedy)")
+
+        for entity in entities.sorted(by: { $0.name < $1.name }) {
+            #expect(entity.attributes.map(\.name).sorted() == expected[entity.name],
+                    "\(entity.name) attributes changed. \(remedy)")
+            #expect(entity.relationships.map(\.name).sorted()
+                    == expectedRelationships[entity.name],
+                    "\(entity.name) relationships changed. \(remedy)")
+        }
+    }
+
     @Test("SchemaV1 is version 1.0.0")
     func schemaVersion() {
         #expect(SchemaV1.versionIdentifier == Schema.Version(1, 0, 0))
@@ -168,6 +238,87 @@ import TaxKit
 
         #expect(fetched.count == 1)
         #expect(fetched.first?.grossIncomeOverride == Money(ringgit: 128_000))
+    }
+
+    @Test("a date of birth and a nationality survive a save and fetch")
+    func contributionFactsRoundTrip() throws {
+        let container = try TaxContainer.make(.inMemory)
+        let context = ModelContext(container)
+
+        var components = DateComponents()
+        components.year = 1965
+        components.month = 3
+        components.day = 14
+        let birthDate = try #require(Calendar(identifier: .gregorian).date(from: components))
+
+        let preferences = UserPreferences()
+        preferences.dateOfBirth = birthDate
+        preferences.nationalityRaw = "citizen"
+        context.insert(preferences)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<UserPreferences>())
+        #expect(fetched.count == 1)
+        #expect(fetched.first?.dateOfBirth == birthDate)
+        #expect(fetched.first?.dateOfBirthRaw == birthDate)
+        #expect(fetched.first?.nationalityRaw == "citizen")
+    }
+
+    /// Both facts must read `nil` until someone is asked. A default would be a claim the
+    /// user never made, and the EPF rate it implies is the one that overstates relief.
+    @Test("preferences nobody was asked read back nil, not a default")
+    func contributionFactsAreNotDefaulted() throws {
+        let container = try TaxContainer.make(.inMemory)
+        let context = ModelContext(container)
+
+        context.insert(UserPreferences())
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<UserPreferences>())
+        #expect(fetched.count == 1)
+        #expect(fetched.first?.dateOfBirthRaw == nil)
+        #expect(fetched.first?.nationalityRaw == nil)
+    }
+
+    /// The only check here that opens a real store rather than describing a schema.
+    ///
+    /// Everything else in this suite inspects `Schema` objects assembled in memory, so all
+    /// of it would stay green even if V2 could not open a store that V1 wrote. That
+    /// failure surfaces on a user's device, on the update that ships V2, with their data
+    /// behind it.
+    @Test("a V1 store on disk opens at V2 with its row intact and the new facts nil")
+    func v1StoreMigratesToV2() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "TaxDataTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storeURL = directory.appending(path: "store.sqlite")
+
+        do {
+            let schema = Schema(versionedSchema: SchemaV1.self)
+            let configuration = ModelConfiguration(schema: schema,
+                                                   url: storeURL,
+                                                   cloudKitDatabase: .none)
+            let container = try ModelContainer(for: schema, configurations: configuration)
+            let context = ModelContext(container)
+
+            let preferences = SchemaV1.UserPreferences()
+            preferences.accentName = "teal"
+            preferences.lastViewedYear = 2024
+            context.insert(preferences)
+            try context.save()
+        }
+
+        let reopened = try TaxContainer.make(.localOnly(storeURL))
+        let reopenedContext = ModelContext(reopened)
+        let fetched = try reopenedContext.fetch(FetchDescriptor<UserPreferences>())
+
+        #expect(fetched.count == 1)
+        #expect(fetched.first?.accentName == "teal")
+        #expect(fetched.first?.lastViewedYear == 2024)
+        #expect(fetched.first?.dateOfBirthRaw == nil)
+        #expect(fetched.first?.nationalityRaw == nil)
     }
 
     @Test("chat history caps at the most recent 200 messages")

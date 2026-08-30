@@ -38,7 +38,7 @@ enum SchemaInvariants {
     /// in `SchemaV2.models` does not exist as far as the container is concerned, so
     /// testing any other list would test something the app never opens.
     ///
-    /// This tracked `SchemaV1.models` until V2 shipped. Leaving it there would now check
+    /// This tracked `SchemaV1.models` until V2 landed. Leaving it there would now check
     /// V1's frozen `UserPreferences` copy, which no live code writes to, and stop checking
     /// the live one, which is the entity that just gained attributes. The check would
     /// still pass and would still be measuring nothing.
