@@ -23,10 +23,22 @@ public struct MonthlyContribution: Hashable, Sendable {
     public let amount: Money
     public let origin: WageOrigin
 
-    public init(month: WageMonth, amount: Money, origin: WageOrigin) {
+    /// True when the amount is a rounded share of a month the source did not pay in full.
+    ///
+    /// A consumer that needs a *lower* bound on the month's wage has to allow a sen for
+    /// each of these. Half-up rounding puts the share up to half a sen above the exact
+    /// fraction, and the exact fraction is itself a model of what the employer paid rather
+    /// than the payment — two slices of one raise month can both land on a half-sen tie
+    /// and carry the summed wage a sen over, which is enough to read the next statutory
+    /// band. A whole month is not rounded at all, so it needs no allowance.
+    public let isProRated: Bool
+
+    public init(month: WageMonth, amount: Money, origin: WageOrigin,
+                isProRated: Bool = false) {
         self.month = month
         self.amount = amount
         self.origin = origin
+        self.isProRated = isProRated
     }
 }
 
@@ -134,7 +146,8 @@ public enum IncomeDerivation {
                 let factor = Decimal(span.days) / Decimal(span.daysInMonth)
                 slices.append(MonthlyContribution(month: labelled.month,
                                                   amount: rate.amount.applying(factor, rounding: .halfUp),
-                                                  origin: .recurringRate))
+                                                  origin: .recurringRate,
+                                                  isProRated: span.days != span.daysInMonth))
             }
         }
 

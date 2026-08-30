@@ -272,6 +272,25 @@ import TaxKit
                               profile: ContributorProfile()).sourceURLs.isEmpty)
     }
 
+    @Test("a raise month's rounding never carries the wage into the band above")
+    func raiseMonthTiesStayInTheBand() {
+        // Both halves of this June land on an exact half-sen tie, and half-up rounding
+        // carries the summed month a sen over the RM3,000 the source really paid — enough
+        // to read the rung above. The exact wage sits in the band that runs from RM2,900,
+        // where the schedules print RM14.75 plus RM5.90; the rung above would claim
+        // RM21.00, above the truth and the guarantee gone.
+        let found = Self.estimate([
+            Self.source("Acme", socso: true, endedOn: Self.date(2024, 6, 30), [
+                IncomeRecordSnapshot(shape: .recurring, amount: Money(sen: 299_999),
+                                     effectiveFrom: Self.date(2024, 6, 1)),
+                IncomeRecordSnapshot(shape: .recurring, amount: Money(sen: 300_001),
+                                     effectiveFrom: Self.date(2024, 6, 16)),
+            ]),
+        ], scheme: .socialSecurity)
+        #expect(found.annualFloor == Money(sen: 2_030))
+        #expect(found.annualFloor! <= Money(sen: 2_065))
+    }
+
     @Test("a part-month wage is still a floor")
     func partialMonths() {
         // The derivation pro-rates a month a source only paid part of, and a pro-rated

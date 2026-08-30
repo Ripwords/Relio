@@ -153,6 +153,12 @@ public enum ContributionDerivation {
 
     /// This source's recurring wage per month, over every month a basis-year reading can
     /// reach: December of the year before through December of the year.
+    ///
+    /// A sen comes off for each pro-rated slice, because a summed month is a lower bound
+    /// only once it does. Half-up rounding leaves each share up to half a sen high, so a
+    /// raise month's two slices can both land on a tie and carry the total a sen over the
+    /// exact fraction — and one sen is enough to read the band above the one the wage is
+    /// really in. A whole month is returned unrounded and gives up nothing.
     private static func recurringWages(for year: Int,
                                        from source: IncomeSourceSnapshot) -> [WageMonth: Money] {
         let reachable = Set(StatutoryContributionFloors.BasisYearReading.allCases
@@ -162,7 +168,9 @@ public enum ContributionDerivation {
         for slice in IncomeDerivation.monthlyContributions(for: year - 1, from: source)
             + IncomeDerivation.monthlyContributions(for: year, from: source)
             where slice.origin == .recurringRate && reachable.contains(slice.month) {
-            byMonth[slice.month] = (byMonth[slice.month] ?? .zero) + slice.amount
+            let allowance = slice.isProRated ? Money(sen: 1) : .zero
+            byMonth[slice.month] = max(.zero,
+                                       (byMonth[slice.month] ?? .zero) + slice.amount - allowance)
         }
         return byMonth
     }
@@ -213,6 +221,12 @@ public enum ContributionDerivation {
     /// confirming that a job deducts EPF proves nothing on its own while the rate still
     /// depends on facts nobody has been asked for, so the profile questions ride along
     /// with the unasked sources as well as the confirmed ones.
+    ///
+    /// Scanned over the wage months of the year itself rather than of both readings, so a
+    /// question that arises only in the December before could go unasked. It would have to
+    /// be a question that arises in no other month of the year, which the age thresholds
+    /// and the era boundaries do not produce; and it costs an unasked question, never an
+    /// overstated floor.
     private static func questions(scheme: ContributionScheme,
                                   profile: ContributorProfile,
                                   inYear: Set<WageMonth>,
