@@ -25,6 +25,7 @@ struct RootView: View {
     @State private var needsOnboarding: Bool?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     init(store: TaxStore) {
         self.store = store
@@ -55,8 +56,25 @@ struct RootView: View {
         .task {
             let preferences = try? await store.preferences()
             needsOnboarding = !(preferences?.hasCompletedOnboarding ?? false)
+            // Housekeeping, not the fix: every read below already resolves duplicates, so
+            // a sweep that throws leaves the figure correct and the duplicate rows on
+            // disk. Swallowing is safe here for that reason and no other.
+            _ = try? await store.reconcile()
             await resumeLastViewedYear(preferences?.lastViewedYear)
             await home.refresh()
+        }
+        // Duplicates arriving while the app was closed are what this catches. One that
+        // lands while it is already open reads correctly straight away and is collapsed
+        // at the next foregrounding; a real sync-complete event would be better and is
+        // its own unit of work.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                guard (try? await store.reconcile())?.changedAnything == true else { return }
+                await context.reload()
+                await home.refresh()
+                await income.refresh()
+            }
         }
     }
 
