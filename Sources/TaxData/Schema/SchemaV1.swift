@@ -14,6 +14,12 @@ import SwiftData
 /// in-place rename drops the old column and silently loses every user's data in it, which
 /// is why `MigrationTests.schemaV1AttributesAreFrozen` pins this entity list attribute by
 /// attribute rather than trusting this comment.
+///
+/// From V2 onwards an entity whose shape changes gets a frozen copy of its V1 form in
+/// `SchemaV1FrozenModels.swift`, and the list below names that copy instead of the live
+/// class. Otherwise V1 would keep reporting the live model's current shape and describe a
+/// store that no device has. Naming the copy leaves V1's stored shape untouched, because
+/// the copy is byte-for-byte what the live class held when V1 shipped.
 public enum SchemaV1: VersionedSchema {
 
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
@@ -25,7 +31,7 @@ public enum SchemaV1: VersionedSchema {
          Document.self,
          DocumentFile.self,
          ChatMessage.self,
-         UserPreferences.self,
+         SchemaV1.UserPreferences.self,
          IncomeSource.self,
          IncomeRecord.self]
     }

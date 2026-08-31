@@ -584,4 +584,25 @@ import TaxData
         let after = try #require(context.result?.assessment(for: ReliefCode("SSPN"))?.claimed)
         #expect(after == before + Money(ringgit: 750))
     }
+
+    @Test("a prefilled editor keeps its figure through load")
+    func prefillSurvivesLoad() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store)
+        await context.load()
+
+        let model = EntryEditorViewModel(context: context, store: store, editing: nil)
+        model.prefill(code: ReliefCode("SSPN"), amount: Money(sen: 182_050))
+        // `load()` runs after the screen is on the stack, and it is the step that would
+        // overwrite both fields if a prefilled editor were mistaken for an editing one.
+        await model.load()
+
+        #expect(model.selectedCode == ReliefCode("SSPN"))
+        #expect(model.amountText == "1820.50")
+        #expect(await model.save())
+        let saved = try #require(try await store.entryDrafts(forYear: context.year)
+            .first { $0.code == ReliefCode("SSPN") && $0.amount == Money(sen: 182_050) })
+        #expect(saved.amount == Money(sen: 182_050))
+    }
 }

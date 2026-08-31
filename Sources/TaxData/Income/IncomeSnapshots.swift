@@ -23,15 +23,24 @@ public struct IncomeSourceSnapshot: Hashable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
     public var kind: IncomeKind
+    /// `nil` is "not asked yet"; `false` is "confirmed no deductions". Never default
+    /// either to `false`, and never read `nil` as `true` — a question nobody has answered
+    /// must not become a contribution nobody made. The same three-valued answer
+    /// `IncomeSourceDraft` carries, and the same one the dedupe hash distinguishes.
+    public var deductsEPF: Bool?
+    public var deductsSOCSO: Bool?
     /// The last day this source paid, inclusive.
     public var endedOn: Date?
     public var records: [IncomeRecordSnapshot]
 
     public init(id: UUID = UUID(), name: String = "", kind: IncomeKind = .employment,
+                deductsEPF: Bool? = nil, deductsSOCSO: Bool? = nil,
                 endedOn: Date? = nil, records: [IncomeRecordSnapshot] = []) {
         self.id = id
         self.name = name
         self.kind = kind
+        self.deductsEPF = deductsEPF
+        self.deductsSOCSO = deductsSOCSO
         self.endedOn = endedOn
         self.records = records
     }

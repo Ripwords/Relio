@@ -195,6 +195,50 @@ import TaxKit
         #expect(earlier.rows.first?.total == Money.zero)
     }
 
+    @Test("the deduction answers reach the snapshot the derivation works on")
+    func snapshotsCarryTheDeductionAnswers() async throws {
+        let store = try await StoreFixture.store()
+        var job = IncomeSourceDraft(name: "Main job")
+        job.deductsEPF = true
+        job.deductsSOCSO = false
+        _ = try await store.save(job)
+        _ = try await store.save(IncomeSourceDraft(name: "Design freelance"))
+
+        let snapshots = try await store.incomeSnapshots()
+        let main = try #require(snapshots.first { $0.name == "Main job" })
+        #expect(main.deductsEPF == true)
+        // `false` is "confirmed no deductions" and must arrive as itself. Dropping it to
+        // `nil` would put the question back to the user after they had answered it.
+        #expect(main.deductsSOCSO == false)
+
+        let freelance = try #require(snapshots.first { $0.name == "Design freelance" })
+        // And an unasked question stays unasked. Reading `nil` as `true` here would derive
+        // a contribution from a source the user has never said deducts anything.
+        #expect(freelance.deductsEPF == nil)
+        #expect(freelance.deductsSOCSO == nil)
+    }
+
+    @Test("an answer only a duplicate row carries still reaches the snapshot")
+    func snapshotsGapFillTheDeductionAnswersAcrossAGroup() async throws {
+        let store = try await StoreFixture.store()
+        var older = IncomeSourceDraft(id: WellKnownID.primaryEmployment, name: "Main job")
+        older.deductsEPF = true
+        _ = try await store.save(older)
+
+        // The newer row wins the identity and has never been asked. The read resolves the
+        // group before it snapshots, so the answer the user gave on their other phone is
+        // still the one the derivation sees.
+        await store.useClock { StoreFixture.epoch.addingTimeInterval(3_600) }
+        try await store.insertDuplicateIncomeSourceForTesting(
+            name: "Main job", monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+
+        let snapshots = try await store.incomeSnapshots()
+        #expect(snapshots.count == 1)
+        #expect(snapshots.first?.deductsEPF == true)
+        #expect(snapshots.first?.deductsSOCSO == nil)
+    }
+
     @Test("saving a record against an unknown source throws instead of orphaning it")
     func unknownSourceThrows() async throws {
         let store = try await StoreFixture.store()

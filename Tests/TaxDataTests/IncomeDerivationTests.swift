@@ -303,33 +303,121 @@ import TaxKit
                 == Money(ringgit: 96_000))
     }
 
-    @Test("the derivation path contains no Double")
-    func noDoubleInDerivation() throws {
+    @Test("a mid-month raise leaves two April slices that group back into one April wage")
+    func midMonthRaiseGroupsBackIntoOneMonth() {
+        let job = Self.source([Self.rate(8_000, from: Self.date(2025, 1, 1)),
+                               Self.rate(9_500, from: Self.date(2025, 4, 15))])
+        let slices = IncomeDerivation.monthlyContributions(for: 2025, from: job)
+
+        let april = slices.filter { $0.month == WageMonth(year: 2025, month: 4) }
+        #expect(april.count == 2)
+        #expect(april.map(\.amount) == [Money(ringgit: 3_733.33), Money(ringgit: 5_066.67)])
+        // The point of the label. Summing the already-rounded slices of one month is what
+        // a statutory wage is assessed on, and it is exactly 8,800 — not 8,799.99 or
+        // 8,800.01, which is what rounding once at the end would produce.
+        #expect(april.reduce(Money.zero) { $0 + $1.amount } == Money(ringgit: 8_800))
+
+        #expect(slices.reduce(Money.zero) { $0 + $1.amount } == Money(ringgit: 108_800))
+    }
+
+    @Test("every month of the year is labelled, in calendar order")
+    func everyMonthIsLabelled() {
+        let job = Self.source([Self.rate(8_000, from: Self.date(2025, 1, 1))])
+        let slices = IncomeDerivation.monthlyContributions(for: 2025, from: job)
+        #expect(slices.map(\.month) == (1...12).map { WageMonth(year: 2025, month: $0) })
+        #expect(slices.allSatisfy { $0.origin == .recurringRate })
+    }
+
+    @Test("a one-off is labelled with the month it was received, and named as one")
+    func oneOffCarriesItsOriginAndMonth() {
+        // A consumer assessing a statutory wage has to be able to leave one-offs out: a
+        // bonus is EPF wages but not SOCSO wages, and Relio cannot tell one from a
+        // travel allowance, which is neither.
+        let job = Self.source([Self.rate(8_000, from: Self.date(2025, 1, 1)),
+                               Self.oneOff(12_000, on: Self.date(2025, 11, 20))])
+        let slices = IncomeDerivation.monthlyContributions(for: 2025, from: job)
+
+        let oneOffs = slices.filter { $0.origin == .oneOff }
+        #expect(oneOffs.count == 1)
+        #expect(oneOffs.first?.month == WageMonth(year: 2025, month: 11))
+        #expect(oneOffs.first?.amount == Money(ringgit: 12_000))
+        // November carries both, and they stay separable.
+        #expect(slices.filter { $0.month == WageMonth(year: 2025, month: 11) }.count == 2)
+    }
+
+    @Test("the labelled slices are the same walk the gross is derived from")
+    func oneWalkBehindBoth() {
+        // The property the single walk exists for: "does this source say anything about
+        // the year" and "what does it say" cannot disagree, and now neither can "which
+        // months did it say it about". A second walk beside this one could drift.
+        let job = Self.source("Main job", endedOn: Self.date(2025, 8, 20),
+                              [Self.rate(8_000, from: Self.date(2024, 4, 15)),
+                               Self.rate(9_500, from: Self.date(2025, 4, 15)),
+                               Self.oneOff(2_000, on: Self.date(2025, 2, 3))])
+        let quiet = Self.source("New job", [])
+
+        for source in [job, quiet] {
+            for year in [2023, 2024, 2025, 2026] {
+                let slices = IncomeDerivation.monthlyContributions(for: year, from: source)
+                #expect(slices.reduce(Money.zero) { $0 + $1.amount }
+                        == IncomeDerivation.total(for: year, from: source))
+                #expect(slices.isEmpty
+                        == (IncomeDerivation.knownAnnualGross(for: year, from: [source]) == nil))
+            }
+        }
+    }
+
+    @Test("no source file in the package uses Double or Float")
+    func noBinaryFloatingPointInSources() throws {
         // This is a calculation path feeding chargeable income. `Double` here would
         // reintroduce exactly the representation error `Money` exists to prevent, at the
         // point where a user's salary becomes a tax figure.
+        //
+        // The whole of `Sources/`, walked recursively, rather than a list of the money
+        // paths known when the rule was written. A list fails open: it named
+        // TaxData/Income and TaxData/Contributions, so `TaxPresentation` grew a money
+        // path of its own that nothing checked, and the rule had to be restated in prose
+        // instead of being enforced. There is nothing to keep updating now, and a module
+        // added tomorrow is covered the day it exists.
+        //
+        // One exemption, by name. `Money.lossyDoubleForCharting` is the single deliberate
+        // crossing into `Double` in the package, and it is named that loudly precisely so
+        // it can be spelled out here and nowhere else. Any other line is a mistake.
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let income = root.appending(path: "Sources/TaxData/Income")
-        let files = try FileManager.default
-            .contentsOfDirectory(at: income, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
+        let files = try swiftFiles(under: root.appending(path: "Sources"))
         #expect(!files.isEmpty)
 
         for file in files {
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
-                guard text.contains("Double") else { continue }
+                guard text.contains("Double") || text.contains("Float") else { continue }
                 // Checking the whole line lets a real `Double` through as long as the line
                 // also has a `//` anywhere on it — `let x: Double = 0 // temp` contains both
                 // substrings. Only the code before the first `//` can be a genuine `Double`;
                 // an occurrence after the marker is inside the comment itself and must still
                 // pass, so the check is scoped to the code segment, not the raw line.
                 let code = text.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0]
-                #expect(!code.contains("Double"),
-                        "\(file.lastPathComponent):\(number + 1) uses Double on the derivation path")
+                guard !code.contains("lossyDoubleForCharting") else { continue }
+                #expect(!code.contains("Double") && !code.contains("Float"),
+                        "\(file.lastPathComponent):\(number + 1) uses Double or Float on a money path")
             }
         }
+    }
+
+    /// All `.swift` files under `directory`, recursing into subdirectories.
+    private func swiftFiles(under directory: URL) throws -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var files: [URL] = []
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            files.append(url)
+        }
+        return files
     }
 }

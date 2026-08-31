@@ -1,5 +1,6 @@
 import SwiftUI
 import TaxKit
+import TaxData
 import TaxPresentation
 
 struct ReliefDetailView: View {
@@ -16,9 +17,16 @@ struct ReliefDetailView: View {
     /// needs to be told when to copy again — see `.task(id:)` below.
     private let context: YearContext
 
-    init(model: ReliefDetailViewModel, context: YearContext) {
+    /// Held only to build the questions sheet's own view model, which needs a writer.
+    /// `ReliefDetailViewModel` reads through `context` and never exposes its store.
+    private let store: TaxStore
+
+    @State private var isAnswering = false
+
+    init(model: ReliefDetailViewModel, context: YearContext, store: TaxStore) {
         _model = State(initialValue: model)
         self.context = context
+        self.store = store
     }
 
     var body: some View {
@@ -35,6 +43,16 @@ struct ReliefDetailView: View {
                     if let saved = assessment.taxSaved {
                         labelled("Tax saved", saved)
                     }
+                }
+
+                if let card = ReliefCopy.card(for: model.advice,
+                                              code: model.code,
+                                              year: model.yearOfAssessment,
+                                              cap: assessment.cap) {
+                    ContributionCardSection(card: card,
+                                            code: model.code,
+                                            onAccept: { await model.acceptSuggestion() },
+                                            onAnswer: { isAnswering = true })
                 }
 
                 if case .needsInfo(let questions) = assessment.eligibility {
@@ -138,13 +156,36 @@ struct ReliefDetailView: View {
         // does not, covering that case; `.task(id:)` stays because it covers the result
         // changing while this screen is still visible, which `.onAppear` would not catch.
         .onAppear { Task { await model.refresh() } }
+        .sheet(isPresented: $isAnswering) {
+            // Refreshed on dismissal, and it has to be here. Answering writes a contributor
+            // profile and income sources, none of which the rulebook evaluates, so
+            // `context.result` comes back equal and the `.task(id:)` above does not re-fire;
+            // `.onAppear` does not fire on a sheet closing either. Without this the card sits
+            // there still asking the questions the user has just answered.
+            Task { await model.refresh() }
+        } content: {
+            ContributionQuestionsSheet(
+                model: ContributionQuestionsViewModel(store: store, questions: model.questions))
+        }
     }
 
+    /// `ViewThatFits` rather than a bare `HStack`, the same way `IncomeView` builds its
+    /// source headers. At the largest Dynamic Type sizes the label and the figure cannot
+    /// share a line, and both lose: "Still claimable" breaks to "Still claim-able" and
+    /// the amount beside it breaks to "RM 4,000." over "00". These four rows are the
+    /// figures the whole screen is about.
     private func labelled(_ title: String, _ amount: Money) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            MoneyText(amount: amount, font: .body, weight: .medium)
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                Text(title)
+                Spacer()
+                MoneyText(amount: amount, font: .body, weight: .medium)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                MoneyText(amount: amount, font: .body, weight: .medium)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

@@ -89,6 +89,39 @@ import Foundation
                                           through: Self.date(2025, 4, 14)).isEmpty)
     }
 
+    @Test("the labelled walk names the month each span falls in")
+    func labelledSpansCarryTheirMonth() {
+        let spans = IncomeCalendar.labelledMonthSpans(from: Self.date(2025, 1, 20),
+                                                      through: Self.date(2025, 3, 10))
+        #expect(spans.map(\.month) == [WageMonth(year: 2025, month: 1),
+                                       WageMonth(year: 2025, month: 2),
+                                       WageMonth(year: 2025, month: 3)])
+    }
+
+    @Test("a span across a year boundary labels December and the January after it")
+    func labelledSpansCrossTheYear() {
+        let spans = IncomeCalendar.labelledMonthSpans(from: Self.date(2024, 12, 20),
+                                                      through: Self.date(2025, 1, 10))
+        #expect(spans.map(\.month) == [WageMonth(year: 2024, month: 12),
+                                       WageMonth(year: 2025, month: 1)])
+        #expect(spans.map(\.span) == [IncomeCalendar.MonthSpan(days: 12, daysInMonth: 31),
+                                      IncomeCalendar.MonthSpan(days: 10, daysInMonth: 31)])
+    }
+
+    @Test("the unlabelled spans are the labelled ones with the label dropped")
+    func oneWalkBehindBoth() {
+        // One walk, so the two answers cannot disagree about how a span divides. If this
+        // ever needs a second implementation to pass, the split has drifted.
+        let cases = [(Self.date(2025, 1, 20), Self.date(2025, 3, 10)),
+                     (Self.date(2025, 4, 15), Self.date(2025, 4, 15)),
+                     (Self.date(2024, 12, 1), Self.date(2025, 2, 28)),
+                     (Self.date(2025, 4, 15), Self.date(2025, 4, 14))]
+        for (start, end) in cases {
+            #expect(IncomeCalendar.labelledMonthSpans(from: start, through: end).map(\.span)
+                    == IncomeCalendar.monthSpans(from: start, through: end))
+        }
+    }
+
     @Test("the day before a date is the previous calendar day")
     func dayBefore() {
         #expect(IncomeCalendar.startOfDay(IncomeCalendar.dayBefore(Self.date(2025, 4, 15)))

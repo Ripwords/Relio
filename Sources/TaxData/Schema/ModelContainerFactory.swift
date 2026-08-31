@@ -18,7 +18,7 @@ public enum TaxContainer {
     }
 
     public static func make(_ storage: Storage) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: SchemaV1.self)
+        let schema = Schema(versionedSchema: SchemaV2.self)
         let configuration: ModelConfiguration
 
         switch storage {
