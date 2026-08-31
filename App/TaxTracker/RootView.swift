@@ -120,6 +120,9 @@ struct RootView: View {
                     .navigationDestination(for: IncomeRoute.self) { _ in
                         IncomeView(model: income)
                     }
+                    .navigationDestination(for: EntryHistoryRoute.self) { _ in
+                        EntryHistoryView(store: store, year: context.year)
+                    }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
@@ -163,6 +166,11 @@ struct RootView: View {
                                     path.append(IncomeRoute())
                                 } label: {
                                     Label("Income", systemImage: "banknote")
+                                }
+                                Button {
+                                    path.append(EntryHistoryRoute())
+                                } label: {
+                                    Label("Input history", systemImage: "clock.arrow.circlepath")
                                 }
                             } label: {
                                 HStack(spacing: 4) {
