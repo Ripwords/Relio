@@ -17,6 +17,9 @@ struct RootView: View {
     /// tab's view builder would be replaced by a fresh empty one on every re-render.
     @State private var documents: DocumentsViewModel
     @State private var selectedTab: Tab = .home
+    /// Ties a relief row to the detail screen it opens. See `ReliefsListView.namespace`.
+    @Namespace private var reliefTransition
+    @Namespace private var homeReliefTransition
     /// The year menu pushes Income, and a menu item cannot be a `NavigationLink`, so the
     /// stack needs a path to append to.
     @State private var path = NavigationPath()
@@ -211,6 +214,8 @@ struct RootView: View {
                                                                       code: code),
                                          context: context,
                                          store: store)
+                            .navigationTransition(.zoom(sourceID: code,
+                                                        in: homeReliefTransition))
                     }
                     .navigationDestination(for: IncomeRoute.self) { _ in
                         IncomeView(model: income)
@@ -267,13 +272,15 @@ struct RootView: View {
             .tag(Tab.home)
 
             NavigationStack {
-                ReliefsListView(model: ReliefsListViewModel(context: context))
+                ReliefsListView(model: ReliefsListViewModel(context: context),
+                                namespace: reliefTransition)
                     .navigationDestination(for: ReliefCode.self) { code in
                         ReliefDetailView(model: ReliefDetailViewModel(context: context,
                                                                       store: store,
                                                                       code: code),
                                          context: context,
                                          store: store)
+                            .navigationTransition(.zoom(sourceID: code, in: reliefTransition))
                     }
                     .toolbar { ToolbarItem(placement: .principal) { yearMenu(canCompare: false) } }
             }
@@ -355,7 +362,8 @@ struct RootView: View {
                      // the full list on the Reliefs tab, so these switch tabs rather than
                      // pushing second copies of those screens into Home's stack.
                      onShowDocuments: { selectedTab = .docs },
-                     onShowAllReliefs: { selectedTab = .reliefs })
+                     onShowAllReliefs: { selectedTab = .reliefs },
+                     namespace: homeReliefTransition)
         case .unavailable(let message):
             // The user's entries still exist. Saying so matters — a blank screen here
             // reads as data loss.

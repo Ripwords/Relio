@@ -8,6 +8,10 @@ struct HomeView: View {
     /// Switch to the Docs and Reliefs tabs. Home does not own that navigation, so it asks.
     let onShowDocuments: () -> Void
     let onShowAllReliefs: () -> Void
+    /// See `ReliefsListView.namespace`. Home's own, not the Reliefs tab's: both screens
+    /// key their sources on the relief code, and two live sources sharing an id in one
+    /// namespace is ambiguous.
+    let namespace: Namespace.ID
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnswering = false
@@ -190,6 +194,7 @@ struct HomeView: View {
                         OpportunityRowView(row: row)
                     }
                     .buttonStyle(.plain)
+                    .matchedTransitionSource(id: row.code, in: namespace)
                 }
                 if model.remainingOpportunityCount > 0 {
                     Button(action: onShowAllReliefs) {

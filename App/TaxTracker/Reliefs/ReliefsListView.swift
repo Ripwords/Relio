@@ -10,8 +10,18 @@ struct ReliefsListView: View {
     /// one.
     @State private var model: ReliefsListViewModel
 
-    init(model: ReliefsListViewModel) {
+    /// Shared with the detail screen's `navigationTransition` so the row the user tapped
+    /// is the thing that grows into it. Spec §11.3 asks for exactly two kinds of motion,
+    /// and this is the first: "matchedGeometryEffect from row to detail".
+    ///
+    /// The zoom navigation transition rather than a bare `matchedGeometryEffect`, because
+    /// the two views live on opposite sides of a `NavigationStack` push and a raw
+    /// namespace effect does not cross one. It also honours Reduce Motion itself.
+    let namespace: Namespace.ID
+
+    init(model: ReliefsListViewModel, namespace: Namespace.ID) {
         _model = State(initialValue: model)
+        self.namespace = namespace
     }
 
     var body: some View {
@@ -23,6 +33,7 @@ struct ReliefsListView: View {
                         NavigationLink(value: row.code) {
                             ReliefRowView(row: row)
                         }
+                        .matchedTransitionSource(id: row.code, in: namespace)
                     }
                 }
             }
