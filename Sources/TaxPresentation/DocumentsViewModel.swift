@@ -95,8 +95,16 @@ public final class DocumentsViewModel {
                 kinds: DocumentKind.allCases.filter(pair.kinds.contains))
         }
         // Biggest claim first: that is the one it costs most to leave unsupported. Ties
-        // break on id, because a list that reshuffles between launches reads as a bug.
-        .sorted { ($0.amount.sen, $1.entryID.uuidString) > ($1.amount.sen, $0.entryID.uuidString) }
+        // break on id, because a list that reshuffles between launches reads as a bug —
+        // and two receipts for the same amount are common.
+        //
+        // Spelled out rather than written as one tuple comparison. Descending on the
+        // first key and ascending on the second needs the operands crossed in a tuple
+        // form, which is correct and reads exactly like a transposition typo.
+        .sorted { left, right in
+            if left.amount != right.amount { return left.amount > right.amount }
+            return left.entryID.uuidString < right.entryID.uuidString
+        }
     }
 
     /// Each claim once, however many documents it is missing.

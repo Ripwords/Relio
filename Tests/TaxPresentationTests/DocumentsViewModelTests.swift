@@ -79,6 +79,47 @@ struct DocumentsViewModelTests {
         #expect(home.prompts.claimsMissingDocuments == documents.outstanding.count)
     }
 
+    /// Two claims for the same amount is ordinary — two receipts, one price. The order
+    /// has to be the same every launch, or the list appears to shuffle itself.
+    @Test("equal amounts order deterministically, biggest first overall")
+    func tiesBreakOnIdentity() {
+        let low = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+        let high = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
+        let big = UUID(uuidString: "00000000-0000-4000-8000-000000000003")!
+
+        let entries = [
+            EntryDraft(id: high, year: 2025, code: .lifestyle,
+                       amount: Money(ringgit: 100), vendor: "Second"),
+            EntryDraft(id: low, year: 2025, code: .lifestyle,
+                       amount: Money(ringgit: 100), vendor: "First"),
+            EntryDraft(id: big, year: 2025, code: .lifestyle,
+                       amount: Money(ringgit: 900), vendor: "Biggest"),
+        ]
+        let result = Self.missingReceipts(for: [low, high, big])
+        let rows = DocumentsViewModel.rows(in: result, entries: entries)
+
+        #expect(rows.map(\.vendor) == ["Biggest", "First", "Second"])
+        // Same input in a different order must land the same way.
+        #expect(DocumentsViewModel.rows(in: result, entries: entries.reversed())
+                .map(\.vendor) == ["Biggest", "First", "Second"])
+    }
+
+    static func missingReceipts(for ids: [UUID]) -> EvaluationResult {
+        EvaluationResult(
+            yearOfAssessment: 2025,
+            assessments: [
+                ReliefAssessment(code: .lifestyle, name: "Lifestyle",
+                                 cap: Money(ringgit: 2_500), claimed: .zero, allowed: .zero,
+                                 headroom: Money(ringgit: 2_500), eligibility: .eligible,
+                                 requirements: [RequirementCheck(kind: .officialReceipt,
+                                                                 status: .missing(entryIDs: ids))],
+                                 taxSaved: nil, unverified: false,
+                                 sourceURL: URL(string: "https://www.hasil.gov.my/")!,
+                                 notes: nil, children: [])
+            ],
+            unresolved: [], chargeableIncome: nil, estimatedTax: nil, totalOpportunity: nil)
+    }
+
     static let entryID = UUID(uuidString: "11111111-2222-4333-8444-555555555555")!
 
     static var entries: [EntryDraft] {
