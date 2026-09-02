@@ -108,22 +108,29 @@ struct HomeView: View {
     }
 
     private func promptRow(systemImage: String, title: String, trailing: Money?) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-            Text(title)
-            Spacer()
-            if let trailing {
-                HStack(spacing: 4) {
-                    Text("unlock")
-                    MoneyText(amount: trailing, weight: .semibold)
-                }
-                .font(.subheadline)
+        AdaptiveRow(spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                Text(title)
             }
-            // These rows have looked like buttons and done nothing since the first build.
-            // Now that they lead somewhere, they get the chevron that says so.
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+        } trailing: {
+            HStack(spacing: 6) {
+                if let trailing {
+                    // One Text, so "unlock" and the figure wrap together as words rather
+                    // than competing for one line with the chevron. Side by side they
+                    // truncated the amount to "RM 20,0…" at the largest type sizes, and a
+                    // truncated figure is not the figure. `monospacedDigit` is kept, which
+                    // is the other thing MoneyText would have given it.
+                    Text("unlock \(trailing.formatted())")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
+                // These rows have looked like buttons and done nothing since the first
+                // build. Now that they lead somewhere, they get the chevron that says so.
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(14)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -168,7 +175,7 @@ struct OpportunityRowView: View {
     let row: OpportunityRow
 
     var body: some View {
-        HStack(spacing: 12) {
+        AdaptiveRow {
             VStack(alignment: .leading, spacing: 6) {
                 Text(row.shortName)
                 // A bar at zero is not information, it is a horizontal rule sitting
@@ -180,8 +187,8 @@ struct OpportunityRowView: View {
                         .tint(.accentColor)
                 }
             }
-            Spacer(minLength: 12)
-            trailing
+        } trailing: {
+            trailingFigure
         }
         // Spec §11.8: VoiceOver reads the amounts, never "68 percent".
         .accessibilityElement(children: .ignore)
@@ -194,7 +201,7 @@ struct OpportunityRowView: View {
     /// figure is the whole cap — what the relief *would* be worth if the answer went the
     /// user's way. Two different kinds of number in one typeface reads as one kind.
     @ViewBuilder
-    private var trailing: some View {
+    private var trailingFigure: some View {
         if row.needsAnswer {
             HStack(spacing: 6) {
                 VStack(alignment: .trailing, spacing: 2) {

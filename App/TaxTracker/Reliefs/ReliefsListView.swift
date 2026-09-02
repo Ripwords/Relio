@@ -43,7 +43,7 @@ struct ReliefRowView: View {
     let row: ReliefRow
 
     var body: some View {
-        HStack(spacing: 12) {
+        AdaptiveRow {
             VStack(alignment: .leading, spacing: 6) {
                 Text(row.shortName)
                 // See `OpportunityRowView`: a bar at zero draws a rule under the name and
@@ -54,7 +54,7 @@ struct ReliefRowView: View {
                         .tint(row.state == .exhausted ? .secondary : .accentColor)
                 }
             }
-            Spacer(minLength: 8)
+        } trailing: {
             trailing
         }
         .accessibilityElement(children: .ignore)

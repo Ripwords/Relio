@@ -62,7 +62,7 @@ struct DocumentRowView: View {
     let row: OutstandingDocument
 
     var body: some View {
-        HStack(spacing: 12) {
+        AdaptiveRow {
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.vendor.isEmpty ? "Untitled entry" : row.vendor)
                 Text(row.shortName)
@@ -73,7 +73,7 @@ struct DocumentRowView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
-            Spacer(minLength: 12)
+        } trailing: {
             MoneyText(amount: row.amount, font: .subheadline, weight: .semibold)
         }
         .accessibilityElement(children: .ignore)
