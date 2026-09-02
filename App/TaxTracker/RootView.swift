@@ -100,6 +100,7 @@ struct RootView: View {
         guard let screen = DemoHarness.screen else { return }
         switch screen {
         case "docs": selectedTab = .docs
+        case "settings": path.append(SettingsRoute())
         case "reliefs": path.append(ReliefsRoute())
         case "income": path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
@@ -158,6 +159,9 @@ struct RootView: View {
                     .navigationDestination(for: EntryHistoryRoute.self) { _ in
                         EntryHistoryView(store: store, year: context.year)
                     }
+                    .navigationDestination(for: SettingsRoute.self) { _ in
+                        SettingsView(context: context, store: store)
+                    }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
@@ -199,23 +203,18 @@ struct RootView: View {
                                         }
                                     }
                                 }
-                                Divider()
-                                Button {
-                                    path.append(IncomeRoute())
-                                } label: {
-                                    Label("Income", systemImage: "banknote")
-                                }
-                                Button {
-                                    path.append(EntryHistoryRoute())
-                                } label: {
-                                    Label("Input history", systemImage: "clock.arrow.circlepath")
-                                }
                             } label: {
                                 HStack(spacing: 4) {
                                     Text("YA \(String(context.year))").fontWeight(.semibold)
                                     Image(systemName: "chevron.down").font(.caption2)
                                 }
                             }
+                        }
+                        ToolbarItem(placement: .topBarLeading) {
+                            NavigationLink(value: SettingsRoute()) {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityLabel("Settings")
                         }
                         ToolbarItem(placement: .primaryAction) {
                             Button {

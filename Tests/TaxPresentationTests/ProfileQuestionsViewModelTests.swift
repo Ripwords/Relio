@@ -49,6 +49,28 @@ struct ProfileQuestionsViewModelTests {
         #expect(model.canSave == true)
     }
 
+    /// Settings edits the same eight facts, but as a profile rather than a task. Someone
+    /// who owns no property can never answer "what did your first home cost?", and gating
+    /// Save on a complete set there would lock them out of changing anything else.
+    @Test("Settings can save a partly answered profile")
+    func settingsDoesNotRequireEveryAnswer() async throws {
+        let store = try await PresentationFixture.store()
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = ProfileQuestionsViewModel(context: context,
+                                              store: store,
+                                              questions: [.maritalStatus, .propertyPrice],
+                                              requiresEveryAnswer: false)
+        await model.load()
+        #expect(model.canSave == true)
+
+        model.maritalStatus = .single
+        await model.save()
+        let facts = try await store.yearFacts(for: 2025)
+        #expect(facts.maritalStatus == .single)
+        #expect(facts.propertyPrice == nil)
+    }
+
     /// "No" is an answer and has to be storable as one. An engine that reads a `nil` as
     /// "not asked" and a `false` as "asked and refused" cannot tell them apart unless the
     /// screen is willing to write `false` — and a user who says they are not disabled

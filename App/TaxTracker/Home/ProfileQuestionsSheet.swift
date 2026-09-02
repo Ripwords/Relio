@@ -27,8 +27,15 @@ struct ProfileQuestionsSheet: View {
 
     let onSaved: () -> Void
 
-    init(model: ProfileQuestionsViewModel, onSaved: @escaping () -> Void) {
+    /// Overrides the count-based title. "3 questions" names the task Home sent the user
+    /// here to finish; opened from Settings there is no task, only a profile.
+    private let title: String?
+
+    init(model: ProfileQuestionsViewModel,
+         title: String? = nil,
+         onSaved: @escaping () -> Void) {
         _model = State(initialValue: model)
+        self.title = title
         self.onSaved = onSaved
     }
 
@@ -56,7 +63,9 @@ struct ProfileQuestionsSheet: View {
                     }
                 }
             }
-            .navigationTitle(model.questions.count == 1 ? "One question" : "\(model.questions.count) questions")
+            .navigationTitle(title ?? (model.questions.count == 1
+                                       ? "One question"
+                                       : "\(model.questions.count) questions"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -20,6 +20,18 @@ public final class ProfileQuestionsViewModel {
     /// Only the questions this screen can actually save, in the order asked.
     public let questions: [ProfileQuestion]
 
+    /// Whether Save waits for a complete set.
+    ///
+    /// True when Home sent the user here to clear a specific prompt: answering two of
+    /// three and saving would leave the prompt on Home saying one is left, which reads as
+    /// the save having failed.
+    ///
+    /// False in Settings, where the same eight questions are a profile to edit rather
+    /// than a task to finish. Someone who owns no property cannot answer "what did your
+    /// first home cost?", and gating on completeness there would lock them out of
+    /// changing their marital status for ever.
+    public let requiresEveryAnswer: Bool
+
     public var maritalStatus: MaritalStatus?
     public var spouseHasIncome: Bool?
     public var assessmentType: AssessmentType?
@@ -37,10 +49,14 @@ public final class ProfileQuestionsViewModel {
     private let context: YearContext
     private let store: TaxStore
 
-    public init(context: YearContext, store: TaxStore, questions: [ProfileQuestion]) {
+    public init(context: YearContext,
+                store: TaxStore,
+                questions: [ProfileQuestion],
+                requiresEveryAnswer: Bool = true) {
         self.context = context
         self.store = store
         self.questions = Self.answerable(questions)
+        self.requiresEveryAnswer = requiresEveryAnswer
     }
 
     /// The questions that have somewhere to be written.
@@ -86,7 +102,8 @@ public final class ProfileQuestionsViewModel {
     /// because a half-answered profile reads to the engine exactly like a fully answered
     /// one that happened to say no.
     public var canSave: Bool {
-        questions.allSatisfy { isAnswered($0) }
+        guard requiresEveryAnswer else { return true }
+        return questions.allSatisfy { isAnswered($0) }
     }
 
     public func isAnswered(_ question: ProfileQuestion) -> Bool {

@@ -26,3 +26,6 @@ struct PrefilledEntryRoute: Hashable {
     let code: ReliefCode
     let amount: Money
 }
+
+/// Navigation value for Settings.
+struct SettingsRoute: Hashable {}
