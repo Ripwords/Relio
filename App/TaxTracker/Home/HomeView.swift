@@ -5,8 +5,9 @@ import TaxPresentation
 struct HomeView: View {
 
     @Bindable var model: HomeViewModel
-    /// Switches to the Docs tab. Home does not own that navigation, so it asks.
+    /// Switch to the Docs and Reliefs tabs. Home does not own that navigation, so it asks.
     let onShowDocuments: () -> Void
+    let onShowAllReliefs: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnswering = false
@@ -151,8 +152,10 @@ struct HomeView: View {
                     .buttonStyle(.plain)
                 }
                 if model.remainingOpportunityCount > 0 {
-                    NavigationLink(value: ReliefsRoute()) {
-                        Text("See all \(model.remainingOpportunityCount + model.opportunities.count)")
+                    Button(action: onShowAllReliefs) {
+                        // "See all 17" left the reader counting what the 17 were. It is
+                        // reliefs, and saying so costs one word.
+                        Text("See all \(model.remainingOpportunityCount + model.opportunities.count) reliefs")
                             .font(.subheadline)
                     }
                 }

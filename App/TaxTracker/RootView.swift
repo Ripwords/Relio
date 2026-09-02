@@ -45,7 +45,11 @@ struct RootView: View {
         _documents = State(initialValue: DocumentsViewModel(context: context, store: store))
     }
 
-    private enum Tab: Hashable { case home, docs, ask }
+    /// Three tabs, all of them real. Two of the original three were
+    /// `ContentUnavailableView` placeholders describing features that do not exist, which
+    /// spent two thirds of the tab bar on apologies. Reliefs takes the Ask tab's place: it
+    /// is a primary surface that was reachable only through Home's "See all" link.
+    private enum Tab: Hashable { case home, reliefs, docs }
 
     var body: some View {
         Group {
@@ -102,7 +106,7 @@ struct RootView: View {
         case "docs": selectedTab = .docs
         case "settings": path.append(SettingsRoute())
         case "compare": path.append(CompareRoute())
-        case "reliefs": path.append(ReliefsRoute())
+        case "reliefs": selectedTab = .reliefs
         case "income": path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
         case "entry":
@@ -144,9 +148,6 @@ struct RootView: View {
                     // *read* from `body` — as these closures used to — meant every
                     // re-render handed the pushed screen a brand-new empty model whose
                     // `.task` had already fired and would not fire again.
-                    .navigationDestination(for: ReliefsRoute.self) { _ in
-                        ReliefsListView(model: ReliefsListViewModel(context: context))
-                    }
                     .navigationDestination(for: ReliefCode.self) { code in
                         ReliefDetailView(model: ReliefDetailViewModel(context: context,
                                                                       store: store,
@@ -247,6 +248,19 @@ struct RootView: View {
             .tag(Tab.home)
 
             NavigationStack {
+                ReliefsListView(model: ReliefsListViewModel(context: context))
+                    .navigationDestination(for: ReliefCode.self) { code in
+                        ReliefDetailView(model: ReliefDetailViewModel(context: context,
+                                                                      store: store,
+                                                                      code: code),
+                                         context: context,
+                                         store: store)
+                    }
+            }
+            .tabItem { Label("Reliefs", systemImage: "list.bullet.rectangle") }
+            .tag(Tab.reliefs)
+
+            NavigationStack {
                 DocumentsView(model: documents)
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
@@ -260,13 +274,6 @@ struct RootView: View {
             .tabItem { Label("Docs", systemImage: "doc.text") }
             .tag(Tab.docs)
 
-            NavigationStack {
-                ContentUnavailableView("Ask",
-                                       systemImage: "bubble.left.and.bubble.right",
-                                       description: Text("The on-device assistant arrives in a later release."))
-            }
-            .tabItem { Label("Ask", systemImage: "bubble.left.and.bubble.right") }
-            .tag(Tab.ask)
         }
         .sheet(item: $editingEntry) { model in
             EntryEditorView(model: model,
@@ -322,12 +329,12 @@ struct RootView: View {
         case .idle, .loading:
             ProgressView()
         case .ready:
-            HomeView(model: home) {
-                // The claims and their missing documents live on the Docs tab, so the
-                // prompt switches to it rather than pushing a second copy of that screen
-                // into Home's stack.
-                selectedTab = .docs
-            }
+            HomeView(model: home,
+                     // The claims and their missing documents live on the Docs tab, and
+                     // the full list on the Reliefs tab, so these switch tabs rather than
+                     // pushing second copies of those screens into Home's stack.
+                     onShowDocuments: { selectedTab = .docs },
+                     onShowAllReliefs: { selectedTab = .reliefs })
         case .unavailable(let message):
             // The user's entries still exist. Saying so matters — a blank screen here
             // reads as data loss.
