@@ -100,17 +100,17 @@ struct CompareView: View {
             Text(headlineText)
                 .font(.headline)
             if model.direction != .noDifference {
-                HStack(spacing: 6) {
-                    MoneyText(amount: model.headlineAmount, font: .title2, weight: .bold)
-                    Text("more relief")
-                        .foregroundStyle(.secondary)
-                }
+                // One Text each, not a figure beside a label. Side by side these wrapped
+                // into "RM 500.00 | more" over "relief" at the largest type sizes — the
+                // same break the entry editor's cap note and Home's unlock row had.
+                Text("\(model.headlineAmount.formatted()) more relief")
+                    .font(.title2.weight(.bold))
+                    .monospacedDigit()
                 if let tax = model.headlineTax {
-                    HStack(spacing: 4) {
-                        MoneyText(amount: tax, font: .subheadline, weight: .semibold)
-                        Text("in tax")
-                    }
-                    .foregroundStyle(.secondary)
+                    Text("\(tax.formatted()) in tax")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -138,13 +138,21 @@ struct CounterfactualRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(ReliefCopy.shortName(for: line.code, fullName: line.name))
-            HStack(spacing: 8) {
-                yearFigure(comparisonYear, line.allowedUnderComparison)
-                Image(systemName: "arrow.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                yearFigure(baselineYear, line.allowedUnderBaseline)
-                Spacer(minLength: 8)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    yearFigure(comparisonYear, line.allowedUnderComparison)
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    yearFigure(baselineYear, line.allowedUnderBaseline)
+                    Spacer(minLength: 8)
+                }
+                // Two figures and an arrow cannot share a line at accessibility sizes.
+                // Stacked, the arrow would point sideways at nothing, so it goes.
+                VStack(alignment: .leading, spacing: 4) {
+                    yearFigure(comparisonYear, line.allowedUnderComparison)
+                    yearFigure(baselineYear, line.allowedUnderBaseline)
+                }
             }
         }
         .accessibilityElement(children: .ignore)
