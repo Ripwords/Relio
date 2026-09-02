@@ -63,6 +63,10 @@ struct ProfileQuestionsSheet: View {
                     }
                 }
             }
+            // Without this the sheet opens blank against a profile that already has
+            // answers, and Save writes nil over every one of them. `hasLoaded` in the
+            // model is the backstop; this is the fix.
+            .task { await model.load() }
             .navigationTitle(title ?? (model.questions.count == 1
                                        ? "One question"
                                        : "\(model.questions.count) questions"))

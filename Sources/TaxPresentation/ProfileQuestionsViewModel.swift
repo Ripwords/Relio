@@ -46,6 +46,19 @@ public final class ProfileQuestionsViewModel {
     /// fixed for.
     public private(set) var saveError: String?
 
+    /// Whether `load()` has run.
+    ///
+    /// `save()` writes every asked question's current value, including nil. A screen that
+    /// forgot to load first would therefore write nil over facts the user had already
+    /// given — and from Settings, where all eight questions are asked, that is every
+    /// household fact they own, on a Save that looks like it is confirming what is on
+    /// screen. That is exactly what shipped: the sheet had no `.task`, so it opened blank
+    /// against a married profile and Save would have blanked it.
+    ///
+    /// Guarding here rather than only fixing the view: the view is one caller of several,
+    /// and a rule the model enforces cannot be forgotten by the next one.
+    public private(set) var hasLoaded = false
+
     private let context: YearContext
     private let store: TaxStore
 
@@ -88,6 +101,7 @@ public final class ProfileQuestionsViewModel {
     /// user their previous answer as unanswered, and overwrite it on the next save.
     public func load() async {
         guard let facts = try? await store.yearFacts(for: context.year) else { return }
+        hasLoaded = true
         maritalStatus = facts.maritalStatus
         spouseHasIncome = facts.spouseHasIncome
         assessmentType = facts.assessmentType
@@ -125,6 +139,11 @@ public final class ProfileQuestionsViewModel {
     /// this model did not load back would be erased by saving.
     public func save() async {
         saveError = nil
+        // Refuses rather than wipes. See `hasLoaded`.
+        guard hasLoaded else {
+            saveError = "Those answers could not be saved. Try again."
+            return
+        }
         do {
             var facts = try await store.yearFacts(for: context.year)
             for question in questions {

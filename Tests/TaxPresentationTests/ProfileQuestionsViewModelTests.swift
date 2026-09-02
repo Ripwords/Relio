@@ -119,3 +119,68 @@ struct ProfileQuestionsViewModelTests {
         #expect(model.canSave == true)
     }
 }
+
+/// The bug this suite exists to prevent recurring.
+///
+/// `save()` writes every asked question's current value, nil included. A screen that
+/// forgot to `load()` first would write nil over answers the user had already given —
+/// and opened from Settings, where all eight questions are asked, that is every household
+/// fact they own, on a Save that looks like it is confirming what is on screen.
+///
+/// It shipped exactly that way: ProfileQuestionsSheet had no `.task`, so it opened blank
+/// against a married profile and Save would have blanked it.
+@Suite("Profile questions: save is gated on a load")
+@MainActor
+struct ProfileQuestionsLoadGuardTests {
+
+    @Test("saving without loading first refuses instead of blanking the year")
+    func saveWithoutLoadRefuses() async throws {
+        let store = try await PresentationFixture.store()
+        var existing = YearFacts()
+        existing.maritalStatus = .married
+        existing.spouseHasIncome = false
+        existing.employmentType = .privateSector
+        try await store.saveYearFacts(existing, for: 2025)
+
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = ProfileQuestionsViewModel(context: context,
+                                              store: store,
+                                              questions: ProfileQuestion.allCases,
+                                              requiresEveryAnswer: false)
+        // Deliberately no load().
+        #expect(model.hasLoaded == false)
+        await model.save()
+
+        #expect(model.saveError != nil)
+        let after = try await store.yearFacts(for: 2025)
+        #expect(after.maritalStatus == .married)
+        #expect(after.spouseHasIncome == false)
+        #expect(after.employmentType == .privateSector)
+    }
+
+    @Test("loading first shows the answers already given, and saving keeps them")
+    func loadingShowsExistingAnswers() async throws {
+        let store = try await PresentationFixture.store()
+        var existing = YearFacts()
+        existing.maritalStatus = .married
+        existing.assessmentType = .separate
+        try await store.saveYearFacts(existing, for: 2025)
+
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = ProfileQuestionsViewModel(context: context,
+                                              store: store,
+                                              questions: ProfileQuestion.allCases,
+                                              requiresEveryAnswer: false)
+        await model.load()
+        #expect(model.hasLoaded == true)
+        #expect(model.maritalStatus == .married)
+        #expect(model.assessmentType == .separate)
+
+        await model.save()
+        let after = try await store.yearFacts(for: 2025)
+        #expect(after.maritalStatus == .married)
+        #expect(after.assessmentType == .separate)
+    }
+}
