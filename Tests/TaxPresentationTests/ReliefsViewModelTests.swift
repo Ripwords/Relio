@@ -214,3 +214,47 @@ import TaxData
         #expect(nonsense.entries.isEmpty)
     }
 }
+
+/// The detail screen says "RM 800 still claimable" and, until this, offered no way to
+/// claim it — the only route to a new entry was Home's + button, which opens an empty
+/// editor and asks the user to find the relief again in a list of two dozen.
+@Suite("Relief detail: logging")
+@MainActor
+struct ReliefDetailLoggingTests {
+
+    static func model(_ store: TaxStore, _ code: ReliefCode) async -> ReliefDetailViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = ReliefDetailViewModel(context: context, store: store, code: code)
+        await model.refresh()
+        return model
+    }
+
+    @Test("a claimable relief offers somewhere to log an entry")
+    func claimableReliefCanBeLogged() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store, .lifestyle)
+        #expect(model.canLogEntries == true)
+    }
+
+    /// SELF_AND_DEPENDENTS is granted in full from household facts. The editor already
+    /// refuses an entry against it, so the button would walk the user into that refusal.
+    @Test("an automatic relief offers nothing to log")
+    func automaticReliefCannotBeLogged() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store, .selfAndDependents)
+        #expect(model.canLogEntries == false)
+    }
+
+    /// A relief blocked on an unanswered question. Logging is not the next step —
+    /// answering is, and the screen's "To claim this" section says so.
+    @Test("a relief waiting on an answer offers nothing to log")
+    func needsInfoReliefCannotBeLogged() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store, .disabledSelf)
+        #expect(model.canLogEntries == false)
+    }
+}

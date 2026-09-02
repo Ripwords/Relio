@@ -32,6 +32,23 @@ public final class ReliefDetailViewModel {
     /// declared on the same type, where `private` is already visible.
     public var yearOfAssessment: Int { context.year }
 
+    /// Whether logging an entry against this relief would do anything.
+    ///
+    /// An `automatic` relief is granted in full from household facts and the evaluator
+    /// discards any logged amount without a trace — `EntryEditorViewModel.validationError`
+    /// already refuses one, so offering the button would walk the user into that refusal.
+    /// An ineligible relief is the same story for a different reason.
+    ///
+    /// `.needsInfo` is excluded too. Logging against a relief whose eligibility is unknown
+    /// is not wrong, but it is not the next step: the answer is, and the "To claim this"
+    /// section above says so.
+    public var canLogEntries: Bool {
+        guard let assessment else { return false }
+        guard context.rule(for: code)?.automatic != true else { return false }
+        if case .eligible = assessment.eligibility { return true }
+        return false
+    }
+
     public func refresh() async {
         guard let found = context.result?.assessment(for: code) else {
             assessment = nil

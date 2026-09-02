@@ -110,6 +110,21 @@ struct ReliefDetailView: View {
                 }
 
                 Section("Entries") {
+                    // The screen says RM 800 is still claimable and, until now, offered no
+                    // way to claim it: the only route to a new entry was Home's + button,
+                    // which opens an empty editor and asks the user to find this relief
+                    // again in a list of two dozen. `PrefilledEntryRoute` already existed
+                    // for exactly this and only the contribution card used it.
+                    //
+                    // Hidden once the relief is full or blocked on an answer, because
+                    // "add an entry" is not the next step in either case.
+                    if assessment.headroom > .zero, model.canLogEntries {
+                        NavigationLink(value: PrefilledEntryRoute(code: model.code,
+                                                                 amount: .zero)) {
+                            Label("Add an entry", systemImage: "plus.circle")
+                        }
+                    }
+
                     if model.entries.isEmpty {
                         Text("Nothing logged for this relief yet.")
                             .foregroundStyle(.secondary)
