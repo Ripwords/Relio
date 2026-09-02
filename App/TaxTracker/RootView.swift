@@ -316,6 +316,7 @@ struct RootView: View {
                           undo: {
                               await lastDeleted.undoDelete()
                               await home.refresh()
+                              await documents.refresh()
                           },
                           isPresented: $showUndo)
                 .padding(.bottom, 60)
@@ -331,7 +332,11 @@ struct RootView: View {
     /// model copies out of `context.result` rather than reading it live, so the save path
     /// has to say when to copy again, exactly as the delete path already did.
     private func handleSaved() {
-        Task { await home.refresh() }
+        // Documents copies out of `context.result` exactly as Home does, so it needs
+        // telling to copy again for exactly the same reason. Saving an entry changes
+        // which claims are missing a document — often the very entry just saved — and
+        // without this the Docs tab kept the count and the rows it had at launch.
+        Task { await home.refresh(); await documents.refresh() }
     }
 
     /// An editor for a brand-new entry that already holds a relief and a figure.
@@ -349,7 +354,7 @@ struct RootView: View {
     private func handleDeleted(_ model: EntryEditorViewModel) {
         lastDeleted = model
         showUndo = true
-        Task { await home.refresh() }
+        Task { await home.refresh(); await documents.refresh() }
     }
 
     @ViewBuilder
