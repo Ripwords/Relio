@@ -54,6 +54,9 @@ struct RootView: View {
             }
         }
         .task {
+            #if DEBUG
+            if DemoHarness.wantsSeed { await DemoHarness.seed(into: store, year: context.year) }
+            #endif
             let preferences = try? await store.preferences()
             needsOnboarding = !(preferences?.hasCompletedOnboarding ?? false)
             // Housekeeping, not the fix: every read below already resolves duplicates, so
@@ -62,6 +65,9 @@ struct RootView: View {
             _ = try? await store.reconcile()
             await resumeLastViewedYear(preferences?.lastViewedYear)
             await home.refresh()
+            #if DEBUG
+            openDemoScreen()
+            #endif
         }
         // Duplicates arriving while the app was closed are what this catches. One that
         // lands while it is already open reads correctly straight away and is collapsed
@@ -77,6 +83,26 @@ struct RootView: View {
             }
         }
     }
+
+    #if DEBUG
+    /// Pushes the screen `-relio-screen` names, so a screenshot run can photograph
+    /// something other than Home. Appending to `path` rather than reaching into each
+    /// screen means the route this takes is the same one a tap takes.
+    private func openDemoScreen() {
+        guard let screen = DemoHarness.screen else { return }
+        switch screen {
+        case "reliefs": path.append(ReliefsRoute())
+        case "income": path.append(IncomeRoute())
+        case "history": path.append(EntryHistoryRoute())
+        case "entry":
+            editingEntry = EntryEditorViewModel(context: context, store: store, editing: nil)
+        case let name where name.hasPrefix("relief:"):
+            path.append(ReliefCode(String(name.dropFirst("relief:".count))))
+        default:
+            print("[DemoHarness] unknown screen '\(screen)'")
+        }
+    }
+    #endif
 
     /// Launch resumes on the year the user left off on. `switchYear` is the only way in:
     /// it owns the supersede guard and writes the preference back, and it also performs

@@ -11,9 +11,19 @@
 # entitlements, no App Store packaging. Once `sudo xcodebuild -runFirstLaunch` has been
 # run, prefer Scripts/build-app.sh.
 #
-# Usage: ./Scripts/run-app.sh [screenshot-path]
+# Usage: ./Scripts/run-app.sh [screenshot-path] [-- <app launch arguments>]
+#
+# Launch arguments after `--` are handed to the app. The DEBUG-only DemoHarness reads
+# them, so `-- -relio-demo -relio-screen reliefs` seeds a profile and opens the Reliefs
+# list — which is the only way to photograph a screen on a machine with no simulator tap
+# automation.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+SHOT=""
+APP_ARGS=()
+if [ $# -ge 1 ] && [ "$1" != "--" ]; then SHOT="$1"; shift; fi
+if [ "${1:-}" = "--" ]; then shift; APP_ARGS=("$@"); fi
 
 DEVICE="${RELIO_SIM_DEVICE:-Relio Test Phone}"
 DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17"
@@ -40,7 +50,7 @@ rm -rf "$STAGE"; mkdir -p "$APP"
 mapfile -t SOURCES < <(find App/TaxTracker -name '*.swift' | sort)
 mapfile -t OBJS < <(find .build-ios/debug/TaxKit.build .build-ios/debug/TaxData.build \
                          .build-ios/debug/TaxPresentation.build -name '*.o' | sort)
-xcrun swiftc -sdk "$SDK" -target "$TARGET" -swift-version 6 -parse-as-library \
+xcrun swiftc -sdk "$SDK" -target "$TARGET" -swift-version 6 -parse-as-library -DDEBUG \
   -I .build-ios/debug/Modules -emit-executable -o "$APP/Relio" \
   "${SOURCES[@]}" "${OBJS[@]}" 2>&1 | grep -v "using sysroot" || true
 
@@ -67,10 +77,10 @@ codesign --force --sign - "$APP" >/dev/null 2>&1
 # 4. Install and launch.
 xcrun simctl uninstall "$DEVICE" "$BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl install "$DEVICE" "$APP"
-xcrun simctl launch "$DEVICE" "$BUNDLE_ID"
+xcrun simctl launch "$DEVICE" "$BUNDLE_ID" "${APP_ARGS[@]}"
 
-if [ $# -ge 1 ]; then
+if [ -n "$SHOT" ]; then
   sleep 4
-  xcrun simctl io "$DEVICE" screenshot "$1" >/dev/null
-  echo "Screenshot: $1"
+  xcrun simctl io "$DEVICE" screenshot "$SHOT" >/dev/null
+  echo "Screenshot: $SHOT"
 fi
