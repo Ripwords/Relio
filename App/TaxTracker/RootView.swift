@@ -78,7 +78,18 @@ struct RootView: View {
             // a sweep that throws leaves the figure correct and the duplicate rows on
             // disk. Swallowing is safe here for that reason and no other.
             _ = try? await store.reconcile()
+            #if DEBUG
+            // Overrides the remembered year, through the same `switchYear` a menu tap uses.
+            if let demoYear = DemoHarness.year, context.availableYears.contains(demoYear) {
+                await context.switchYear(to: demoYear)
+                await income.refresh()
+                await documents.refresh()
+            } else {
+                await resumeLastViewedYear(preferences?.lastViewedYear)
+            }
+            #else
             await resumeLastViewedYear(preferences?.lastViewedYear)
+            #endif
             await home.refresh()
             #if DEBUG
             openDemoScreen()

@@ -35,6 +35,10 @@ enum DemoHarness {
     /// carries the code after the colon, which is the only one that needs a payload.
     static var screen: String? { value(after: "-relio-screen") }
 
+    /// The year to open on, as `-relio-year 2023`. Year switching is a core flow with no
+    /// other way to reach it from a screenshot run.
+    static var year: Int? { value(after: "-relio-year").flatMap(Int.init) }
+
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }
 
     private static func value(after flag: String) -> String? {
