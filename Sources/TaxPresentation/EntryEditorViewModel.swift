@@ -167,7 +167,7 @@ public final class EntryEditorViewModel {
     /// code it no longer holds.
     public var readOnlyReason: String? {
         guard let selectedCode, Self.isAutomatic(selectedCode, in: context) else { return nil }
-        return "\(selectedCode.rawValue) is granted automatically from your household details. Any amount recorded here is ignored — edit your details instead."
+        return "\(reliefName(selectedCode)) is granted automatically from your household details. Any amount recorded here is ignored — edit your details instead."
     }
 
     public var isReadOnly: Bool { readOnlyReason != nil }
@@ -247,6 +247,18 @@ public final class EntryEditorViewModel {
                            overBy: overBy)
     }
 
+    /// The relief as the user knows it, for a message the user reads.
+    ///
+    /// These two sentences named the rulebook's key — "SELF_AND_DEPENDENTS is granted
+    /// automatically…" — which is the leak `ReliefCopy` exists to prevent. The rulebook's
+    /// own name is the fallback, and the raw code only if neither is known.
+    private func reliefName(_ code: ReliefCode) -> String {
+        let full = availableCodes.first { $0.code == code }?.name
+            ?? context.result?.allAssessments.first { $0.code == code }?.name
+            ?? code.rawValue
+        return ReliefCopy.shortName(for: code, fullName: full)
+    }
+
     public var validationError: String? {
         guard let selectedCode else { return "Choose a relief." }
         if Self.isAutomatic(selectedCode, in: context) {
@@ -255,7 +267,7 @@ public final class EntryEditorViewModel {
             // property and `availableCodes` already excludes automatic codes, so a
             // check that only consulted the picker's list would silently vanish the
             // moment a caller sets this directly rather than through the picker.
-            return "\(selectedCode.rawValue) is granted automatically from your household details and cannot be logged here."
+            return "\(reliefName(selectedCode)) is granted automatically from your household details and cannot be logged here."
         }
         guard let amount = MoneyParsing.money(from: amountText) else {
             return amountText.isEmpty ? "Enter an amount." : "That is not an amount."

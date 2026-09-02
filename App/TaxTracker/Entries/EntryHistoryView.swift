@@ -24,13 +24,24 @@ struct EntryHistoryView: View {
                         ForEach(model.filteredEntries) { entry in
                             NavigationLink(value: EntryRoute(entryID: entry.id)) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
+                                    AdaptiveRow {
                                         Text(entry.vendor.isEmpty ? "Untitled entry" : entry.vendor)
                                             .font(.headline)
-                                        Spacer()
+                                    } trailing: {
                                         MoneyText(amount: entry.amount, font: .subheadline, weight: .semibold)
                                     }
-                                    Text(entry.code.rawValue)
+                                    // The relief, not its database key. This screen was
+                                    // printing "INSURANCE_EDU_MEDICAL" and
+                                    // "LIFESTYLE_SPORTS" straight onto the row — the exact
+                                    // leak ReliefCopy exists to prevent, and the only
+                                    // place left in the app still doing it.
+                                    //
+                                    // The raw code remains the fallback, which is right:
+                                    // a code no rulebook knows has no name to show, and
+                                    // those are the entries this screen is filtered to
+                                    // when it arrives from Home's unresolved prompt.
+                                    Text(ReliefCopy.shortName(for: entry.code,
+                                                              fullName: entry.code.rawValue))
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                     if let date = entry.spentOn {

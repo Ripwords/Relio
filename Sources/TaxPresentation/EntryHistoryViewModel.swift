@@ -42,6 +42,10 @@ public final class EntryHistoryViewModel {
             guard restrictedTo?.contains(entry.id) ?? true else { return false }
             return query.isEmpty || entry.vendor.localizedCaseInsensitiveContains(query)
                 || entry.note.localizedCaseInsensitiveContains(query)
+                // The name the row shows, as well as the code underneath it. Searching
+                // for what is on screen has to work.
+                || ReliefCopy.shortName(for: entry.code, fullName: entry.code.rawValue)
+                    .localizedCaseInsensitiveContains(query)
                 || entry.code.rawValue.localizedCaseInsensitiveContains(query)
         }
         switch sort {
