@@ -67,6 +67,31 @@ import TaxKit
         #expect(try await store.yearFacts(for: 2025).maritalStatus == .married)
     }
 
+    /// Onboarding was one-way. A user who reached the household step and realised they
+    /// had mistyped their salary on the step before had no way back to it — and no way to
+    /// fix it afterwards either, because onboarding never runs a second time and there was
+    /// no Settings screen. The only recovery was deleting the app.
+    @Test("steps go back as well as forward, and stop at the first")
+    func stepsGoBack() async throws {
+        let store = try await PresentationFixture.store()
+        let model = OnboardingViewModel(store: store, year: 2025)
+        #expect(model.isFirstStep)
+
+        model.advance()
+        model.advance()
+        #expect(model.isLastStep)
+
+        model.goBack()
+        #expect(model.step == .household)
+        model.goBack()
+        #expect(model.step == .welcome)
+        #expect(model.isFirstStep)
+
+        // Going back from the first step is a no-op, not a crash or a wrap-around.
+        model.goBack()
+        #expect(model.step == .welcome)
+    }
+
     @Test("steps advance in order and stop at the end")
     func stepping() async throws {
         let store = try await PresentationFixture.store()

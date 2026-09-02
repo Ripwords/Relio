@@ -42,10 +42,20 @@ public final class OnboardingViewModel {
     }
 
     public var isLastStep: Bool { step == OnboardingStep.allCases.last }
+    public var isFirstStep: Bool { step == OnboardingStep.allCases.first }
 
     public func advance() {
         guard let next = OnboardingStep(rawValue: step.rawValue + 1) else { return }
         step = next
+    }
+
+    /// Onboarding used to run forwards only. Realising on the income step that the
+    /// household answer above it was wrong left no way back — and no way to fix it later
+    /// either, because onboarding never runs again. Settings now exists as the second
+    /// answer to that; this is the first.
+    public func goBack() {
+        guard let previous = OnboardingStep(rawValue: step.rawValue - 1) else { return }
+        step = previous
     }
 
     /// What `finish()`/`skip()` actually managed to do.

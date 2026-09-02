@@ -31,6 +31,8 @@ struct OnboardingView: View {
     var body: some View {
         @Bindable var model = model
         return VStack(spacing: 0) {
+            stepIndicator(model)
+
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(24)
@@ -47,6 +49,11 @@ struct OnboardingView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
 
+                if !model.isFirstStep {
+                    Button("Back") { model.goBack() }
+                        .font(.subheadline)
+                }
+
                 Button("Skip for now") {
                     // Unchanged: skipping asks for no income, so nothing can fail to save.
                     Task { await model.skip(); onFinished() }
@@ -55,6 +62,25 @@ struct OnboardingView: View {
             }
             .padding(24)
         }
+    }
+
+    /// Three dots, so the user can see how long this is before deciding to sit through
+    /// it. Three skippable screens with no end in sight is a flow people abandon at the
+    /// second one — and skipping costs them every relief that depends on a household
+    /// fact.
+    ///
+    /// A back button rides alongside, because onboarding used to run forwards only.
+    private func stepIndicator(_ model: OnboardingViewModel) -> some View {
+        HStack(spacing: 8) {
+            ForEach(OnboardingStep.allCases, id: \.self) { step in
+                Capsule()
+                    .fill(step == model.step ? Color.accentColor : Color.secondary.opacity(0.25))
+                    .frame(width: step == model.step ? 22 : 7, height: 7)
+            }
+        }
+        .padding(.top, 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(model.step.rawValue + 1) of \(OnboardingStep.allCases.count)")
     }
 
     /// Leaves onboarding only when the writes the user asked for actually happened.
