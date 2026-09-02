@@ -3,6 +3,20 @@ import TaxKit
 
 /// The only place a `Money` becomes a `View`.
 ///
+/// **Use it for a figure in its own column; not for one inside a sentence.**
+///
+/// Four screens shipped the same break before this was written down: a `MoneyText` beside
+/// a `Text` in an `HStack`, which cannot wrap as a sentence because each view wraps on its
+/// own. At the largest Dynamic Type sizes they came apart into
+/// "RM 500.00 | more" over "relief", "unlock RM 20,0…", and
+/// "RM 2,200.00 | of this will not count. | The cap is | RM 2,500.00" — the figures
+/// orphaned from the words that give them meaning.
+///
+/// A sentence containing an amount is one `Text` with `amount.formatted()` interpolated
+/// and `.monospacedDigit()` applied, which is what every accessibility label in the app
+/// already does. The formatter stays the single source either way; what changes is that
+/// the words and the number wrap together.
+///
 /// Global constraint: one formatter, and interpolating an amount into user-facing text
 /// anywhere else is a defect. Routing every amount through one view makes that a
 /// one-line grep, and gives `.monospacedDigit()` a single home — spec §11.2 requires
