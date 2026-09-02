@@ -33,16 +33,11 @@ struct ReliefDetailView: View {
         List {
             if let assessment = model.assessment {
                 Section {
-                    labelled("Cap", assessment.cap)
-                    labelled("Claimed", assessment.claimed)
-                    // Both figures, labelled. `claimed` is what the user entered;
-                    // `allowed` is what LHDN would permit once caps bind. Showing one
-                    // without the other either hides a trim or overstates the claim.
-                    labelled("Allowed", assessment.allowed)
-                    labelled("Still claimable", assessment.headroom)
-                    if let saved = assessment.taxSaved {
-                        labelled("Tax saved", saved)
-                    }
+                    // The one figure this screen exists to give, at the size that says
+                    // so. Five equal rows made the reader find "still claimable" fourth
+                    // down a list where every line looked equally important — the same
+                    // flat treatment Home was fixed out of.
+                    headline(assessment)
                 } header: {
                     // Where the full LHDN name lives now that the title is the short one.
                     // `.textCase(nil)` because a grouped header would otherwise shout it
@@ -51,6 +46,17 @@ struct ReliefDetailView: View {
                         .textCase(nil)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    labelled("Cap", assessment.cap)
+                    labelled("Claimed", assessment.claimed)
+                    // Both figures, labelled. `claimed` is what the user entered;
+                    // `allowed` is what LHDN would permit once caps bind. Showing one
+                    // without the other either hides a trim or overstates the claim.
+                    labelled("Allowed", assessment.allowed)
+                } header: {
+                    Text("How that is worked out")
                 }
 
                 if let card = ReliefCopy.card(for: model.advice,
@@ -180,6 +186,38 @@ struct ReliefDetailView: View {
             ContributionQuestionsSheet(
                 model: ContributionQuestionsViewModel(store: store, questions: model.questions))
         }
+    }
+
+    /// The headroom, large, with what it is worth in tax under it — the same shape as
+    /// Home's headline, because it answers the same question about one relief instead of
+    /// all of them.
+    ///
+    /// "Exhausted" is said in words rather than shown as RM 0.00. A zero here is a good
+    /// outcome, not an empty one, and a bare zero reads as the latter.
+    @ViewBuilder
+    private func headline(_ assessment: ReliefAssessment) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if assessment.headroom > .zero {
+                MoneyText(amount: assessment.headroom, font: .largeTitle, weight: .bold)
+                Text("still claimable")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let saved = assessment.taxSaved, saved > .zero {
+                    Text("worth \(saved.formatted()) in tax")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            } else {
+                Text("Fully claimed")
+                    .font(.title2.weight(.semibold))
+                Text("You have used all of this relief for this year.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 
     /// `ViewThatFits` rather than a bare `HStack`, the same way `IncomeView` builds its
