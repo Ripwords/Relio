@@ -6,8 +6,10 @@ import TaxPresentation
 struct EntryHistoryView: View {
     @State private var model: EntryHistoryViewModel
 
-    init(store: TaxStore, year: Int) {
-        _model = State(initialValue: EntryHistoryViewModel(store: store, year: year))
+    init(store: TaxStore, year: Int, restrictedTo: Set<UUID>? = nil) {
+        _model = State(initialValue: EntryHistoryViewModel(store: store,
+                                                           year: year,
+                                                           restrictedTo: restrictedTo))
     }
 
     var body: some View {
@@ -47,11 +49,19 @@ struct EntryHistoryView: View {
                         }
                     } header: {
                         Text("\(model.filteredEntries.count) inputs")
+                    } footer: {
+                        // Says why the list is short, so a filtered screen is not mistaken
+                        // for the whole history with entries missing from it.
+                        if model.restrictedTo != nil {
+                            Text("These entries use a relief this year's rules do not "
+                                 + "recognise, so they count towards nothing. Open one to "
+                                 + "give it a relief that this year has.")
+                        }
                     }
                 }
             }
         }
-        .navigationTitle("Input history")
+        .navigationTitle(model.restrictedTo == nil ? "Input history" : "Needs a relief")
         .searchable(text: $model.searchText, prompt: "Search vendor, note, or relief")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

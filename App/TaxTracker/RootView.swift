@@ -167,8 +167,10 @@ struct RootView: View {
                     .navigationDestination(for: IncomeRoute.self) { _ in
                         IncomeView(model: income)
                     }
-                    .navigationDestination(for: EntryHistoryRoute.self) { _ in
-                        EntryHistoryView(store: store, year: context.year)
+                    .navigationDestination(for: EntryHistoryRoute.self) { route in
+                        EntryHistoryView(store: store,
+                                         year: context.year,
+                                         restrictedTo: route.restrictedTo)
                     }
                     .navigationDestination(for: SettingsRoute.self) { _ in
                         SettingsView(context: context, store: store)

@@ -43,12 +43,14 @@ public struct HomePrompts: Hashable, Sendable {
     /// invisible on every screen in the app and their claim looks like it was never
     /// made. Rendering the actionable row is the reliefs screen's job; owning the number
     /// is this view model's.
-    public var unresolvedEntryCount: Int
+    public var unresolvedEntryIDs: [UUID]
+
+    public var unresolvedEntryCount: Int { unresolvedEntryIDs.count }
 
     public static let none = HomePrompts(unansweredQuestions: [],
                                          unlockableRelief: .zero,
                                          claimsMissingDocuments: 0,
-                                         unresolvedEntryCount: 0)
+                                         unresolvedEntryIDs: [])
 }
 
 /// Spec §11: Home answers one question — how much is being left on the table.
@@ -201,6 +203,6 @@ public final class HomeViewModel {
         return HomePrompts(unansweredQuestions: questions,
                            unlockableRelief: unlockable,
                            claimsMissingDocuments: missing,
-                           unresolvedEntryCount: result.unresolved.count)
+                           unresolvedEntryIDs: result.unresolved.map(\.entryID))
     }
 }

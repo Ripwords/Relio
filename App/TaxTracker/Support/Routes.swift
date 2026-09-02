@@ -9,7 +9,14 @@ struct EntryRoute: Hashable {
 /// Navigation value for the income timeline.
 struct IncomeRoute: Hashable {}
 
-struct EntryHistoryRoute: Hashable {}
+/// The input history, optionally narrowed to a named set of entries.
+///
+/// `nil` is the whole year — the ordinary Settings route. Home's "entries use a relief
+/// this year's rules don't recognise" prompt passes the ids the evaluator could not
+/// resolve, so the tap lands on exactly the rows that need re-coding.
+struct EntryHistoryRoute: Hashable {
+    var restrictedTo: Set<UUID>?
+}
 
 /// Navigation value for a new entry that opens with a figure already in it.
 ///

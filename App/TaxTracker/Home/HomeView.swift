@@ -130,12 +130,19 @@ struct HomeView: View {
                 .buttonStyle(.plain)
             }
             if model.prompts.unresolvedEntryCount > 0 {
-                promptRow(
-                    systemImage: "exclamationmark.triangle",
-                    title: model.prompts.unresolvedEntryCount == 1
-                        ? "1 entry uses a relief this year's rules don't recognise"
-                        : "\(model.prompts.unresolvedEntryCount) entries use a relief this year's rules don't recognise",
-                    trailing: nil)
+                // The last prompt on this screen that led nowhere. `UnresolvedEntry`
+                // documents itself as existing "so the UI can show an actionable amber
+                // row"; it now opens the input history filtered to exactly those entries.
+                NavigationLink(value: EntryHistoryRoute(
+                    restrictedTo: Set(model.prompts.unresolvedEntryIDs))) {
+                    promptRow(
+                        systemImage: "exclamationmark.triangle",
+                        title: model.prompts.unresolvedEntryCount == 1
+                            ? "1 entry uses a relief this year's rules don't recognise"
+                            : "\(model.prompts.unresolvedEntryCount) entries use a relief this year's rules don't recognise",
+                        trailing: nil)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

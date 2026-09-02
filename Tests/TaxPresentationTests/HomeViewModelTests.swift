@@ -295,3 +295,41 @@ import TaxData
         #expect(model.opportunities.isEmpty)
     }
 }
+
+/// Home's third prompt row — "N entries use a relief this year's rules don't recognise" —
+/// was the last one on the screen with nothing behind the tap. `UnresolvedEntry`
+/// documents itself as existing "so the UI can show an actionable amber row instead of
+/// dropping the claim", and the row was not actionable.
+@Suite("Entry history filter") @MainActor struct EntryHistoryFilterTests {
+
+    @Test("a restricted history shows only the entries it was given")
+    func restrictionNarrowsTheList() async throws {
+        let store = try await PresentationFixture.store()
+        let keep = try await store.save(EntryDraft(year: 2025, code: .lifestyle,
+                                                   amount: Money(ringgit: 100),
+                                                   vendor: "Keep"))
+        _ = try await store.save(EntryDraft(year: 2025, code: .sspn,
+                                            amount: Money(ringgit: 200),
+                                            vendor: "Hide"))
+
+        let all = EntryHistoryViewModel(store: store, year: 2025)
+        await all.refresh()
+        #expect(all.filteredEntries.count == 2)
+
+        let only = EntryHistoryViewModel(store: store, year: 2025, restrictedTo: [keep])
+        await only.refresh()
+        #expect(only.filteredEntries.map(\.vendor) == ["Keep"])
+    }
+
+    /// No restriction is not an empty restriction. Passing nil has to mean "everything",
+    /// or the ordinary Input history screen would come up blank.
+    @Test("no restriction shows everything")
+    func noRestrictionShowsEverything() async throws {
+        let store = try await PresentationFixture.store()
+        _ = try await store.save(EntryDraft(year: 2025, code: .lifestyle,
+                                            amount: Money(ringgit: 100), vendor: "One"))
+        let model = EntryHistoryViewModel(store: store, year: 2025, restrictedTo: nil)
+        await model.refresh()
+        #expect(model.filteredEntries.count == 1)
+    }
+}
