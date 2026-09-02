@@ -29,3 +29,6 @@ struct PrefilledEntryRoute: Hashable {
 
 /// Navigation value for Settings.
 struct SettingsRoute: Hashable {}
+
+/// Navigation value for the year comparison.
+struct CompareRoute: Hashable {}

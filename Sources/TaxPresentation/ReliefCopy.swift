@@ -138,6 +138,38 @@ public enum ReliefCopy {
         }
     }
 
+    /// One published rule change, for the Compare screen's list of what moved.
+    ///
+    /// Phrased from the later year's point of view, because that is the direction the
+    /// screen reads in — "rose to RM 4,000", not "was RM 3,000".
+    public static func text(for delta: ReliefDelta, in year: Int) -> String {
+        switch delta {
+        case .added(_, _, let cap):
+            "New in \(String(year)), up to \(cap.formatted())"
+        case .removed(_, _, let supersededBy):
+            supersededBy == nil
+                ? "Withdrawn in \(String(year))"
+                : "Merged into another relief in \(String(year))"
+        case .capChanged(_, _, let from, let to):
+            to > from
+                ? "Cap rose from \(from.formatted()) to \(to.formatted())"
+                : "Cap fell from \(from.formatted()) to \(to.formatted())"
+        case .conditionsChanged:
+            "The conditions changed"
+        }
+    }
+
+    /// The relief a change is about, named the short way.
+    public static func name(of delta: ReliefDelta) -> String {
+        switch delta {
+        case .added(let code, let name, _),
+             .removed(let code, let name, _),
+             .capChanged(let code, let name, _, _),
+             .conditionsChanged(let code, let name, _, _):
+            shortName(for: code, fullName: name)
+        }
+    }
+
     /// A required supporting document kind, for a relief's "Documents" section.
     public static func text(for kind: DocumentKind) -> String {
         switch kind {

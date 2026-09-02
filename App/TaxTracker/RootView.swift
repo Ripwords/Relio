@@ -101,6 +101,7 @@ struct RootView: View {
         switch screen {
         case "docs": selectedTab = .docs
         case "settings": path.append(SettingsRoute())
+        case "compare": path.append(CompareRoute())
         case "reliefs": path.append(ReliefsRoute())
         case "income": path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
@@ -162,6 +163,11 @@ struct RootView: View {
                     .navigationDestination(for: SettingsRoute.self) { _ in
                         SettingsView(context: context, store: store)
                     }
+                    .navigationDestination(for: CompareRoute.self) { _ in
+                        CompareView(model: CompareViewModel(store: store,
+                                                            loader: BundledRuleSetLoader(),
+                                                            baselineYear: context.year))
+                    }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
@@ -201,6 +207,15 @@ struct RootView: View {
                                         } else {
                                             Text("YA \(String(year))")
                                         }
+                                    }
+                                }
+                                if context.availableYears.count > 1 {
+                                    Divider()
+                                    Button {
+                                        path.append(CompareRoute())
+                                    } label: {
+                                        Label("Compare with another year",
+                                              systemImage: "arrow.left.arrow.right")
                                     }
                                 }
                             } label: {

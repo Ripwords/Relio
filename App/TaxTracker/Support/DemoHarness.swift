@@ -134,6 +134,10 @@ enum DemoHarness {
             (ReliefCode.medicalCheckup, 400, "BP Healthcare", 9, 12),
             (ReliefCode.lifestyleSports, 500, "Decathlon", 3, 27),
             (ReliefCode.childcare, 2_400, "Little Caliphs", 4, 6),
+            // Deliberately a relief whose cap moved between YA2024 and YA2025, so the
+            // Compare screen's priced lines have something to price. Without one, every
+            // seeded run showed only its "other changes" half.
+            (ReliefCode.insuranceEduMedical, 3_500, "AIA Medical", 6, 18),
         ].enumerated().map { index, row in
             let (code, ringgit, vendor, month, day) = row
             return EntryDraft(id: DemoID.entry(index),
