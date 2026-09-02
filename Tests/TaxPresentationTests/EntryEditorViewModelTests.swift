@@ -606,3 +606,67 @@ import TaxData
         #expect(saved.amount == Money(sen: 182_050))
     }
 }
+
+/// Nothing in the entry editor ever mentioned the cap. A user typing RM 3,000 against a
+/// relief capped at RM 2,500 got a clean save, and only found out that RM 500 of it
+/// counted for nothing by going to the relief screen afterwards and comparing "claimed"
+/// with "allowed".
+///
+/// The engine has known the cap and the headroom all along. The editor just never asked.
+@Suite("Entry editor cap guidance")
+@MainActor
+struct EntryEditorCapGuidanceTests {
+
+    static func editor(_ store: TaxStore, editing: UUID? = nil) async -> EntryEditorViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = EntryEditorViewModel(context: context, store: store, editing: editing)
+        await model.load()
+        return model
+    }
+
+    @Test("no relief chosen means nothing to say about a cap")
+    func noGuidanceWithoutARelief() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        #expect(model.capGuidance == nil)
+    }
+
+    @Test("an amount within the cap is not flagged")
+    func withinCapIsNotFlagged() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.amountText = "100"
+
+        let guidance = try #require(model.capGuidance)
+        #expect(guidance.overBy == .zero)
+    }
+
+    /// The figure that matters: how much of what they typed will not count.
+    @Test("an amount past the cap reports the excess")
+    func overCapReportsTheExcess() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        // Lifestyle is capped at RM 2,500 and this profile has logged nothing against it.
+        model.amountText = "3000"
+
+        let guidance = try #require(model.capGuidance)
+        #expect(guidance.cap == Money(ringgit: 2_500))
+        #expect(guidance.overBy == Money(ringgit: 500))
+    }
+
+    /// Guidance is a warning, never a refusal. LHDN caps what it allows; it does not stop
+    /// someone spending more, and an editor that refused the real figure would force them
+    /// to write down a number that is not what they spent.
+    @Test("going over the cap does not block the save")
+    func overCapStillSaves() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.amountText = "3000"
+        #expect(model.canSave == true)
+    }
+}

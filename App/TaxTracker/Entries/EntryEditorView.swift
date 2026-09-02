@@ -65,7 +65,10 @@ struct EntryEditorView: View {
                 Picker("Relief", selection: $model.selectedCode) {
                     Text("Choose…").tag(ReliefCode?.none)
                     ForEach(model.availableCodes) { option in
-                        Text(option.name).tag(ReliefCode?.some(option.code))
+                        // Short names here too. A picker of two dozen four-line LHDN
+                        // descriptions is not a list anyone reads to the end.
+                        Text(ReliefCopy.shortName(for: option.code, fullName: option.name))
+                            .tag(ReliefCode?.some(option.code))
                     }
                 }
 
@@ -74,6 +77,14 @@ struct EntryEditorView: View {
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .monospacedDigit()
+                }
+
+                // The cap, while there is still time to do something about it. Without
+                // this the editor took RM 3,000 against a RM 2,500 relief without
+                // comment, and the user found out — if ever — by noticing later that the
+                // relief's "claimed" and "allowed" figures disagreed.
+                if let guidance = model.capGuidance {
+                    capNote(guidance)
                 }
 
                 if !model.admittedClaimants.isEmpty {
@@ -167,5 +178,33 @@ struct EntryEditorView: View {
             .onChange(of: model.claimant) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.dependentID) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.spentOn) { Task { await model.checkForDuplicate() } }
+    }
+
+    /// Advice, not an error: secondary type while the amount fits, orange only once part
+    /// of it would not count. Save stays enabled either way — LHDN caps what it allows,
+    /// it does not stop anyone spending more, and an editor that refused the real figure
+    /// would push the user to write down a number that is not what they spent.
+    @ViewBuilder
+    private func capNote(_ guidance: EntryEditorViewModel.CapGuidance) -> some View {
+        // One `Text`, not an `HStack` of `MoneyText` and labels. A sentence built from
+        // side-by-side views cannot wrap as a sentence: at this width the first attempt
+        // broke into "RM 2,200.00 | of this will not count. | The cap is | RM 2,500.00"
+        // with the figures orphaned from the words they belong to. The amounts still come
+        // from the one formatter, the same way every accessibility label in the app does.
+        if guidance.overBy > .zero {
+            Label {
+                Text("\(guidance.overBy.formatted()) of this will not count. "
+                     + "The cap is \(guidance.cap.formatted()), and "
+                     + "\(guidance.headroom.formatted()) of it is left.")
+            } icon: {
+                Image(systemName: "exclamationmark.circle")
+            }
+            .font(.footnote)
+            .foregroundStyle(.orange)
+        } else {
+            Text("\(guidance.headroom.formatted()) of this relief is still claimable.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
     }
 }

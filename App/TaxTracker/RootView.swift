@@ -111,6 +111,14 @@ struct RootView: View {
         case "history": path.append(EntryHistoryRoute())
         case "entry":
             editingEntry = EntryEditorViewModel(context: context, store: store, editing: nil)
+        case let name where name.hasPrefix("entry:"):
+            // `entry:CODE:RINGGIT` — a prefilled editor, so a screenshot run can see the
+            // amount fields in a state a blank new entry never shows.
+            let parts = name.split(separator: ":")
+            if parts.count == 3, let ringgit = Int(parts[2]) {
+                path.append(PrefilledEntryRoute(code: ReliefCode(String(parts[1])),
+                                                amount: Money(ringgit: Decimal(ringgit))))
+            }
         case let name where name.hasPrefix("relief:"):
             path.append(ReliefCode(String(name.dropFirst("relief:".count))))
         default:

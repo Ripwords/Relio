@@ -89,6 +89,9 @@ public final class EntryEditorViewModel {
     private let store: TaxStore
     private let editingID: UUID?
     private var deletedID: UUID?
+    /// The amount this editor opened on, or zero for a new entry. Subtracted from the
+    /// evaluation's `claimed` in `capGuidance`, which counts the entry being edited.
+    private var originalAmount: Money = .zero
     /// Every code's admitted claimants, inherited down from the nearest ancestor that
     /// declares its own `.claimant(in:)` — built once per `load()` from `context.ruleSet`
     /// and covering every code in the rulebook, not just the offerable ones.
@@ -148,6 +151,7 @@ public final class EntryEditorViewModel {
 
         selectedCode = existing.code
         amountText = existing.amount.formattedForEditing()
+        originalAmount = existing.amount
         vendor = existing.vendor
         spentOn = existing.spentOn
         claimant = existing.claimant
@@ -199,6 +203,48 @@ public final class EntryEditorViewModel {
             .flatMap { context.rule(for: $0) }
             .map { Self.mentionsDependentFact($0.eligibility) } ?? false
         return claimantAdmitsADependent || ownRuleTurnsOnADependentFact
+    }
+
+    /// What the chosen relief's cap does to the amount being typed.
+    ///
+    /// The editor has never mentioned a cap. Someone entering RM 3,000 against a relief
+    /// capped at RM 2,500 got a clean save and no hint that RM 500 of it counts for
+    /// nothing — they would find out by opening the relief afterwards and noticing that
+    /// "claimed" and "allowed" disagree, if they noticed at all.
+    ///
+    /// A warning, never a refusal. LHDN caps what it allows; it does not stop anyone
+    /// spending more, and an editor that rejected the real figure would push the user to
+    /// write down a number that is not what they spent.
+    public struct CapGuidance: Hashable, Sendable {
+        public var cap: Money
+        /// Already claimed against this relief, excluding the entry being edited.
+        public var claimedElsewhere: Money
+        /// Room left before this entry is counted.
+        public var headroom: Money
+        /// How much of this entry would exceed the cap. Zero when it fits.
+        public var overBy: Money
+    }
+
+    public var capGuidance: CapGuidance? {
+        guard let selectedCode,
+              let assessment = context.result?.allAssessments
+                  .first(where: { $0.code == selectedCode }),
+              assessment.cap > .zero else { return nil }
+
+        // The evaluation counts the entry being edited, so its current amount has to come
+        // back out — otherwise re-opening a RM 1,700 entry and retyping the same figure
+        // reports it as RM 1,700 over.
+        let claimedElsewhere = assessment.claimed - originalAmount
+        let headroom = claimedElsewhere >= assessment.cap
+            ? .zero
+            : assessment.cap - claimedElsewhere
+        let amount = MoneyParsing.money(from: amountText) ?? .zero
+        let overBy = amount > headroom ? amount - headroom : .zero
+
+        return CapGuidance(cap: assessment.cap,
+                           claimedElsewhere: claimedElsewhere,
+                           headroom: headroom,
+                           overBy: overBy)
     }
 
     public var validationError: String? {
