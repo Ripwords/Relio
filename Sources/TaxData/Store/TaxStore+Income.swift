@@ -233,6 +233,40 @@ extension TaxStore {
         try modelContext.save()
     }
 
+    /// Undoes `softDeleteIncomeSource`.
+    ///
+    /// Every row sharing the identity, for the reason the delete clears every row sharing
+    /// it: CloudKit can deliver two, reads resolve across both, and reviving one of them
+    /// would show the user their job coming back and then disappearing again the next
+    /// time the sweep ran.
+    ///
+    /// Idempotent, like the delete. A source that is already live is not re-stamped —
+    /// a replayed undo must not outrank a genuine later edit under newest-write-wins.
+    public func restoreIncomeSource(id: UUID) throws {
+        let deleted = try modelContext.fetch(FetchDescriptor<IncomeSource>(
+            predicate: #Predicate { $0.id == id && $0.deletedAt != nil }))
+        guard !deleted.isEmpty else { return }
+        let stamp = now()
+        for row in deleted {
+            row.deletedAt = nil
+            row.updatedAt = stamp
+        }
+        try modelContext.save()
+    }
+
+    /// Undoes `softDeleteIncomeRecord`, on the same terms.
+    public func restoreIncomeRecord(id: UUID) throws {
+        let deleted = try modelContext.fetch(FetchDescriptor<IncomeRecord>(
+            predicate: #Predicate { $0.id == id && $0.deletedAt != nil }))
+        guard !deleted.isEmpty else { return }
+        let stamp = now()
+        for row in deleted {
+            row.deletedAt = nil
+            row.updatedAt = stamp
+        }
+        try modelContext.save()
+    }
+
     // MARK: - Reads
 
     /// One draft per identity, not per row. Two rows CloudKit delivered for one source are

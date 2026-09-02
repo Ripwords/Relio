@@ -243,11 +243,54 @@ public final class IncomeViewModel {
     /// happen looks identical to one that did — the row stays, and the user reads that as
     /// the tap not registering and tries again. There is no undo for income, and the
     /// per-record swipe has no confirmation to fall back on either.
+    /// What the last delete removed, so the toast can put it back.
+    ///
+    /// Spec §11.6 asks for soft delete plus an undo toast on every destructive action.
+    /// Income was the exception — both deletes soft-delete, so the rows were always
+    /// recoverable, and nothing could ask for them back.
+    public enum Undoable: Hashable, Sendable {
+        case source(UUID, name: String)
+        case record(UUID)
+
+        public var message: String {
+            switch self {
+            case .source(_, let name): "Deleted \(name)"
+            case .record: "Deleted income change"
+            }
+        }
+    }
+
+    public private(set) var lastDeleted: Undoable?
+
+    public func clearUndo() { lastDeleted = nil }
+
+    /// Puts back whatever the last delete removed. Idempotent at the store level, so a
+    /// double tap on the toast cannot do harm.
+    public func undoDelete() async {
+        guard let lastDeleted else { return }
+        do {
+            switch lastDeleted {
+            case .source(let id, _): try await store.restoreIncomeSource(id: id)
+            case .record(let id): try await store.restoreIncomeRecord(id: id)
+            }
+        } catch {
+            // Nothing to say that the screen cannot already show: the reload below puts
+            // the true state back on screen either way, and a failed undo leaves the row
+            // deleted, which is what the user is already looking at.
+        }
+        self.lastDeleted = nil
+        await reloadEverything()
+    }
+
     @discardableResult
     public func deleteSource(id: UUID) async -> Bool {
         var succeeded = false
+        // Captured before the delete: afterwards the source is gone from the drafts and
+        // the toast would have no name to show.
+        let name = sources.first { $0.id == id }?.name ?? "income source"
         do {
             try await store.softDeleteIncomeSource(id: id)
+            lastDeleted = .source(id, name: name)
             succeeded = true
         } catch {
             succeeded = false
@@ -261,6 +304,7 @@ public final class IncomeViewModel {
         var succeeded = false
         do {
             try await store.softDeleteIncomeRecord(id: id)
+            lastDeleted = .record(id)
             succeeded = true
         } catch {
             succeeded = false

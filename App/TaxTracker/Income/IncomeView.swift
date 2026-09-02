@@ -25,6 +25,7 @@ struct IncomeView: View {
     /// kind of news: a save the user believes happened and did not.
     @State private var overrideError: String?
     /// The source a destructive tap is asking about, held until it is confirmed.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sourcePendingDeletion: IncomeSourceRow?
     /// Set when a delete reported failure. Shown the same way as `overrideError` — the row
     /// staying put is exactly what a tap that never registered looks like, and there is no
@@ -203,10 +204,27 @@ struct IncomeView: View {
             }
             Button("Keep it", role: .cancel) { sourcePendingDeletion = nil }
         } message: { source in
-            // Names what goes with it. The records are the derivation — losing them
-            // silently is losing the user's working, and there is no undo for this.
+            // Names what goes with it. The records are the derivation, and losing them
+            // silently is losing the user's working. The undo toast below is the second
+            // net; the confirmation stays because restoring a source is a worse
+            // experience than not deleting it.
             Text(Self.deletionWarning(recordCount: source.records.count))
         }
+        // Spec §11.6: every destructive action is undoable, on every platform. Income was
+        // the exception — both deletes already soft-deleted, so the rows were recoverable
+        // the whole time and nothing could ask for them back. The per-record swipe was the
+        // sharper edge of the two: no confirmation and no undo, on a gesture people fire
+        // by accident, against the figure every tax number in the app derives from.
+        .overlay(alignment: .bottom) {
+            if let undoable = model.lastDeleted {
+                UndoToast(message: undoable.message,
+                          undo: { await model.undoDelete() },
+                          isPresented: Binding(get: { model.lastDeleted != nil },
+                                               set: { if !$0 { model.clearUndo() } }))
+                    .padding(.bottom, 12)
+            }
+        }
+        .animation(reduceMotion ? nil : .spring(duration: 0.3), value: model.lastDeleted)
         .task {
             await model.refresh()
             overrideText = model.overrideEditingText

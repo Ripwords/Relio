@@ -538,3 +538,62 @@ import TaxData
         }
     }
 }
+
+/// Spec §11.6 asks for an undo toast on every destructive action. Income had none, on
+/// either of its two deletes, against the figure every tax number in the app derives from.
+@Suite("Income undo") @MainActor struct IncomeUndoTests {
+
+    static func seeded() async throws -> (TaxStore, IncomeViewModel, UUID, UUID) {
+        let store = try await PresentationFixture.store()
+        let sourceID = try await store.seedPrimaryEmployment(
+            name: "Main job",
+            monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: IncomeViewModelTests.date(2025, 1, 1))
+        var raise = IncomeRecordDraft(sourceID: sourceID)
+        raise.amount = Money(ringgit: 9_000)
+        raise.effectiveFrom = IncomeViewModelTests.date(2025, 7, 1)
+        let raiseID = try await store.save(raise)
+        let model = await IncomeViewModelTests.model(store)
+        return (store, model, sourceID, raiseID)
+    }
+
+    @Test("deleting a source offers it back by name")
+    func deletingASourceIsUndoable() async throws {
+        let (_, model, sourceID, _) = try await Self.seeded()
+        #expect(model.lastDeleted == nil)
+
+        await model.deleteSource(id: sourceID)
+        #expect(model.lastDeleted == .source(sourceID, name: "Main job"))
+        // The name is captured before the delete; afterwards the source is gone from the
+        // drafts and the toast would have nothing to show.
+        #expect(model.lastDeleted?.message == "Deleted Main job")
+        #expect(model.sources.isEmpty)
+
+        await model.undoDelete()
+        #expect(model.lastDeleted == nil)
+        #expect(model.sources.count == 1)
+    }
+
+    /// The swipe with no confirmation. This is the one an undo matters most for.
+    @Test("deleting a record offers it back, and the total returns")
+    func deletingARecordIsUndoable() async throws {
+        let (_, model, _, raiseID) = try await Self.seeded()
+        let before = model.derivedTotal
+
+        await model.deleteRecord(id: raiseID)
+        #expect(model.lastDeleted == .record(raiseID))
+        #expect(model.derivedTotal != before)
+
+        await model.undoDelete()
+        #expect(model.derivedTotal == before)
+    }
+
+    @Test("dismissing the toast leaves the delete standing")
+    func clearingUndoDoesNotRestore() async throws {
+        let (_, model, sourceID, _) = try await Self.seeded()
+        await model.deleteSource(id: sourceID)
+        model.clearUndo()
+        #expect(model.lastDeleted == nil)
+        #expect(model.sources.isEmpty)
+    }
+}

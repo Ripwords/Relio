@@ -505,3 +505,88 @@ import TaxKit
             id: WellKnownID.primaryEmployment) == 0)
     }
 }
+
+/// Spec §11.6: "Every destructive action is undoable — soft delete plus an undo toast,
+/// all platforms." Income was the exception. Both deletes soft-delete, so the rows were
+/// always recoverable — nothing could ask for them back.
+///
+/// The per-record swipe was the sharper edge of the two: no confirmation and no undo, on
+/// a gesture people fire by accident, against the figure every tax number in the app is
+/// derived from.
+@Suite("Income restore") struct IncomeRestoreTests {
+
+    static func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        IncomeStoreTests.date(y, m, d)
+    }
+
+    static func seeded() async throws -> (TaxStore, UUID, UUID) {
+        let store = try await StoreFixture.store()
+        let sourceID = try await store.seedPrimaryEmployment(
+            name: "Main job",
+            monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: date(2025, 1, 1))
+        var raise = IncomeRecordDraft(sourceID: sourceID)
+        raise.amount = Money(ringgit: 9_000)
+        raise.effectiveFrom = date(2025, 7, 1)
+        let raiseID = try await store.save(raise)
+        return (store, sourceID, raiseID)
+    }
+
+    @Test("a restored source comes back, and so does the income it derives")
+    func restoringASourceRestoresItsIncome() async throws {
+        let (store, sourceID, _) = try await Self.seeded()
+        let before = try await store.derivedGrossIncome(for: 2025)
+        #expect(before > .zero)
+
+        try await store.softDeleteIncomeSource(id: sourceID)
+        #expect(try await store.derivedGrossIncome(for: 2025) == .zero)
+
+        try await store.restoreIncomeSource(id: sourceID)
+        #expect(try await store.incomeSourceDrafts().count == 1)
+        #expect(try await store.derivedGrossIncome(for: 2025) == before)
+    }
+
+    @Test("a restored record rejoins its source's timeline")
+    func restoringARecordRestoresTheRaise() async throws {
+        let (store, sourceID, raiseID) = try await Self.seeded()
+        let before = try await store.derivedGrossIncome(for: 2025)
+
+        try await store.softDeleteIncomeRecord(id: raiseID)
+        let withoutRaise = try await store.derivedGrossIncome(for: 2025)
+        #expect(withoutRaise < before)
+
+        try await store.restoreIncomeRecord(id: raiseID)
+        #expect(try await store.derivedGrossIncome(for: 2025) == before)
+        #expect(try await store.incomeRecordDrafts(forSource: sourceID).count == 2)
+    }
+
+    /// The deletes clear every row sharing an identity, because CloudKit can deliver two.
+    /// A restore that revived one of them would leave the other deleted — and since reads
+    /// resolve across duplicates, the user would watch their job come back looking right
+    /// and then vanish again on the next sweep.
+    @Test("restoring revives every row sharing the identity, not one of them")
+    func restoreCoversDuplicates() async throws {
+        let (store, sourceID, _) = try await Self.seeded()
+        try await store.insertDuplicateIncomeSourceForTesting(
+            id: sourceID,
+            name: "Main job",
+            monthlyRate: Money(ringgit: 8_000),
+            effectiveFrom: Self.date(2025, 1, 1))
+
+        try await store.softDeleteIncomeSource(id: sourceID)
+        try await store.restoreIncomeSource(id: sourceID)
+
+        #expect(try await store.liveIncomeSourceRowCountForTesting(id: sourceID) == 2)
+    }
+
+    /// Idempotent, like the deletes it undoes. Restoring something that was never deleted
+    /// must not re-stamp it — that would let a replayed undo outrank a genuine later edit
+    /// under newest-write-wins.
+    @Test("restoring a live source changes nothing")
+    func restoringALiveSourceIsANoOp() async throws {
+        let (store, sourceID, _) = try await Self.seeded()
+        let before = try await store.incomeSourceDrafts()
+        try await store.restoreIncomeSource(id: sourceID)
+        #expect(try await store.incomeSourceDrafts() == before)
+    }
+}
