@@ -30,6 +30,9 @@ struct EntryEditorView: View {
     let onDeleted: (EntryEditorViewModel) -> Void
 
     @State private var hasDate = false
+    /// A button plus `navigationDestination(isPresented:)` rather than a NavigationLink,
+    /// so a screenshot run can open the picker — there is no way to tap this simulator.
+    @State private var isPickingRelief = false
 
     init(model: EntryEditorViewModel,
          presentation: EntryEditorPresentation,
@@ -62,15 +65,26 @@ struct EntryEditorView: View {
             }
 
             Section {
-                Picker("Relief", selection: $model.selectedCode) {
-                    Text("Choose…").tag(ReliefCode?.none)
-                    ForEach(model.availableCodes) { option in
-                        // Short names here too. A picker of two dozen four-line LHDN
-                        // descriptions is not a list anyone reads to the end.
-                        Text(ReliefCopy.shortName(for: option.code, fullName: option.name))
-                            .tag(ReliefCode?.some(option.code))
+                // A searchable list rather than a `Picker`. Two dozen reliefs with no way
+                // to search is a lot of scrolling on the screen the app exists to make
+                // quick, and a picker row can only show a name — which is not enough to
+                // decide between "Lifestyle" and "Lifestyle — sports".
+                Button {
+                    isPickingRelief = true
+                } label: {
+                    LabeledContent("Relief") {
+                        if let code = model.selectedCode {
+                            Text(ReliefCopy.shortName(
+                                for: code,
+                                fullName: model.availableCodes
+                                    .first { $0.code == code }?.name ?? code.rawValue))
+                        } else {
+                            Text("Choose…").foregroundStyle(.secondary)
+                        }
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
 
                 LabeledContent("Amount") {
                     TextField("0.00", text: $model.amountText)
@@ -161,9 +175,16 @@ struct EntryEditorView: View {
                     .disabled(!model.canSave)
                 }
             }
+            .navigationDestination(isPresented: $isPickingRelief) {
+                ReliefPickerView(options: model.availableCodes,
+                                 selection: $model.selectedCode)
+            }
             .task {
                 await model.load()
                 hasDate = model.spentOn != nil
+                #if DEBUG
+                if DemoHarness.screen == "relief-picker" { isPickingRelief = true }
+                #endif
             }
             .onChange(of: hasDate) { _, isOn in
                 if !isOn { model.spentOn = nil }

@@ -125,7 +125,7 @@ struct RootView: View {
         case "reliefs": selectedTab = .reliefs
         case "income": path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
-        case "entry":
+        case "entry", "relief-picker":
             editingEntry = EntryEditorViewModel(context: context, store: store, editing: nil)
         case let name where name.hasPrefix("entry:"):
             // `entry:CODE:RINGGIT` — a prefilled editor, so a screenshot run can see the
