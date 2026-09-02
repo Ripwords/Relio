@@ -24,7 +24,7 @@ and for what remains unverified.
 | **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation, income as a dated timeline (not one figure per year) | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
 | iOS app — Home, Reliefs, entry CRUD, Income, onboarding | ✅ Built; every screen read on the simulator |
-| Settings, Compare, Documents outstanding | ✅ Built and read on the simulator |
+| Settings, Compare, Documents outstanding, Dependants | ✅ Built and read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started — the Docs tab lists what each claim still needs, but nothing can attach one yet |
 | On-device AI assistant | Not started |
@@ -108,9 +108,11 @@ they did. A DEBUG-only harness fixes it: anything after `--` is passed to the ap
 ```
 
 `-relio-demo` seeds the household this README's worked example describes.
-`-relio-screen` takes `home`, `reliefs`, `docs`, `settings`, `compare`, `income`,
-`history`, `questions`, `entry`, `relief:<CODE>` or `entry:<CODE>:<ringgit>`, and
-`-relio-onboarding` forces the welcome flow. Combine with `xcrun simctl ui <device>
+`-relio-screen` takes `home`, `reliefs`, `docs`, `settings`, `dependents`, `compare`,
+`income`, `history`, `questions`, `entry`, `relief-picker`, `settings-household`,
+`settings-contributor`, `relief:<CODE>` or `entry:<CODE>:<ringgit>`. `-relio-onboarding`
+forces the welcome flow, `-relio-empty` completes it and seeds nothing (every empty state
+lives there), and `-relio-year 2023` opens on another Year of Assessment. Combine with `xcrun simctl ui <device>
 appearance dark` and `content_size accessibility-extra-extra-extra-large` to check both
 of the axes the spec requires.
 

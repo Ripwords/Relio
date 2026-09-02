@@ -95,9 +95,10 @@ struct ReliefDetailView: View {
                         Text("To claim this")
                     } footer: {
                         if answerable.count < questions.count {
-                            // Says why some of them have no button, rather than leaving
-                            // the user to wonder which ones the button covers.
-                            Text("The rest are asked where the details they belong to are edited.")
+                            // Names where, rather than leaving the user to wonder which
+                            // questions the button covers and where the others live.
+                            // Dependant details belong to a person, not to the year.
+                            Text("The rest are answered under Settings › Dependants.")
                         }
                     }
                 }
