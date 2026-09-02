@@ -59,9 +59,9 @@ struct DependentEditorView: View {
                         // age 18 threshold, where the relief quadruples.
                         Button("Set a date of birth") { isSettingBirthDate = true }
                     }
-                } header: {
-                    Text("Date of birth")
                 } footer: {
+                    // No section header: the row already says "Date of birth", and a
+                    // header repeating it put the same three words on screen twice.
                     Text("Age decides which child relief applies: RM 2,000 under 18, and RM 8,000 for full-time tertiary study.")
                 }
 
@@ -94,7 +94,9 @@ struct DependentEditorView: View {
                 Section {
                     // Three states, not two: yes, no, and not asked. A Toggle cannot say
                     // the third, and the engine needs it to know whether to prompt.
-                    Picker("Registered with JKM as disabled", selection: $draft.isDisabled) {
+                    // Short enough to leave the value on the same line. The footer
+                    // carries what JKM registration is and what it is worth.
+                    Picker("Registered disabled", selection: $draft.isDisabled) {
                         Text("Not said").tag(Bool?.none)
                         Text("Yes").tag(Bool?.some(true))
                         Text("No").tag(Bool?.some(false))

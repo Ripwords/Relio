@@ -121,7 +121,7 @@ struct RootView: View {
         case "docs": selectedTab = .docs
         case "settings", "settings-household", "settings-contributor":
             path.append(SettingsRoute())
-        case "dependents":
+        case "dependents", "dependent-editor", "dependent-new":
             path.append(DependentsRoute())
         case "compare": path.append(CompareRoute())
         case "reliefs": selectedTab = .reliefs

@@ -58,7 +58,18 @@ struct DependentsView: View {
                 await model.save(edited)
             }
         }
-        .task { await model.refresh() }
+        .task {
+            await model.refresh()
+            #if DEBUG
+            // The editor is presented from this view's own state, so RootView's route
+            // switch cannot reach it.
+            switch DemoHarness.screen {
+            case "dependent-editor": editing = model.dependents.first?.draft
+            case "dependent-new": editing = DependentDraft()
+            default: break
+            }
+            #endif
+        }
         // Spec §11.6. Deleting a dependant takes every child relief claimed against them
         // with it, which is a large and silent consequence for one swipe.
         .overlay(alignment: .bottom) {
