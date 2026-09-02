@@ -146,6 +146,54 @@ struct RootView: View {
         await context.switchYear(to: remembered)
     }
 
+
+    /// The year switcher, shared by every tab that shows year-scoped figures.
+    ///
+    /// It used to live only in Home's toolbar, which was fine while Home was the only
+    /// tab with a year in it. Reliefs and Docs are both scoped to the year too, and after
+    /// they became tabs a user standing on either one saw a year's figures with nothing
+    /// naming the year and no way to change it.
+    ///
+    /// - Parameter canCompare: Compare pushes onto Home's navigation path, so only Home's
+    ///   copy of the menu offers it. The other tabs get the switcher without it rather
+    ///   than a menu item that would push onto a stack the user is not looking at.
+    @ViewBuilder
+    private func yearMenu(canCompare: Bool) -> some View {
+        Menu {
+            ForEach(context.availableYears.reversed(), id: \.self) { year in
+                Button {
+                    Task {
+                        await context.switchYear(to: year)
+                        await home.refresh()
+                        // Income is per-year too, and its model outlives the switch. So is
+                        // Documents: its rows come from the year's requirement checks.
+                        await income.refresh()
+                        await documents.refresh()
+                    }
+                } label: {
+                    if year == context.year {
+                        Label("YA \(String(year))", systemImage: "checkmark")
+                    } else {
+                        Text("YA \(String(year))")
+                    }
+                }
+            }
+            if canCompare, context.availableYears.count > 1 {
+                Divider()
+                Button {
+                    path.append(CompareRoute())
+                } label: {
+                    Label("Compare with another year", systemImage: "arrow.left.arrow.right")
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text("YA \(String(context.year))").fontWeight(.semibold)
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+        }
+    }
+
     private var tabs: some View {
         TabView(selection: $selectedTab) {
             NavigationStack(path: $path) {
@@ -196,47 +244,7 @@ struct RootView: View {
                             onDeleted: handleDeleted)
                     }
                     .toolbar {
-                        ToolbarItem(placement: .principal) {
-                            Menu {
-                                ForEach(context.availableYears.reversed(), id: \.self) { year in
-                                    Button {
-                                        Task {
-                                            await context.switchYear(to: year)
-                                            await home.refresh()
-                                            // Income is per-year too, and its model
-                                            // outlives the switch. So is Documents: its
-                                            // rows come from the year's requirement
-                                            // checks.
-                                            await income.refresh()
-                                            await documents.refresh()
-                                        }
-                                    } label: {
-                                        // The check marks the current year; Compare joins
-                                        // this menu in a later plan, which is why the
-                                        // switcher lives in the title rather than a tab.
-                                        if year == context.year {
-                                            Label("YA \(String(year))", systemImage: "checkmark")
-                                        } else {
-                                            Text("YA \(String(year))")
-                                        }
-                                    }
-                                }
-                                if context.availableYears.count > 1 {
-                                    Divider()
-                                    Button {
-                                        path.append(CompareRoute())
-                                    } label: {
-                                        Label("Compare with another year",
-                                              systemImage: "arrow.left.arrow.right")
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text("YA \(String(context.year))").fontWeight(.semibold)
-                                    Image(systemName: "chevron.down").font(.caption2)
-                                }
-                            }
-                        }
+                        ToolbarItem(placement: .principal) { yearMenu(canCompare: true) }
                         ToolbarItem(placement: .topBarLeading) {
                             NavigationLink(value: SettingsRoute()) {
                                 Image(systemName: "gearshape")
@@ -267,12 +275,14 @@ struct RootView: View {
                                          context: context,
                                          store: store)
                     }
+                    .toolbar { ToolbarItem(placement: .principal) { yearMenu(canCompare: false) } }
             }
             .tabItem { Label("Reliefs", systemImage: "list.bullet.rectangle") }
             .tag(Tab.reliefs)
 
             NavigationStack {
                 DocumentsView(model: documents)
+                    .toolbar { ToolbarItem(placement: .principal) { yearMenu(canCompare: false) } }
                     .navigationDestination(for: EntryRoute.self) { route in
                         EntryEditorView(
                             model: EntryEditorViewModel(context: context, store: store,
