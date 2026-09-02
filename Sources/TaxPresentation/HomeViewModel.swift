@@ -63,6 +63,15 @@ public final class HomeViewModel {
     public private(set) var remainingOpportunityCount: Int = 0
     public private(set) var prompts: HomePrompts = .none
 
+    /// Whether the user has logged anything at all this year.
+    ///
+    /// Gates the headline. With nothing logged every relief reports headroom equal to its
+    /// cap, so the total is the rulebook's theoretical maximum rather than anything this
+    /// person can claim — "RM 87,350.00 of relief still claimable" on a first launch.
+    /// Home shows its first-run state instead, which is what spec §11.5 asked for and
+    /// what the unreachable "Nothing logged yet" branch was already written to say.
+    public private(set) var hasLoggedAnything = false
+
     private let store: TaxStore
 
     public init(context: YearContext, store: TaxStore) {
@@ -87,6 +96,7 @@ public final class HomeViewModel {
             opportunities = []
             remainingOpportunityCount = 0
             prompts = .none
+            hasLoggedAnything = false
             return
         }
 
@@ -105,6 +115,7 @@ public final class HomeViewModel {
         opportunities = Array(candidates.prefix(3))
         remainingOpportunityCount = max(0, candidates.count - opportunities.count)
         prompts = await makePrompts(result)
+        hasLoggedAnything = !((try? await store.entryDrafts(forYear: context.year)) ?? []).isEmpty
     }
 
     /// Eligible-or-unanswered reliefs with room left, best first.

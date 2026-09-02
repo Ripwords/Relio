@@ -245,6 +245,34 @@ import TaxData
         }
     }
 
+    /// The worst screen in the app, and the first one every real user saw.
+    ///
+    /// With nothing logged, every relief reports headroom equal to its whole cap, so the
+    /// headline summed to "RM 87,350.00 of relief still claimable" for someone who had
+    /// entered nothing and answered nothing. That is not money waiting to be collected,
+    /// it is the theoretical maximum for a person who qualified for every relief in the
+    /// rulebook and spent to the cap on all of them — and stating it as a claimable
+    /// figure is the same overstatement as ranking an unanswered relief top of the
+    /// opportunities, one level up.
+    ///
+    /// Spec §11.5 says empty states are the design. Home had one written — "Nothing
+    /// logged yet" — and it could never appear, because `opportunities` is never empty
+    /// when every cap counts as headroom.
+    @Test("with nothing logged, Home says so instead of summing every cap")
+    func nothingLoggedShowsTheFirstRunState() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.model(store)
+        #expect(model.hasLoggedAnything == false)
+    }
+
+    @Test("one entry is enough for the headline to mean something")
+    func oneEntryLeavesTheFirstRunState() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.model(store)
+        #expect(model.hasLoggedAnything == true)
+    }
+
     @Test("an empty first launch shows a number, not an error")
     func emptyStateHasAHeadline() async throws {
         let store = try await PresentationFixture.store()

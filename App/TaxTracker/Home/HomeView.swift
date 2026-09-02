@@ -20,9 +20,19 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                headline
+                // With nothing logged the headline is the sum of every relief's whole cap
+                // — the rulebook's theoretical maximum, not this person's money. Showing
+                // it as "still claimable" on a first launch was the most overstated figure
+                // in the app, on the first screen anyone sees.
+                if model.hasLoggedAnything {
+                    headline
+                } else {
+                    firstRun
+                }
                 prompts
-                opportunities
+                if model.hasLoggedAnything {
+                    opportunities
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 24)
@@ -42,6 +52,29 @@ struct HomeView: View {
                 Task { await model.refresh() }
             }
         }
+    }
+
+    /// Spec §11.5: empty states are the design, not an afterthought. Home had one written
+    /// and unreachable — `opportunities` is never empty, because every unclaimed relief
+    /// reports its whole cap as headroom.
+    ///
+    /// It names the two things worth doing rather than a figure, because there is no
+    /// honest figure yet. The prompts below it still show: a question the user can answer
+    /// is real work whether or not anything has been logged.
+    private var firstRun: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Nothing logged yet")
+                .font(.title2.weight(.bold))
+            Text("Add a receipt and Relio will show what it is worth in tax, and how much "
+                 + "room each relief has left.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("Estimate only. Verify with LHDN before you file.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // The only large number on the screen. Spec §11.
@@ -140,14 +173,7 @@ struct HomeView: View {
     @ViewBuilder
     private var opportunities: some View {
         if model.opportunities.isEmpty {
-            // Spec §11.5: empty states are the design, not an afterthought.
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Nothing logged yet")
-                    .font(.headline)
-                Text("Add your first receipt and Relio will show what it is worth.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Biggest opportunities")

@@ -67,6 +67,7 @@ struct RootView: View {
         .task {
             #if DEBUG
             if DemoHarness.wantsSeed { await DemoHarness.seed(into: store, year: context.year) }
+            if DemoHarness.wantsEmpty { await DemoHarness.markOnboarded(store, year: context.year) }
             #endif
             let preferences = try? await store.preferences()
             needsOnboarding = !(preferences?.hasCompletedOnboarding ?? false)

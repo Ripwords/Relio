@@ -19,6 +19,12 @@ enum DemoHarness {
     /// Seed a profile before the first read. Off unless asked for.
     static var wantsSeed: Bool { arguments.contains("-relio-demo") }
 
+    /// Complete onboarding and seed nothing, which is the state every real user is in the
+    /// moment they finish the welcome flow. Every empty state in the app lives here and
+    /// nothing else could reach it: `-relio-demo` fills the app up, and a fresh install
+    /// stops at onboarding.
+    static var wantsEmpty: Bool { arguments.contains("-relio-empty") }
+
     /// Force the welcome flow even though the seeded profile has completed it, so
     /// onboarding stays reviewable after seeding.
     static var wantsOnboarding: Bool { arguments.contains("-relio-onboarding") }
@@ -44,6 +50,18 @@ enum DemoHarness {
     /// Two facts are deliberately left unanswered. `propertyPrice` and `spouseIsDisabled`
     /// are what make Home show its "answer N questions" prompt, and that prompt is the
     /// thing being worked on. A fully answered profile would hide it.
+    /// Marks onboarding done and writes nothing else.
+    static func markOnboarded(_ store: TaxStore, year: Int) async {
+        do {
+            var preferences = try await store.preferences()
+            preferences.hasCompletedOnboarding = true
+            preferences.lastViewedYear = year
+            try await store.savePreferences(preferences)
+        } catch {
+            print("[DemoHarness] could not mark onboarded: \(error)")
+        }
+    }
+
     static func seed(into store: TaxStore, year: Int) async {
         do {
             var facts = YearFacts()
