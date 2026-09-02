@@ -22,6 +22,7 @@ struct ReliefDetailView: View {
     private let store: TaxStore
 
     @State private var isAnswering = false
+    @State private var isAnsweringProfile = false
 
     init(model: ReliefDetailViewModel, context: YearContext, store: TaxStore) {
         _model = State(initialValue: model)
@@ -70,9 +71,33 @@ struct ReliefDetailView: View {
                 }
 
                 if case .needsInfo(let questions) = assessment.eligibility {
-                    Section("To claim this") {
+                    // Listing what is missing and offering no way to supply it is the same
+                    // dead end Home's prompt was: this screen led with "answer to unlock
+                    // RM 7,000" and then printed the questions as plain labels.
+                    //
+                    // Only the answerable ones get a button. `dependentDetails` and
+                    // `lastClaimYear` have nowhere to be written, so a tap would open a
+                    // sheet with nothing in it.
+                    let answerable = ProfileQuestionsViewModel.answerable(questions)
+                    Section {
                         ForEach(questions, id: \.self) { question in
                             Label(ReliefCopy.text(for: question), systemImage: "questionmark.circle")
+                        }
+                        if !answerable.isEmpty {
+                            Button {
+                                isAnsweringProfile = true
+                            } label: {
+                                Label(answerable.count == 1 ? "Answer this" : "Answer these",
+                                      systemImage: "checkmark.circle")
+                            }
+                        }
+                    } header: {
+                        Text("To claim this")
+                    } footer: {
+                        if answerable.count < questions.count {
+                            // Says why some of them have no button, rather than leaving
+                            // the user to wonder which ones the button covers.
+                            Text("The rest are asked where the details they belong to are edited.")
                         }
                     }
                 }
@@ -190,6 +215,17 @@ struct ReliefDetailView: View {
         // does not, covering that case; `.task(id:)` stays because it covers the result
         // changing while this screen is still visible, which `.onAppear` would not catch.
         .onAppear { Task { await model.refresh() } }
+        .sheet(isPresented: $isAnsweringProfile) {
+            // Refreshed on dismissal for the same reason the contribution sheet is:
+            // answering changes eligibility, so every figure on this screen moves.
+            Task { await context.reload(); await model.refresh() }
+        } content: {
+            ProfileQuestionsSheet(
+                model: ProfileQuestionsViewModel(
+                    context: context,
+                    store: store,
+                    questions: profileQuestions)) {}
+        }
         .sheet(isPresented: $isAnswering) {
             // Refreshed on dismissal, and it has to be here. Answering writes a contributor
             // profile and income sources, none of which the rulebook evaluates, so
@@ -203,6 +239,12 @@ struct ReliefDetailView: View {
         }
     }
 
+    /// The rulebook questions blocking this relief, as the sheet needs them.
+    private var profileQuestions: [ProfileQuestion] {
+        guard case .needsInfo(let questions) = model.assessment?.eligibility else { return [] }
+        return questions
+    }
+
     /// The headroom, large, with what it is worth in tax under it — the same shape as
     /// Home's headline, because it answers the same question about one relief instead of
     /// all of them.
@@ -212,7 +254,18 @@ struct ReliefDetailView: View {
     @ViewBuilder
     private func headline(_ assessment: ReliefAssessment) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            if assessment.headroom > .zero {
+            if case .needsInfo = assessment.eligibility {
+                // The same overstatement Home was fixed out of, one screen in. This
+                // relief's headroom is its whole cap because nothing is claimed against
+                // it — and nothing can be, until the question below is answered. Calling
+                // that "still claimable" tells someone who is not registered with JKM
+                // that they have RM 7,000 waiting for them.
+                MoneyText(amount: assessment.headroom, font: .largeTitle, weight: .bold)
+                    .foregroundStyle(.secondary)
+                Text("if this relief applies to you")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else if assessment.headroom > .zero {
                 MoneyText(amount: assessment.headroom, font: .largeTitle, weight: .bold)
                 Text("still claimable")
                     .font(.subheadline)
@@ -223,6 +276,14 @@ struct ReliefDetailView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
+            } else if case .ineligible = assessment.eligibility {
+                // Reached the "fully claimed" branch before, which congratulated the user
+                // for using up a relief they were never able to claim.
+                Text("Not available to you")
+                    .font(.title2.weight(.semibold))
+                Text("Your details put this relief out of reach for this year.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             } else {
                 Text("Fully claimed")
                     .font(.title2.weight(.semibold))
