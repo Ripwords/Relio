@@ -37,7 +37,25 @@ public final class ProfileQuestionsViewModel {
     public var assessmentType: AssessmentType?
     public var employmentType: EmploymentType?
     public var gender: Gender?
-    public var propertyPrice: Money?
+    /// The property price, as typed.
+    ///
+    /// The text lives here rather than in the sheet for the reason `EntryEditorViewModel`
+    /// keeps `amountText`: `Money.formattedForEditing()` is internal to this module, so a
+    /// view holding the string would have to grow money formatting of its own.
+    ///
+    /// It also has to live here to be *loaded*. Held as `@State` in the sheet, a price
+    /// already in the store populated `propertyPrice` and left the field looking empty —
+    /// the user would be shown a blank box for an answer they had already given.
+    public var propertyPriceText: String {
+        get { storedPropertyPriceText }
+        set {
+            guard newValue != storedPropertyPriceText else { return }
+            storedPropertyPriceText = newValue
+            propertyPrice = MoneyParsing.money(from: newValue)
+        }
+    }
+
+    public private(set) var propertyPrice: Money?
     public var selfIsDisabled: Bool?
     public var spouseIsDisabled: Bool?
 
@@ -58,6 +76,8 @@ public final class ProfileQuestionsViewModel {
     /// Guarding here rather than only fixing the view: the view is one caller of several,
     /// and a rule the model enforces cannot be forgotten by the next one.
     public private(set) var hasLoaded = false
+
+    private var storedPropertyPriceText = ""
 
     private let context: YearContext
     private let store: TaxStore
@@ -108,6 +128,10 @@ public final class ProfileQuestionsViewModel {
         employmentType = facts.employmentType
         gender = facts.gender
         propertyPrice = facts.propertyPrice
+        // Assigned directly rather than through `propertyPriceText`, whose observer would
+        // re-parse it straight back into `propertyPrice` — harmless here, but the text is
+        // a rendering of the loaded figure, not an edit of it.
+        storedPropertyPriceText = facts.propertyPrice?.formattedForEditing() ?? ""
         selfIsDisabled = facts.selfIsDisabled
         spouseIsDisabled = facts.spouseIsDisabled
     }

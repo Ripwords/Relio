@@ -95,7 +95,8 @@ struct ProfileQuestionsViewModelTests {
         try await store.saveYearFacts(existing, for: 2025)
 
         let model = await Self.model(store, [.propertyPrice])
-        model.propertyPrice = Money(ringgit: 450_000)
+        // Through the text field, which is the path the user takes.
+        model.propertyPriceText = "450000"
         await model.save()
 
         let facts = try await store.yearFacts(for: 2025)
@@ -182,5 +183,63 @@ struct ProfileQuestionsLoadGuardTests {
         let after = try await store.yearFacts(for: 2025)
         #expect(after.maritalStatus == .married)
         #expect(after.assessmentType == .separate)
+    }
+}
+
+/// The property price is the only typed answer on the sheet, and typing has a shape the
+/// tick-box answers do not: half-typed text is not a `Money`.
+@Suite("Profile questions: the typed answer")
+@MainActor
+struct ProfileQuestionsPriceTests {
+
+    static func model(_ store: TaxStore) async -> ProfileQuestionsViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = ProfileQuestionsViewModel(context: context,
+                                              store: store,
+                                              questions: [.propertyPrice],
+                                              requiresEveryAnswer: false)
+        await model.load()
+        return model
+    }
+
+    /// Held as `@State` in the sheet, a price already in the store populated the model and
+    /// left the field looking empty — the user was shown a blank box for an answer they
+    /// had already given, and only a fresh figure could get past it.
+    @Test("a price already saved comes back in the field, not just in the model")
+    func loadedPriceAppearsInTheField() async throws {
+        let store = try await PresentationFixture.store()
+        var existing = YearFacts()
+        existing.propertyPrice = Money(ringgit: 450_000)
+        try await store.saveYearFacts(existing, for: 2025)
+
+        let model = await Self.model(store)
+        #expect(model.propertyPrice == Money(ringgit: 450_000))
+        #expect(!model.propertyPriceText.isEmpty)
+        #expect(MoneyParsing.money(from: model.propertyPriceText) == Money(ringgit: 450_000))
+    }
+
+    @Test("clearing the field clears the answer rather than keeping the old one")
+    func clearingTheFieldClearsTheAnswer() async throws {
+        let store = try await PresentationFixture.store()
+        var existing = YearFacts()
+        existing.propertyPrice = Money(ringgit: 450_000)
+        try await store.saveYearFacts(existing, for: 2025)
+
+        let model = await Self.model(store)
+        model.propertyPriceText = ""
+        #expect(model.propertyPrice == nil)
+
+        await model.save()
+        #expect(try await store.yearFacts(for: 2025).propertyPrice == nil)
+    }
+
+    @Test("half-typed text is not an answer yet")
+    func partialTextIsNotAnAnswer() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.model(store)
+        model.propertyPriceText = "abc"
+        #expect(model.propertyPrice == nil)
+        #expect(model.isAnswered(.propertyPrice) == false)
     }
 }

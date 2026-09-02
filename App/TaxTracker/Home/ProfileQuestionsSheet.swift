@@ -20,9 +20,6 @@ struct ProfileQuestionsSheet: View {
     /// one mid-answer, discarding what the user had already picked.
     @State private var model: ProfileQuestionsViewModel
 
-    /// Half-typed text is not a `Money`, so the field owns a string and commits on change.
-    @State private var propertyPriceText = ""
-
     @Environment(\.dismiss) private var dismiss
 
     let onSaved: () -> Void
@@ -113,13 +110,12 @@ struct ProfileQuestionsSheet: View {
             yesNo($model.spouseIsDisabled)
         case .propertyPrice:
             LabeledContent("Price") {
-                TextField("0.00", text: $propertyPriceText)
+                // Bound to the model, not to local state: a price already in the store has
+                // to appear in the field, and `load()` cannot reach a `@State` in here.
+                TextField("0.00", text: $model.propertyPriceText)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .monospacedDigit()
-                    .onChange(of: propertyPriceText) {
-                        model.propertyPrice = MoneyParsing.money(from: propertyPriceText)
-                    }
             }
         case .dependentDetails, .lastClaimYear:
             // `ProfileQuestionsViewModel.answerable` filters both of these out before the
