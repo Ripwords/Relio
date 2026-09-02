@@ -19,6 +19,10 @@ public struct ReliefRow: Hashable, Sendable, Identifiable {
     public var usedPercent: Int
     public var state: ReliefRowState
 
+    /// What a row shows. `name` is LHDN's full description and stays the accessibility
+    /// label, where length costs nothing and precision is worth having.
+    public var shortName: String { ReliefCopy.shortName(for: code, fullName: name) }
+
     public var id: ReliefCode { code }
 }
 
@@ -57,8 +61,14 @@ public final class ReliefsListViewModel {
 
         let needle = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         let rows = result.assessments
+            // The short name is searched too, because it is the only name on screen: a
+            // user who reads "Serious medical" in the list and types it back would
+            // otherwise get no results, LHDN's own name being "Medical — serious illness,
+            // fertility treatment, vaccination, dental".
             .filter { needle.isEmpty
                 || $0.name.lowercased().contains(needle)
+                || ReliefCopy.shortName(for: $0.code, fullName: $0.name)
+                    .lowercased().contains(needle)
                 || $0.code.rawValue.lowercased().contains(needle) }
             .map(Self.row(from:))
 

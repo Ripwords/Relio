@@ -21,6 +21,10 @@ public struct OpportunityRow: Hashable, Sendable, Identifiable {
     /// True for a `.needsInfo` relief, which renders as a question rather than a figure.
     public var needsAnswer: Bool
 
+    /// See `ReliefRow.shortName`. Home has the least horizontal room of any screen, so a
+    /// four-line row title costs it more than anywhere else.
+    public var shortName: String { ReliefCopy.shortName(for: code, fullName: name) }
+
     public var id: ReliefCode { code }
 }
 

@@ -43,6 +43,14 @@ struct ReliefDetailView: View {
                     if let saved = assessment.taxSaved {
                         labelled("Tax saved", saved)
                     }
+                } header: {
+                    // Where the full LHDN name lives now that the title is the short one.
+                    // `.textCase(nil)` because a grouped header would otherwise shout it
+                    // in capitals, and this is a sentence, not a label.
+                    Text(assessment.name)
+                        .textCase(nil)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
                 if let card = ReliefCopy.card(for: model.advice,
@@ -139,7 +147,12 @@ struct ReliefDetailView: View {
                                        description: Text("This relief is not part of the \(String(model.yearOfAssessment)) rulebook."))
             }
         }
-        .navigationTitle(model.assessment?.name ?? "Relief")
+        // The short name, because an inline title has one line and LHDN's own name
+        // truncates to "Lifestyle — books, computer, smartp…". The full name is not lost:
+        // it heads the figures section below, where it has the width to be read.
+        .navigationTitle(model.assessment.map {
+            ReliefCopy.shortName(for: model.code, fullName: $0.name)
+        } ?? "Relief")
         .navigationBarTitleDisplayMode(.inline)
         // Re-copies whenever the shared evaluation changes, which is what a save, delete
         // or undo from the entry editor pushed on top of this screen produces. `.task`

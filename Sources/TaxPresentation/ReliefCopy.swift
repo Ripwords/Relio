@@ -31,6 +31,61 @@ public enum ReliefCopy {
         }
     }
 
+    /// A name short enough to be a list row or a navigation title.
+    ///
+    /// The rulebook's own `name` is LHDN's description, written to remove ambiguity rather
+    /// than to fit: "Lifestyle — books, computer, smartphone, tablet, internet, courses"
+    /// wraps to four lines in a row and truncates in a toolbar. The full name stays where
+    /// it reads well — the detail screen, and VoiceOver — and this is what the compact
+    /// surfaces use.
+    ///
+    /// Editorial copy, so it lives here and not in `Resources/Rules/`: nothing in the
+    /// rulebook should carry a string LHDN never published, or the `verifiedOn` stamp
+    /// beside it stops meaning anything. `ReliefShortNameTests` is what keeps the table in
+    /// step with the shipped codes, since `ReliefCode` is a string wrapper and a missing
+    /// entry cannot be a compile error.
+    ///
+    /// - Parameter fullName: the rulebook's name, returned unchanged for a code this table
+    ///   does not know. A rulebook shipped ahead of this file still renders.
+    public static func shortName(for code: ReliefCode, fullName: String) -> String {
+        shortNames[code] ?? fullName
+    }
+
+    private static let shortNames: [ReliefCode: String] = [
+        .selfAndDependents: "Individual and dependants",
+        .parentsMedical: "Parents and grandparents",
+        .parentsCheckup: "Parents' medical checkup",
+        .disabledEquipment: "Supporting equipment",
+        .disabledSelf: "Disabled individual",
+        .disabledSpouse: "Disabled spouse",
+        .educationSelf: "Education fees",
+        .educationUpskill: "Upskilling courses",
+        .medicalSerious: "Serious medical",
+        .medicalCheckup: "Medical checkup",
+        .medicalDental: "Dental treatment",
+        .medicalLearndis: "Learning disability care",
+        .medicalVaccination: "Vaccination",
+        .lifestyle: "Lifestyle",
+        .lifestyleSports: "Lifestyle — sports",
+        .breastfeeding: "Breastfeeding equipment",
+        .childcare: "Childcare and kindergarten",
+        .sspn: "SSPN net deposit",
+        .spouseAlimony: "Spouse or alimony",
+        .childUnder18: "Child under 18",
+        .childPreTertiary: "Child in pre-degree study",
+        .childTertiary: "Child in tertiary study",
+        .childDisabled: "Disabled child",
+        .childDisabledTertiary: "Disabled child, tertiary",
+        .insuranceLifeEpf: "Life insurance and EPF",
+        .lifeInsurance: "Life insurance",
+        .epfContribution: "EPF contributions",
+        .prsAnnuity: "PRS and deferred annuity",
+        .insuranceEduMedical: "Education and medical cover",
+        .socsoEis: "SOCSO and EIS",
+        .evCharging: "EV charging and composting",
+        .housingLoanInterest: "Housing loan interest",
+    ]
+
     /// A required supporting document kind, for a relief's "Documents" section.
     public static func text(for kind: DocumentKind) -> String {
         switch kind {

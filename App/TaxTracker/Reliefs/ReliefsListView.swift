@@ -45,7 +45,7 @@ struct ReliefRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(row.name)
+                Text(row.shortName)
                 if row.state == .claimable || row.state == .exhausted {
                     ProgressView(value: Double(row.usedPercent), total: 100)
                         .tint(row.state == .exhausted ? .secondary : .accentColor)

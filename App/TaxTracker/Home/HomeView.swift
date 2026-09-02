@@ -138,7 +138,7 @@ struct OpportunityRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(row.name)
+                Text(row.shortName)
                 ProgressView(value: Double(row.usedPercent), total: 100)
                     .tint(.accentColor)
             }
