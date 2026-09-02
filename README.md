@@ -13,19 +13,20 @@ Account-less and server-less. Data lives on your own devices and in your own iCl
 
 ## Current state
 
-The calculation core, persistence layer and view models are built and tested. The iOS
-app's screens are written, build and link through `xcodebuild`, and have been installed,
-launched and read on the simulator at default and largest Dynamic Type sizes — see
-[Running the app](#running-the-app) for verification scope.
+The calculation core, persistence layer and view models are built and tested. Every iOS
+screen has been installed, launched and read on the simulator in light and dark mode at
+default and largest Dynamic Type sizes — see [Running the app](#running-the-app) for how,
+and for what remains unverified.
 
 | | Status |
 |---|---|
 | **TaxKit** — the tax engine behind Relio | ✅ Done |
 | **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation, income as a dated timeline (not one figure per year) | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
-| iOS app — Home, Reliefs, entry CRUD, Income, onboarding | Built, installed and launched; Home, Income and onboarding read on the simulator |
+| iOS app — Home, Reliefs, entry CRUD, Income, onboarding | ✅ Built; every screen read on the simulator |
+| Settings, Compare, Documents outstanding | ✅ Built and read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
-| Receipt capture, OCR, MyInvois e-invoices | Not started |
+| Receipt capture, OCR, MyInvois e-invoices | Not started — the Docs tab lists what each claim still needs, but nothing can attach one yet |
 | On-device AI assistant | Not started |
 | watchOS, macOS, widgets | Not started |
 
@@ -91,12 +92,27 @@ to open against the new schema or lightweight-migrates and drops the year's inco
 figure with it. A fresh install starts at onboarding, which is the intended path.
 
 This cross-compiles the package for the simulator, links the app sources against it,
-stages TaxKit's resource bundle, ad-hoc signs and installs the bundle via `simctl`.
-The app has been verified to launch and render the onboarding screen on iOS 26.1
-simulator. Dark Mode is correct. Dynamic Type at the largest accessibility size (AX5)
-renders the screen without truncation and both buttons are reachable. The script does
-not perform asset catalog compilation, entitlements processing or App Store packaging,
-so a real `xcodebuild` build could still surface issues this path did not.
+stages TaxKit's resource bundle, ad-hoc signs and installs the bundle via `simctl`. The
+script does not perform asset catalog compilation, entitlements processing or App Store
+packaging, so a real `xcodebuild` build could still surface issues this path did not.
+
+**Seeing a screen other than the first.** This machine has no simulator tap automation,
+so for a long time the only screen anyone could actually look at was the one a fresh
+install opens on — which is onboarding. That is why dead-end taps survived as long as
+they did. A DEBUG-only harness fixes it: anything after `--` is passed to the app.
+
+```bash
+./Scripts/run-app.sh shot.png -- -relio-demo                      # seeded Home
+./Scripts/run-app.sh shot.png -- -relio-demo -relio-screen docs   # any named screen
+./Scripts/run-app.sh shot.png -- -relio-demo -relio-screen entry:LIFESTYLE:3000
+```
+
+`-relio-demo` seeds the household this README's worked example describes.
+`-relio-screen` takes `home`, `reliefs`, `docs`, `settings`, `compare`, `income`,
+`history`, `questions`, `entry`, `relief:<CODE>` or `entry:<CODE>:<ringgit>`, and
+`-relio-onboarding` forces the welcome flow. Combine with `xcrun simctl ui <device>
+appearance dark` and `content_size accessibility-extra-extra-extra-large` to check both
+of the axes the spec requires.
 
 **Proper Xcode build (once first-launch is done):**
 ```bash
@@ -108,8 +124,8 @@ This requires `sudo xcodebuild -runFirstLaunch` to have been run once on the mac
 proper gate.
 
 **Not yet verified:** VoiceOver and Reduce Motion (the simulator control tool cannot
-toggle either), and every screen past onboarding (Home, Reliefs, detail, entry editor)
-— these have been type-checked and unit-tested but never rendered. CloudKit sync
+toggle either) — the accessibility labels are unit-tested and read correct, but no one
+has heard them. CloudKit sync
 remains entirely unverified and requires two devices and a paid Apple Developer team.
 
 To enable iCloud sync on a verified build, put your team id in `Config/Signing.xcconfig`
