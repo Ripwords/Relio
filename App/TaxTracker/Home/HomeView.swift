@@ -5,6 +5,8 @@ import TaxPresentation
 struct HomeView: View {
 
     @Bindable var model: HomeViewModel
+    /// Switches to the Docs tab. Home does not own that navigation, so it asks.
+    let onShowDocuments: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnswering = false
@@ -83,12 +85,15 @@ struct HomeView: View {
                 .buttonStyle(.plain)
             }
             if model.prompts.claimsMissingDocuments > 0 {
-                promptRow(
-                    systemImage: "doc.viewfinder",
-                    title: model.prompts.claimsMissingDocuments == 1
-                        ? "1 claim needs a document"
-                        : "\(model.prompts.claimsMissingDocuments) claims need documents",
-                    trailing: nil)
+                Button(action: onShowDocuments) {
+                    promptRow(
+                        systemImage: "doc.viewfinder",
+                        title: model.prompts.claimsMissingDocuments == 1
+                            ? "1 claim needs a document"
+                            : "\(model.prompts.claimsMissingDocuments) claims need documents",
+                        trailing: nil)
+                }
+                .buttonStyle(.plain)
             }
             if model.prompts.unresolvedEntryCount > 0 {
                 promptRow(

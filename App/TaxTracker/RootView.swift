@@ -13,6 +13,10 @@ struct RootView: View {
     /// pushed screen a brand-new empty one on every re-render, after its `.task` had
     /// already fired.
     @State private var income: IncomeViewModel
+    /// Held here for the same reason `home` and `income` are: a model built inside the
+    /// tab's view builder would be replaced by a fresh empty one on every re-render.
+    @State private var documents: DocumentsViewModel
+    @State private var selectedTab: Tab = .home
     /// The year menu pushes Income, and a menu item cannot be a `NavigationLink`, so the
     /// stack needs a path to append to.
     @State private var path = NavigationPath()
@@ -38,7 +42,10 @@ struct RootView: View {
         _context = State(initialValue: context)
         _home = State(initialValue: HomeViewModel(context: context, store: store))
         _income = State(initialValue: IncomeViewModel(context: context, store: store))
+        _documents = State(initialValue: DocumentsViewModel(context: context, store: store))
     }
+
+    private enum Tab: Hashable { case home, docs, ask }
 
     var body: some View {
         Group {
@@ -80,6 +87,7 @@ struct RootView: View {
                 await context.reload()
                 await home.refresh()
                 await income.refresh()
+                await documents.refresh()
             }
         }
     }
@@ -91,6 +99,7 @@ struct RootView: View {
     private func openDemoScreen() {
         guard let screen = DemoHarness.screen else { return }
         switch screen {
+        case "docs": selectedTab = .docs
         case "reliefs": path.append(ReliefsRoute())
         case "income": path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
@@ -123,7 +132,7 @@ struct RootView: View {
     }
 
     private var tabs: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack(path: $path) {
                 content
                     .navigationBarTitleDisplayMode(.inline)
@@ -173,8 +182,11 @@ struct RootView: View {
                                             await context.switchYear(to: year)
                                             await home.refresh()
                                             // Income is per-year too, and its model
-                                            // outlives the switch.
+                                            // outlives the switch. So is Documents: its
+                                            // rows come from the year's requirement
+                                            // checks.
                                             await income.refresh()
+                                            await documents.refresh()
                                         }
                                     } label: {
                                         // The check marks the current year; Compare joins
@@ -218,13 +230,21 @@ struct RootView: View {
                     }
             }
             .tabItem { Label("Home", systemImage: "house") }
+            .tag(Tab.home)
 
             NavigationStack {
-                ContentUnavailableView("Documents",
-                                       systemImage: "doc.text",
-                                       description: Text("Receipt capture arrives in a later release."))
+                DocumentsView(model: documents)
+                    .navigationDestination(for: EntryRoute.self) { route in
+                        EntryEditorView(
+                            model: EntryEditorViewModel(context: context, store: store,
+                                                        editing: route.entryID),
+                            presentation: .pushed,
+                            onSaved: handleSaved,
+                            onDeleted: handleDeleted)
+                    }
             }
             .tabItem { Label("Docs", systemImage: "doc.text") }
+            .tag(Tab.docs)
 
             NavigationStack {
                 ContentUnavailableView("Ask",
@@ -232,6 +252,7 @@ struct RootView: View {
                                        description: Text("The on-device assistant arrives in a later release."))
             }
             .tabItem { Label("Ask", systemImage: "bubble.left.and.bubble.right") }
+            .tag(Tab.ask)
         }
         .sheet(item: $editingEntry) { model in
             EntryEditorView(model: model,
@@ -287,7 +308,12 @@ struct RootView: View {
         case .idle, .loading:
             ProgressView()
         case .ready:
-            HomeView(model: home)
+            HomeView(model: home) {
+                // The claims and their missing documents live on the Docs tab, so the
+                // prompt switches to it rather than pushing a second copy of that screen
+                // into Home's stack.
+                selectedTab = .docs
+            }
         case .unavailable(let message):
             // The user's entries still exist. Saying so matters — a blank screen here
             // reads as data loss.

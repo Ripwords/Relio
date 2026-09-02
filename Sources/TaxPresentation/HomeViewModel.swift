@@ -178,8 +178,14 @@ public final class HomeViewModel {
         // Stable order, so the sheet does not reshuffle its questions between openings.
         let questions = ProfileQuestion.allCases.filter(asked.contains)
 
-        let missing = (try? await store.entryDrafts(forYear: context.year)
-            .filter(\.needsDocument).count) ?? 0
+        // Counted through the same function the Docs tab renders, for the same reason the
+        // questions above are: the prompt is a button now, and a button whose number
+        // disagrees with the screen it opens is worse than no button. `needsDocument` is
+        // a per-entry flag the store maintains; the evaluator knows which kinds a relief
+        // actually requires, and the two disagree whenever an entry is flagged against a
+        // relief that requires nothing. Home said 8, the screen said 6.
+        let entries = (try? await store.entryDrafts(forYear: context.year)) ?? []
+        let missing = DocumentsViewModel.rows(in: result, entries: entries).count
 
         return HomePrompts(unansweredQuestions: questions,
                            unlockableRelief: unlockable,
