@@ -121,6 +121,8 @@ struct RootView: View {
         case "docs": selectedTab = .docs
         case "settings", "settings-household", "settings-contributor":
             path.append(SettingsRoute())
+        case "dependents":
+            path.append(DependentsRoute())
         case "compare": path.append(CompareRoute())
         case "reliefs": selectedTab = .reliefs
         case "income": path.append(IncomeRoute())
@@ -239,6 +241,10 @@ struct RootView: View {
                     }
                     .navigationDestination(for: SettingsRoute.self) { _ in
                         SettingsView(context: context, store: store)
+                    }
+                    .navigationDestination(for: DependentsRoute.self) { _ in
+                        DependentsView(model: DependentsViewModel(store: store,
+                                                                  year: context.year))
                     }
                     .navigationDestination(for: CompareRoute.self) { _ in
                         CompareView(model: CompareViewModel(store: store,

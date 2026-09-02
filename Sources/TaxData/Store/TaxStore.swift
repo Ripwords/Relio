@@ -269,6 +269,19 @@ public actor TaxStore {
         try modelContext.save()
     }
 
+    /// Undoes `softDeleteDependent`, mirroring `restoreEntry`.
+    ///
+    /// Idempotent for the same reason the delete is: a replayed undo must not re-stamp a
+    /// row that is already live, or it can outrace a genuine concurrent edit.
+    public func restoreDependent(id: UUID) throws {
+        let descriptor = FetchDescriptor<Dependent>(predicate: #Predicate { $0.id == id })
+        guard let row = try modelContext.fetch(descriptor).first else { return }
+        guard row.deletedAt != nil else { return }
+        row.deletedAt = nil
+        row.updatedAt = now()
+        try modelContext.save()
+    }
+
     // MARK: - Preferences
 
     public func savePreferences(_ snapshot: PreferencesSnapshot) throws {

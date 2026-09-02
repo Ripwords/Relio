@@ -32,3 +32,6 @@ struct SettingsRoute: Hashable {}
 
 /// Navigation value for the year comparison.
 struct CompareRoute: Hashable {}
+
+/// Navigation value for the dependants list.
+struct DependentsRoute: Hashable {}

@@ -31,6 +31,11 @@ struct SettingsView: View {
                 sheetRow("Date of birth and nationality", systemImage: "calendar") {
                     isEditingContributor = true
                 }
+                // The child, parent and grandparent reliefs are claimed against these
+                // people, and until now nothing in the app could add one.
+                NavigationLink(value: DependentsRoute()) {
+                    Label("Dependants", systemImage: "person.2")
+                }
             } header: {
                 Text("About you")
             } footer: {
