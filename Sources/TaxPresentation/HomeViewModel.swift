@@ -29,7 +29,9 @@ public struct OpportunityRow: Hashable, Sendable, Identifiable {
 }
 
 public struct HomePrompts: Hashable, Sendable {
-    public var unansweredQuestionCount: Int
+    /// The facts to ask about, not just how many there are: the prompt row is now a
+    /// button, and the sheet it opens has to know what to put on screen.
+    public var unansweredQuestions: [ProfileQuestion]
     /// Relief that would become claimable if those questions were answered favourably.
     public var unlockableRelief: Money
     public var claimsMissingDocuments: Int
@@ -43,7 +45,7 @@ public struct HomePrompts: Hashable, Sendable {
     /// is this view model's.
     public var unresolvedEntryCount: Int
 
-    public static let none = HomePrompts(unansweredQuestionCount: 0,
+    public static let none = HomePrompts(unansweredQuestions: [],
                                          unlockableRelief: .zero,
                                          claimsMissingDocuments: 0,
                                          unresolvedEntryCount: 0)
@@ -66,6 +68,16 @@ public final class HomeViewModel {
     public init(context: YearContext, store: TaxStore) {
         self.context = context
         self.store = store
+    }
+
+    /// The model behind the "answer N questions" prompt. Built here because this class
+    /// holds both halves — the year context and the only thing allowed to write — and a
+    /// view that had to be handed a store to build it would be one more place where the
+    /// store leaks into the view layer.
+    public func profileQuestions() -> ProfileQuestionsViewModel {
+        ProfileQuestionsViewModel(context: context,
+                                  store: store,
+                                  questions: prompts.unansweredQuestions)
     }
 
     public func refresh() async {
@@ -145,19 +157,31 @@ public final class HomeViewModel {
     }
 
     private func makePrompts(_ result: EvaluationResult) async -> HomePrompts {
-        var questions = 0
+        // Distinct questions, and only the ones something can take an answer for.
+        //
+        // Counting `asked.count` per relief counted one question once per relief that
+        // happened to be blocked on it: "answer 3 questions" for a household with a
+        // single unanswered fact that three reliefs each needed. And a question with no
+        // storage — `dependentDetails`, `lastClaimYear` — could never be driven off the
+        // screen, so the prompt would sit there for ever however many the user answered.
+        // `ProfileQuestionsViewModel.answerable` is the one list; the sheet asks it too.
+        var asked: Set<ProfileQuestion> = []
         var unlockable = Money.zero
         for assessment in result.assessments {
-            if case .needsInfo(let asked) = assessment.eligibility {
-                questions += asked.count
+            if case .needsInfo(let questions) = assessment.eligibility {
+                let answerable = ProfileQuestionsViewModel.answerable(questions)
+                guard !answerable.isEmpty else { continue }
+                asked.formUnion(answerable)
                 unlockable = unlockable + assessment.headroom
             }
         }
+        // Stable order, so the sheet does not reshuffle its questions between openings.
+        let questions = ProfileQuestion.allCases.filter(asked.contains)
 
         let missing = (try? await store.entryDrafts(forYear: context.year)
             .filter(\.needsDocument).count) ?? 0
 
-        return HomePrompts(unansweredQuestionCount: questions,
+        return HomePrompts(unansweredQuestions: questions,
                            unlockableRelief: unlockable,
                            claimsMissingDocuments: missing,
                            unresolvedEntryCount: result.unresolved.count)

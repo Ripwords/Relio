@@ -190,7 +190,7 @@ import TaxData
         try await store.saveYearFacts(facts, for: 2025)
         let model = await Self.model(store)
 
-        #expect(model.prompts.unansweredQuestionCount > 0)
+        #expect(!model.prompts.unansweredQuestions.isEmpty)
         #expect(model.prompts.unlockableRelief > Money.zero)
     }
 

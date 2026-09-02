@@ -86,6 +86,58 @@ public enum ReliefCopy {
         .housingLoanInterest: "Housing loan interest",
     ]
 
+    /// The same fact as `text(for:)`, phrased as the question the sheet actually asks.
+    ///
+    /// "Disability status" is a fine row label and a poor thing to put a Yes/No control
+    /// under — the user has to guess which way round the answer runs. Every one of these
+    /// is answerable without knowing any tax law, which is the bar: a question the user
+    /// cannot answer confidently is worse than no question, because a wrong answer here
+    /// silently changes what the app says they can claim.
+    public static func question(for question: ProfileQuestion) -> String {
+        switch question {
+        case .maritalStatus: "What is your marital status?"
+        case .spouseHasIncome: "Does your spouse have income of their own?"
+        case .assessmentType: "How are you and your spouse assessed?"
+        case .employmentType: "How are you employed?"
+        case .gender: "What is your gender?"
+        case .dependentDetails: "Tell us about your dependants"
+        case .lastClaimYear: "When did you last claim this?"
+        case .propertyPrice: "What did your first home cost?"
+        case .disabilityStatus: "Are you registered with JKM as a person with a disability?"
+        case .spouseDisabilityStatus: "Is your spouse registered with JKM as a person with a disability?"
+        }
+    }
+
+    /// Why Relio is asking, shown under each question.
+    ///
+    /// Spec §1: an account-less app that asks for personal facts owes the user a reason
+    /// for each one, in the place it asks. "Because the form said so" is how a tracker
+    /// gets abandoned at the second question.
+    public static func reasonForAsking(_ question: ProfileQuestion) -> String {
+        switch question {
+        case .maritalStatus:
+            "Marital status decides whether the spouse and alimony reliefs apply to you."
+        case .spouseHasIncome:
+            "A spouse with no income of their own is what the spouse relief is for."
+        case .assessmentType:
+            "Joint and separate assessment claim child reliefs differently."
+        case .employmentType:
+            "Your EPF and SOCSO rates follow from how you are employed."
+        case .gender:
+            "Only the breastfeeding equipment relief depends on this."
+        case .dependentDetails:
+            "Each child's age and study level decides which child relief applies."
+        case .lastClaimYear:
+            "This relief can only be claimed once every few years."
+        case .propertyPrice:
+            "The housing loan interest cap is RM 7,000 up to RM 500,000, and RM 5,000 up to RM 750,000."
+        case .disabilityStatus:
+            "JKM registration unlocks the RM 7,000 disabled individual relief."
+        case .spouseDisabilityStatus:
+            "JKM registration unlocks the RM 6,000 disabled spouse relief."
+        }
+    }
+
     /// A required supporting document kind, for a relief's "Documents" section.
     public static func text(for kind: DocumentKind) -> String {
         switch kind {

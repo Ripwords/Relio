@@ -7,6 +7,7 @@ struct HomeView: View {
     @Bindable var model: HomeViewModel
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isAnswering = false
     /// Spec §11.2: no fixed point sizes. This is the one number the screen exists for, so
     /// leaving it unscaled while every label around it grows inverts the hierarchy at the
     /// larger accessibility sizes — the headline ends up smaller than its own caption.
@@ -24,7 +25,20 @@ struct HomeView: View {
             .padding(.vertical, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task { await model.refresh() }
+        .task {
+            await model.refresh()
+            #if DEBUG
+            // The sheet is presented from this view's own state, so RootView's
+            // `-relio-screen` switch cannot reach it. Opened here instead.
+            if DemoHarness.screen == "questions" { isAnswering = true }
+            #endif
+        }
+        .sheet(isPresented: $isAnswering) {
+            ProfileQuestionsSheet(model: model.profileQuestions()) {
+                // Answering changes eligibility, so every figure on this screen moves.
+                Task { await model.refresh() }
+            }
+        }
     }
 
     // The only large number on the screen. Spec §11.
@@ -55,13 +69,18 @@ struct HomeView: View {
     @ViewBuilder
     private var prompts: some View {
         VStack(spacing: 10) {
-            if model.prompts.unansweredQuestionCount > 0 {
-                promptRow(
-                    systemImage: "questionmark.circle",
-                    title: model.prompts.unansweredQuestionCount == 1
-                        ? "Answer 1 question"
-                        : "Answer \(model.prompts.unansweredQuestionCount) questions",
-                    trailing: model.prompts.unlockableRelief)
+            if !model.prompts.unansweredQuestions.isEmpty {
+                Button {
+                    isAnswering = true
+                } label: {
+                    promptRow(
+                        systemImage: "questionmark.circle",
+                        title: model.prompts.unansweredQuestions.count == 1
+                            ? "Answer 1 question"
+                            : "Answer \(model.prompts.unansweredQuestions.count) questions",
+                        trailing: model.prompts.unlockableRelief)
+                }
+                .buttonStyle(.plain)
             }
             if model.prompts.claimsMissingDocuments > 0 {
                 promptRow(
@@ -94,6 +113,11 @@ struct HomeView: View {
                 }
                 .font(.subheadline)
             }
+            // These rows have looked like buttons and done nothing since the first build.
+            // Now that they lead somewhere, they get the chevron that says so.
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
         .padding(14)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
