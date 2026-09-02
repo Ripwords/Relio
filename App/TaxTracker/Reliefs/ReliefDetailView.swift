@@ -114,10 +114,24 @@ struct ReliefDetailView: View {
                     Section("Within this relief") {
                         ForEach(model.subLimits) { child in
                             NavigationLink(value: child.code) {
-                                HStack {
-                                    Text(child.name)
-                                    Spacer()
-                                    MoneyText(amount: child.headroom, font: .subheadline)
+                                AdaptiveRow {
+                                    // The short name, like every other row in the app.
+                                    // "Life insurance premiums, family takaful,
+                                    // additional voluntary EPF" was wrapping to two lines
+                                    // inside a row that already has a figure to fit.
+                                    Text(ReliefCopy.shortName(for: child.code,
+                                                              fullName: child.name))
+                                } trailing: {
+                                    // "Full", not RM 0.00 — the same word the Reliefs list
+                                    // uses for an exhausted relief. A bare zero reads as
+                                    // "nothing here" rather than "you have used all of it".
+                                    if child.headroom > .zero {
+                                        MoneyText(amount: child.headroom, font: .subheadline)
+                                    } else {
+                                        Text("Full")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
@@ -151,8 +165,18 @@ struct ReliefDetailView: View {
                     }
 
                     if model.entries.isEmpty {
-                        Text("Nothing logged for this relief yet.")
-                            .foregroundStyle(.secondary)
+                        // A parent relief holds no entries of its own — they sit under its
+                        // sub-limits. Saying "nothing logged" beneath a "Claimed
+                        // RM 3,000.00" three rows above reads as a contradiction, and the
+                        // user is left wondering which of the two figures to believe.
+                        if assessment.claimed > .zero, !model.subLimits.isEmpty {
+                            Text("\(assessment.claimed.formatted()) is logged under the "
+                                 + "reliefs within this one, not against this one directly.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Nothing logged for this relief yet.")
+                                .foregroundStyle(.secondary)
+                        }
                     } else {
                         ForEach(model.entries) { entry in
                             NavigationLink(value: EntryRoute(entryID: entry.id)) {
