@@ -21,8 +21,16 @@ struct ContributionQuestionsSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    init(model: ContributionQuestionsViewModel) {
+    /// Overrides the default title.
+    ///
+    /// "Quick answers" is right when a contribution card sends the user here to unblock a
+    /// figure. It is wrong from Settings, where they tapped a row called "Date of birth
+    /// and nationality" and would land on a title naming neither.
+    private let title: String?
+
+    init(model: ContributionQuestionsViewModel, title: String? = nil) {
         _model = State(initialValue: model)
+        self.title = title
     }
 
     var body: some View {
@@ -100,7 +108,7 @@ struct ContributionQuestionsSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .navigationTitle("Quick answers")
+            .navigationTitle(title ?? "Quick answers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

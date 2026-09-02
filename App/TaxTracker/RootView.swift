@@ -108,7 +108,8 @@ struct RootView: View {
         guard let screen = DemoHarness.screen else { return }
         switch screen {
         case "docs": selectedTab = .docs
-        case "settings": path.append(SettingsRoute())
+        case "settings", "settings-household", "settings-contributor":
+            path.append(SettingsRoute())
         case "compare": path.append(CompareRoute())
         case "reliefs": selectedTab = .reliefs
         case "income": path.append(IncomeRoute())

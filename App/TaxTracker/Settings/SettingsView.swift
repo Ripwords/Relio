@@ -72,6 +72,17 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        #if DEBUG
+        // Both sheets are presented from this view's own state, so RootView's
+        // `-relio-screen` switch cannot reach them.
+        .task {
+            switch DemoHarness.screen {
+            case "settings-household": isEditingHousehold = true
+            case "settings-contributor": isEditingContributor = true
+            default: break
+            }
+        }
+        #endif
         .sheet(isPresented: $isEditingHousehold) {
             ProfileQuestionsSheet(
                 model: ProfileQuestionsViewModel(context: context,
@@ -86,7 +97,8 @@ struct SettingsView: View {
             ContributionQuestionsSheet(
                 model: ContributionQuestionsViewModel(
                     store: store,
-                    questions: [.contribution(.dateOfBirth), .contribution(.nationality)]))
+                    questions: [.contribution(.dateOfBirth), .contribution(.nationality)]),
+                title: "Date of birth and nationality")
         }
     }
 
