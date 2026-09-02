@@ -1,0 +1,34 @@
+[     101ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925:0
+[     136ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://www.googletagmanager.com/gtag/js?id=G-WQE1285P0S:0
+[     137ms] [LOG] =============== @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:2129
+[     137ms] [LOG]  @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:2130
+[     137ms] [LOG]  @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:2131
+[     141ms] [LOG] [tr.hidden, tr.hidden, tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5251
+[     142ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5263
+[     142ms] [LOG] [tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5464
+[     142ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5476
+[     142ms] [LOG] [tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5643
+[     142ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5655
+[     142ms] [LOG] [tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5820
+[     142ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5832
+[     142ms] [LOG] [tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:5999
+[     142ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6011
+[     143ms] [LOG] [tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6137
+[     143ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6149
+[     143ms] [LOG] [tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6262
+[     143ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6274
+[     143ms] [LOG] [tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6387
+[     143ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6399
+[     143ms] [LOG] [tr.hidden, tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6570
+[     143ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6582
+[     144ms] [LOG] [tr.hidden] t @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6837
+[     144ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:6849
+[     156ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://www.googletagmanager.com/gtm.js?id=GTM-5J8CJ6WZ:0
+[     229ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:4551
+[     229ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:4552
+[     229ms] [LOG] 0 @ https://www.kwsp.gov.my/en/employer/responsibilities/mandatory-contribution:4553
+[    3167ms] ReferenceError: Insider is not defined
+    at validateInsiderFns (https://www.kwsp.gov.my/documents/d/guest/insider-all:28:3)
+[    3189ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://segment.api.useinsider.com/v4/segments/178809767111253086c206c.aa399ca2?partnerid=10011132&fields=c6d61e56b9822e966919176fb876fd5c,6babc1258d3ebe34c2799e7c66f853b1,34d37f5e8f8a62eaa5bea6b8518043e4&:0
+[    5924ms] [ERROR] Creating a worker from 'blob:https://www.kwsp.gov.my/3ae3b9c8-b3ed-4737-aa9f-9119611c1ca8' violates the following Content Security Policy directive: "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'". Note that 'worker-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js:21
+[    5924ms] [LOG] Warning: Setting up fake worker. @ https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js:21

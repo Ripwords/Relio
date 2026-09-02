@@ -117,6 +117,18 @@ public final class HomeViewModel {
                                       needsAnswer: needsAnswer)
             }
             .sorted { left, right in
+                // Claimability outranks value. A `.needsInfo` relief reports headroom
+                // equal to its whole cap, so on a pure value sort it beats every relief
+                // the user can actually claim — Home led with "Disabled individual,
+                // RM 7,000" for a household that had never said anyone was disabled.
+                // Its figure is what the relief would be worth if the answer went the
+                // user's way, which is not the same kind of number as money already
+                // sitting there, and sorting the two together implies it is.
+                //
+                // Still listed, per Plan 1: answering one question may recover real
+                // money. Below the sure thing, and rendered as a question.
+                if left.needsAnswer != right.needsAnswer { return right.needsAnswer }
+
                 // Ties break on code. Plan 1 shipped a bug where equal-valued rows
                 // reordered between launches; the fix is a total order, not a sort key.
                 let leftValue = left.taxSaved ?? left.headroom

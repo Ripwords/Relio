@@ -1,0 +1,5 @@
+[     142ms] [LOG] JQMIGRATE: Migrate is installed, version 3.4.1 @ https://www.hasil.gov.my/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1:1
+[     918ms] [LOG] payload {_id: 6996e87c71fcda393982a85f, entryPoints: Array(1), messengerId: 68f1bec7c0468f56e6044197, metadata: Object, organizationId: 68015b819222f50d2ae0e91b} @ :5
+[     947ms] [LOG] messenger visible = false null @ :329
+[     947ms] [LOG] initiate lang en @ :616
+[     972ms] [LOG] Launcher button found: JSHandle@node @ :396

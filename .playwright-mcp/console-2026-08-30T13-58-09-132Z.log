@@ -1,0 +1,12 @@
+[     762ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://www.googletagmanager.com/gtag/js?id=G-WQE1285P0S:0
+[     764ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://www.googletagmanager.com/gtm.js?id=GTM-5J8CJ6WZ:0
+[     764ms] [LOG] =============== @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:2103
+[     764ms] [LOG]  @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:2104
+[     764ms] [LOG]  @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:2105
+[     783ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925:0
+[    1470ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:4525
+[    1470ms] [LOG] JSHandle@node @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:4526
+[    1470ms] [LOG] 0 @ https://www.kwsp.gov.my/en/w/new-minimum-statutory-rate-for-employees-above-age-60-takes-effect-1:4527
+[    4310ms] ReferenceError: Insider is not defined
+    at validateInsiderFns (https://www.kwsp.gov.my/documents/d/guest/insider-all:28:3)
+[    4429ms] [ERROR] Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR @ https://segment.api.useinsider.com/v4/segments/178809767111253086c206c.aa399ca2?partnerid=10011132&fields=c6d61e56b9822e966919176fb876fd5c,6babc1258d3ebe34c2799e7c66f853b1,34d37f5e8f8a62eaa5bea6b8518043e4&:0

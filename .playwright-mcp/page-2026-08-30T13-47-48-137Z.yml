@@ -1,0 +1,429 @@
+- generic [ref=e2]:
+  - navigation "Quick Links":
+    - list:
+      - listitem:
+        - link "Skip to Main Content" [ref=e3] [cursor=pointer]:
+          - /url: "#main-content"
+  - generic:
+    - banner:
+      - generic [ref=e5]:
+        - link [ref=e6] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e12]:
+          - generic [ref=e13]:
+            - link "Member" [ref=e14] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member
+            - listitem [ref=e16]:
+              - button [ref=e17] [cursor=pointer]
+          - generic [ref=e19]:
+            - link "Employer" [ref=e20] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/employer
+            - listitem [ref=e22]:
+              - button [ref=e23] [cursor=pointer]
+          - generic [ref=e25]:
+            - link "Corporate" [ref=e26] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate
+            - listitem [ref=e28]:
+              - button [ref=e29] [cursor=pointer]
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - listitem [ref=e33]:
+              - button [ref=e34] [cursor=pointer]
+            - button "EN" [ref=e43] [cursor=pointer]
+          - link [ref=e44] [cursor=pointer]:
+            - /url: ""
+  - generic [ref=e47]:
+    - heading "Employer Mandatory Contribution" [level=2] [ref=e48]
+    - main [ref=e49]:
+      - heading "EPF Mandatory Contribution Rates for Employers" [level=1] [ref=e50]
+      - generic [ref=e53]:
+        - img "Smiling man in suit and glasses in a bright modern office." [ref=e54]
+        - generic [ref=e56]:
+          - navigation "Breadcrumb" [ref=e63]:
+            - list [ref=e64]:
+              - listitem [ref=e65]:
+                - link "Employer" [ref=e66] [cursor=pointer]:
+                  - /url: https://www.kwsp.gov.my/en/employer
+              - listitem [ref=e68]:
+                - link "Responsibilities" [ref=e69] [cursor=pointer]:
+                  - /url: https://www.kwsp.gov.my/en/employer/responsibilities
+              - listitem [ref=e71]:
+                - generic [ref=e72]: Mandatory Contribution
+          - generic [ref=e73]:
+            - heading "Mandatory Contribution" [level=4] [ref=e74]
+            - paragraph [ref=e75]: Know Your Responsibilities As An Employer
+      - generic [ref=e76]: As an employer, your responsibilities includes paying EPF contributions in respect of any person you have engaged to work under a Contract of Service or Apprenticeship. You have to ensure accurate monthly contributions are deducted from your employees’ salary and remitted to EPF.
+      - generic [ref=e90]:
+        - generic [ref=e91]: Subject to the provisions of section 52, every employee and every employer of a person who is an employee within the meaning of this Act shall be liable to pay monthly contributions on the amount of wages at the rate respectively set out in the Third Schedule.
+        - strong [ref=e94]: Section 43(1), EPF Act 1991
+      - generic [ref=e99]:
+        - heading "When And What To Contribute" [level=3] [ref=e102]
+        - separator [ref=e112]
+        - paragraph [ref=e116]:
+          - text: Employer must make monthly payment on or before 15th of the month.
+          - strong [ref=e117]: "Example:"
+          - text: Salary for January 2024 Therefore, the Contribution Month is February 2024 and it has to be paid either before or on 15 February 2024. The employer needs to pay both the employees’ and the employer’s share to the EPF. Employers may deduct the employee’s share from their salary.
+      - generic [ref=e122]:
+        - heading "Contribution Rate" [level=4] [ref=e125]
+        - table [ref=e133]:
+          - rowgroup [ref=e134]:
+            - row [ref=e135]:
+              - columnheader "Employee’s Status" [ref=e136]
+              - columnheader "Monthly Salary Rate" [ref=e137]
+              - columnheader "Stage 1 (Below 60 years old)" [ref=e138]
+              - columnheader "Stage 2 (Age 60 and above)" [ref=e139]
+          - rowgroup [ref=e140]:
+            - row [ref=e141]:
+              - cell "Malaysian" [ref=e142]
+              - cell "No limit" [ref=e148]
+              - cell [ref=e153]
+              - cell [ref=e154]:
+                - generic [ref=e160]:
+                  - text: "Employees share: 0% Employer’s share: 4%"
+                  - emphasis [ref=e161]:
+                    - text: (
+                    - link "Ref Third Schedule – Part E" [ref=e162] [cursor=pointer]:
+                      - /url: /documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+            - row [ref=e163]:
+              - cell [ref=e164]:
+                - list [ref=e169]:
+                  - listitem [ref=e170]: Malaysian
+                  - listitem [ref=e171]: Permanent Residents (PR)
+                  - listitem [ref=e172]: Non-Malaysians (registered as member before 1 August 1998)
+              - cell "RM5,000 and below" [ref=e173]
+              - cell [ref=e178]:
+                - generic [ref=e184]:
+                  - text: "Employees share: 11% Employer’s share: 13%"
+                  - emphasis [ref=e185]:
+                    - text: (
+                    - link "Ref Third Schedule – Part A" [ref=e186] [cursor=pointer]:
+                      - /url: /documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+              - cell [ref=e187]:
+                - generic [ref=e193]:
+                  - text: "Applicable for (ii) and (iii) only Employees share: 5.5% Employer’s share: 6.5%"
+                  - emphasis [ref=e194]:
+                    - text: (
+                    - link "Ref Third Schedule – Part C" [ref=e195] [cursor=pointer]:
+                      - /url: /documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+            - row [ref=e196]:
+              - cell [ref=e197]:
+                - list [ref=e202]:
+                  - listitem [ref=e203]: Malaysian
+                  - listitem [ref=e204]: Permanent Residents (PR)
+                  - listitem [ref=e205]: Non-Malaysians (registered as member before 1 August 1998)
+              - cell "More than RM5,000" [ref=e206]
+              - cell [ref=e211]:
+                - generic [ref=e217]:
+                  - text: "Employees share: 11% Employer’s share: 12%"
+                  - emphasis [ref=e218]:
+                    - text: (
+                    - link "Ref Third Schedule – Part A" [ref=e219] [cursor=pointer]:
+                      - /url: /documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+              - cell [ref=e220]:
+                - generic [ref=e226]:
+                  - text: "Applicable for (ii) and (iii) only Employees share: 5.5% Employer’s share: 6%"
+                  - emphasis [ref=e227]:
+                    - text: (
+                    - link "Ref Third Schedule – Part C" [ref=e228] [cursor=pointer]:
+                      - /url: /documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+            - row [ref=e229]:
+              - cell "Non-Malaysians (registered as member from 1 August 1998)" [ref=e230]
+              - cell "No limit" [ref=e236]
+              - cell [ref=e241]:
+                - generic [ref=e247]:
+                  - text: "Employees share: 2% Employer’s share: 2%"
+                  - emphasis [ref=e248]:
+                    - text: (
+                    - link "Ref Third Schedule – Part F" [ref=e249] [cursor=pointer]:
+                      - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+              - cell [ref=e250]:
+                - generic [ref=e256]:
+                  - text: "Employees share: 2% Employer’s share: 2%"
+                  - emphasis [ref=e257]:
+                    - text: (
+                    - link "Ref Third Schedule – Part F" [ref=e258] [cursor=pointer]:
+                      - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-october-2025
+                    - text: )
+        - generic [ref=e261]:
+          - strong [ref=e262]: "Note:"
+          - text: 1. The minimum age to register and contribute as an EPF member is age 14. Meanwhile, maximum age of contribution is 75 years old. 2. Employers are not allowed to calculate the employer’s and employee’s share based on exact percentage EXCEPT for salaries that exceed RM20,000.00. The total contribution which includes cents shall be rounded to the next ringgit. 3. Effective for October 2025 salary/wage (November 2025 contribution month).
+      - generic [ref=e267]:
+        - heading "Monthly Contribution Rate (Third Schedule)" [level=2] [ref=e270]
+        - generic [ref=e276]:
+          - paragraph [ref=e277]: The latest contribution rate for employees and employers effective October 2025 'salary/wage' can be referred in the Third Schedule, EPF Act 1991. Employers are required to remit EPF contributions based on this schedule.
+          - paragraph [ref=e278]: "For late contribution payments, employers are required to remit contributions in accordance with the third schedule as attached below by referring to the applicable effective date. Please click on the hyperlinks below for employee and employer contribution rates:"
+          - list [ref=e279]:
+            - listitem [ref=e280]:
+              - link "Effective 1 October 2025" [ref=e281] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-october-2025
+              - text: (October 2025 salary/wage)
+            - listitem [ref=e282]:
+              - link "Effective 1 July 2022 to 30 September 2025" [ref=e283] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-july-2022
+              - text: (July 2022 salary/wage up to September 2025)
+            - listitem [ref=e284]:
+              - link "Effective from 1 January 2021 to 30 June 2022" [ref=e285] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-january-2021
+              - text: (January 2021 salary/wage up to June 2022)
+            - listitem [ref=e286]:
+              - link "Effective from 1 April 2020 to 31 December 2020" [ref=e287] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-april-2020
+              - link [ref=e288] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/20126/273744/JADUAL+KETIGA+27032020_ENG.pdf
+              - text: (April 2020 salary/wage up to December 2020)
+            - listitem [ref=e289]:
+              - link "Effective from 1 January 2019 to 31 March 2020" [ref=e290] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-january-2019
+              - text: (January 2019 salary/wage up to March 2020)
+            - listitem [ref=e291]:
+              - link "Effective from 1 January 2019 to 31 December 2018" [ref=e292] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-january-2018
+              - text: (January 2018 salary/wage up to December 2018)
+            - listitem [ref=e293]:
+              - link "Effective from 1 March 2016 to 31 December 2017" [ref=e294] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-march-2016
+              - text: (March 2016 salary/wage up to December 2017)
+            - listitem [ref=e295]:
+              - link "Effective from 1 August 2013 to 29 February 2016" [ref=e296] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-august-2013
+              - text: (August 2013 salary/wage up to February 2016)
+            - listitem [ref=e297]:
+              - link "Effective from 1 January 2012 to 31 July 2013" [ref=e298] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-january-2012
+              - text: (January 2012 salary/wage up to July 2013)
+            - listitem [ref=e299]:
+              - link "Effective prior 1 January 2011 to 31 December 2011" [ref=e300] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/documents/d/guest/third_schedule_from_-1-january-2011
+              - text: (January 2011 salary/wage up to December 2011)
+        - heading "Overdue Contributions" [level=4] [ref=e304]
+        - generic [ref=e308]: In the event that the employer fails to pay the contributions within the prescribed period, this contribution will be considered as an outstanding contribution. Under certain circumstances, the EPF will make an assessment of the contribution. The EPF Officer will provide Form KWSP 7 (Form E) and Form KWSP 8 (Form F). Payment must then be made using Form KWSP 8 (Form F). For unpaid outstanding contributions, payments can be made using Form A (Online).
+        - table [ref=e315]:
+          - rowgroup [ref=e316]:
+            - row [ref=e317]:
+              - columnheader "Late Payment Charge" [ref=e318]
+              - columnheader "Dividend" [ref=e319]
+          - rowgroup [ref=e320]:
+            - row [ref=e321]:
+              - cell [ref=e322]:
+                - generic [ref=e327]:
+                  - text: The lower dividend rate between Simpanan Konvensional and Simpanan Shariah for each respective year with an additional one (1) percent. The minimum late payment charge imposed is RM10. The late payment charge will be rounded up to the nearest Ringgit denomination.
+                  - strong [ref=e328]: "Example: The late payment charge imposed is RM13.21 and this must be rounded up to RM14."
+              - cell "Dividend rate is calculated based on the lowest dividend declared between the Simpanan Konvensional and Simpanan Shariah. For the year 2016 and prior, Simpanan Konvensional's dividend rate is used for the calculation of late payment charge and dividends." [ref=e329]
+      - generic [ref=e337]:
+        - generic [ref=e338]: Frequently Asked Questions
+        - button "View" [ref=e339] [cursor=pointer]
+      - generic [ref=e341]:
+        - generic [ref=e342]:
+          - paragraph [ref=e343]: Recommended Reads
+          - paragraph [ref=e344]: These articles might inspire you
+        - group "Splide Basic HTML Example" [ref=e353]:
+          - generic:
+            - button "Previous slide" [ref=e354] [cursor=pointer]
+            - button "Next slide" [ref=e357] [cursor=pointer]
+          - generic [ref=e360]:
+            - tabpanel [ref=e361]:
+              - link [ref=e364] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-for-gig-worker
+                - paragraph [ref=e367]: LIFESTYLE
+                - paragraph [ref=e369]: Unlocking Financial Freedom in the Gig Economy
+            - tabpanel [ref=e370]:
+              - link [ref=e373] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/employer-responsibility-malaysia
+                - paragraph [ref=e376]: EMPLOYER
+                - paragraph [ref=e378]: Are You Fulfilling Your Duties as an Employer?
+            - tabpanel [ref=e379]:
+              - link [ref=e382] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-planning-tips
+                - paragraph [ref=e385]: RETIREMENT
+                - paragraph [ref=e387]: Retirement Planning Tips
+            - tabpanel [ref=e388]:
+              - link [ref=e391] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-for-gig-worker
+                - paragraph [ref=e394]: LIFESTYLE
+                - paragraph [ref=e396]: Unlocking Financial Freedom in the Gig Economy
+            - tabpanel [ref=e397]:
+              - link [ref=e400] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/employer-responsibility-malaysia
+                - paragraph [ref=e403]: EMPLOYER
+                - paragraph [ref=e405]: Are You Fulfilling Your Duties as an Employer?
+            - tabpanel [ref=e406]:
+              - link [ref=e409] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-planning-tips
+                - paragraph [ref=e412]: RETIREMENT
+                - paragraph [ref=e414]: Retirement Planning Tips
+            - tabpanel "1 of 3" [ref=e415]:
+              - link [ref=e418] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-for-gig-worker
+                - generic:
+                  - generic:
+                    - img "text icon"
+                - img "LIFESTYLE" [ref=e420]
+                - paragraph [ref=e421]: LIFESTYLE
+                - paragraph [ref=e423]: Unlocking Financial Freedom in the Gig Economy
+            - tabpanel "2 of 3" [ref=e424]:
+              - link [ref=e427] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/employer-responsibility-malaysia
+                - generic:
+                  - generic:
+                    - img "text icon"
+                - img "EMPLOYER" [ref=e429]
+                - paragraph [ref=e430]: EMPLOYER
+                - paragraph [ref=e432]: Are You Fulfilling Your Duties as an Employer?
+            - tabpanel "3 of 3" [ref=e433]:
+              - link [ref=e436] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-planning-tips
+                - generic:
+                  - generic:
+                    - img "text icon"
+                - img "RETIREMENT" [ref=e438]
+                - paragraph [ref=e439]: RETIREMENT
+                - paragraph [ref=e441]: Retirement Planning Tips
+            - tabpanel [ref=e442]:
+              - link [ref=e445] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-for-gig-worker
+                - paragraph [ref=e448]: LIFESTYLE
+                - paragraph [ref=e450]: Unlocking Financial Freedom in the Gig Economy
+            - tabpanel [ref=e451]:
+              - link [ref=e454] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/employer-responsibility-malaysia
+                - paragraph [ref=e457]: EMPLOYER
+                - paragraph [ref=e459]: Are You Fulfilling Your Duties as an Employer?
+            - tabpanel [ref=e460]:
+              - link [ref=e463] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-planning-tips
+                - paragraph [ref=e466]: RETIREMENT
+                - paragraph [ref=e468]: Retirement Planning Tips
+            - tabpanel [ref=e469]:
+              - link [ref=e472] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-for-gig-worker
+                - paragraph [ref=e475]: LIFESTYLE
+                - paragraph [ref=e477]: Unlocking Financial Freedom in the Gig Economy
+            - tabpanel [ref=e478]:
+              - link [ref=e481] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/employer-responsibility-malaysia
+                - paragraph [ref=e484]: EMPLOYER
+                - paragraph [ref=e486]: Are You Fulfilling Your Duties as an Employer?
+            - tabpanel [ref=e487]:
+              - link [ref=e490] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/w/article/retirement-planning-tips
+                - paragraph [ref=e493]: RETIREMENT
+                - paragraph [ref=e495]: Retirement Planning Tips
+  - contentinfo [ref=e496]:
+    - generic [ref=e498]:
+      - generic [ref=e499]:
+        - paragraph [ref=e500]: Member
+        - list [ref=e506]:
+          - listitem [ref=e507]:
+            - link "Register As A Member" [ref=e508] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/overview
+          - listitem [ref=e509]:
+            - link "Grow Your Savings" [ref=e510] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/savings
+          - listitem [ref=e511]:
+            - link "Manage Your EPF Account" [ref=e512] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/account-centre
+          - listitem [ref=e513]:
+            - link "Home Ownership" [ref=e514] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/house-withdrawal
+          - listitem [ref=e515]:
+            - link "Financial Life Stages" [ref=e516] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/life-stages
+          - listitem [ref=e517]:
+            - link "Health Protection" [ref=e518] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/healthcare
+          - listitem [ref=e519]:
+            - link "KWSP i-Akaun App" [ref=e520] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/member/kwsp-i-akaun
+      - generic [ref=e521]:
+        - paragraph [ref=e522]: Employer
+        - list [ref=e528]:
+          - listitem [ref=e529]:
+            - link "Introduction" [ref=e530] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/employer/introduction
+          - listitem [ref=e531]:
+            - link "Responsibilities" [ref=e532] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/employer/responsibilities
+          - listitem [ref=e533]:
+            - link "Online Platform" [ref=e534] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/employer/online-platform
+          - listitem [ref=e535]:
+            - link "Employers Education Programme" [ref=e536] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/epf-learning-campus
+      - generic [ref=e537]:
+        - paragraph [ref=e538]: Corporate
+        - list [ref=e544]:
+          - listitem [ref=e545]:
+            - link "About Us" [ref=e546] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/about-us
+          - listitem [ref=e547]:
+            - link "Organisational Structure" [ref=e548] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/about-us/organisation-structure
+          - listitem [ref=e549]:
+            - link "News & Highlights" [ref=e550] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/news-highlights
+          - listitem [ref=e551]:
+            - link "Publications & Research" [ref=e552] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/publications
+          - listitem [ref=e553]:
+            - link "Investment" [ref=e554] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/investment
+          - listitem [ref=e555]:
+            - link "Sustainability" [ref=e556] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/sustainability
+          - listitem [ref=e557]:
+            - link "Corporate Governance" [ref=e558] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/about-us/governance
+          - listitem [ref=e559]:
+            - link "Careers" [ref=e560] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/careers
+          - listitem [ref=e561]:
+            - link "Procurement" [ref=e562] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/procurement
+          - listitem [ref=e563]:
+            - link "Business Partners" [ref=e564] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/business-partners
+          - listitem [ref=e565]:
+            - link "Whistleblowing & Anti‑Fraud" [ref=e566] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/anti-fraud
+          - listitem [ref=e567]:
+            - link "Contact Us" [ref=e568] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/corporate/connect-with-us
+      - generic [ref=e569]:
+        - paragraph [ref=e570]: Others
+        - list [ref=e576]:
+          - listitem [ref=e577]:
+            - link "Terms & Conditions" [ref=e578] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/terms-and-conditions
+          - listitem [ref=e579]:
+            - link "Privacy Policy" [ref=e580] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/privacy-policy
+          - listitem [ref=e581]:
+            - link "Security Policy" [ref=e582] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/security-policy
+          - listitem [ref=e583]:
+            - link "Disclaimer" [ref=e584] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/disclaimer
+          - listitem [ref=e585]:
+            - link "Online Security Tips" [ref=e586] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/security-tips
+          - listitem [ref=e587]:
+            - link "Other Links" [ref=e588] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/other-links
+          - listitem [ref=e589]:
+            - link "Forms" [ref=e590] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/forms
+          - listitem [ref=e591]:
+            - link "Resource Centre" [ref=e592] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/resource-centre
+          - listitem [ref=e593]:
+            - link "Achievements" [ref=e594] [cursor=pointer]:
+              - /url: https://www.kwsp.gov.my/en/others/achievements
+  - generic [ref=e595]:
+    - img "WhatsApp Us" [ref=e596] [cursor=pointer]
+    - img "Connect With Us" [ref=e597] [cursor=pointer]

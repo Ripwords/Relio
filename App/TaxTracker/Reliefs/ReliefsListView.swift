@@ -46,7 +46,10 @@ struct ReliefRowView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(row.shortName)
-                if row.state == .claimable || row.state == .exhausted {
+                // See `OpportunityRowView`: a bar at zero draws a rule under the name and
+                // says nothing. Most reliefs in this list are untouched, so most rows were
+                // drawing one.
+                if (row.state == .claimable || row.state == .exhausted) && row.usedPercent > 0 {
                     ProgressView(value: Double(row.usedPercent), total: 100)
                         .tint(row.state == .exhausted ? .secondary : .accentColor)
                 }

@@ -1,0 +1,195 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - navigation "Quick Links":
+      - list:
+        - listitem:
+          - link "Skip to Main Content" [ref=f8e3] [cursor=pointer]:
+            - /url: "#main-content"
+    - generic:
+      - banner:
+        - generic [ref=f8e5]:
+          - link [ref=f8e6] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f8e12]:
+            - generic [ref=f8e13]:
+              - link "Member" [ref=f8e14] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member
+              - listitem [ref=f8e16]:
+                - button [ref=f8e17] [cursor=pointer]
+            - generic [ref=f8e19]:
+              - link "Employer" [ref=f8e20] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/employer
+              - listitem [ref=f8e22]:
+                - button [ref=f8e23] [cursor=pointer]
+            - generic [ref=f8e25]:
+              - link "Corporate" [ref=f8e26] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate
+              - listitem [ref=f8e28]:
+                - button [ref=f8e29] [cursor=pointer]
+          - generic [ref=f8e31]:
+            - generic [ref=f8e32]:
+              - listitem [ref=f8e33]:
+                - button [ref=f8e34] [cursor=pointer]
+              - button "EN" [ref=f8e43] [cursor=pointer]
+            - link [ref=f8e44] [cursor=pointer]:
+              - /url: "#"
+    - generic [ref=f8e47]:
+      - heading "New Minimum Statutory Rate For Employees Above Age 60 Takes Effect" [level=2] [ref=f8e48]
+      - main [ref=f8e49]:
+        - generic [ref=f8e52]:
+          - link [ref=f8e55] [cursor=pointer]:
+            - /url: "#"
+            - img "back chevron" [ref=f8e57]
+          - generic [ref=f8e62]:
+            - generic [ref=f8e63]:
+              - generic [ref=f8e64]: Share
+              - generic [ref=f8e65]:
+                - link "" [ref=f8e66] [cursor=pointer]:
+                  - /url: "#"
+                - link "" [ref=f8e68] [cursor=pointer]:
+                  - /url: "#"
+                - link "" [ref=f8e70] [cursor=pointer]:
+                  - /url: "#"
+                - link "" [ref=f8e72] [cursor=pointer]:
+                  - /url: "#"
+            - generic: Link copied!
+        - generic [ref=f8e75]:
+          - generic [ref=f8e76]:
+            - generic [ref=f8e77]: "Date: 07 Jan 2019"
+            - generic [ref=f8e79]: New Minimum Statutory Rate For Employees Above Age 60 Takes Effect
+            - generic [ref=f8e83]:
+              - paragraph [ref=f8e84]:
+                - strong [ref=f8e85]: "KUALA LUMPUR, 7 January 2019: The Employees Provident Fund"
+                - text: (EPF) announces that the minimum Employers’ share of EPF statutory contribution rate for employees above age 60 who are liable to contribute will be reduced to four (4) per cent per month, while the Employees’ share of contribution rate will be zero per cent.
+              - paragraph [ref=f8e86]
+              - paragraph [ref=f8e87]: The new minimum statutory rates will start with the January 2019 salary/wage for contribution month of February 2019.
+              - paragraph [ref=f8e88]
+              - paragraph [ref=f8e89]: The move to reduce the statutory contribution rates follows the Government’s proposal during the tabling of Budget 2019 on 2 November 2018, to help increase the take-home pay for employees who continue to work after reaching age 60. The reduction in employers’ share to minimum four (4) per cent would also encourage employment opportunities for workers above 60 years of age, thus ensuring the population above 60-years-old to remain productive and active in the economy.
+              - paragraph [ref=f8e90]
+              - paragraph [ref=f8e91]:
+                - text: For more details, please refer to the EPF website at
+                - strong [ref=f8e92]:
+                  - link "www.kwsp.gov.my" [ref=f8e93] [cursor=pointer]:
+                    - /url: https://www.kwsp.gov.my
+                - text: or call the EPF Contact Management Centre at 03-89226000.
+              - paragraph [ref=f8e94]
+              - paragraph [ref=f8e95]:
+                - strong [ref=f8e96]: "Issued by:"
+                - text: "Corporate Affairs Department Employees Provident Fund Date: 7 January 2019"
+          - generic [ref=f8e98]:
+            - paragraph [ref=f8e99]:
+              - strong [ref=f8e101]: About the Employees Provident Fund (EPF)
+            - paragraph [ref=f8e102]: The Employees Provident Fund (“EPF”) is one of the oldest retirement funds in the world. Established in 1951, the EPF is a social-security organisation focused on safeguarding member savings and delivering excellent services. In recent years, in line with its vision of helping members achieve a better future, the EPF has expanded its role to encompass the creation of a comprehensive social well-being ecosystem. Today, the EPF remains steadfast in its commitment to members through consistent efforts to update and improve itself, in order to build the foundation for sustainable, holistic and equitable well-being for all Malaysians.
+    - contentinfo [ref=f8e103]:
+      - generic [ref=f8e105]:
+        - generic [ref=f8e108]:
+          - paragraph [ref=f8e109]: Member
+          - list [ref=f8e115]:
+            - listitem [ref=f8e116]:
+              - link "Register As A Member" [ref=f8e117] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/overview
+            - listitem [ref=f8e118]:
+              - link "Grow Your Savings" [ref=f8e119] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/savings
+            - listitem [ref=f8e120]:
+              - link "Manage Your EPF Account" [ref=f8e121] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/account-centre
+            - listitem [ref=f8e122]:
+              - link "Home Ownership" [ref=f8e123] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/house-withdrawal
+            - listitem [ref=f8e124]:
+              - link "Financial Life Stages" [ref=f8e125] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/life-stages
+            - listitem [ref=f8e126]:
+              - link "Health Protection" [ref=f8e127] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/healthcare
+            - listitem [ref=f8e128]:
+              - link "KWSP i-Akaun App" [ref=f8e129] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/member/kwsp-i-akaun
+        - generic [ref=f8e130]:
+          - paragraph [ref=f8e131]: Employer
+          - list [ref=f8e137]:
+            - listitem [ref=f8e138]:
+              - link "Introduction" [ref=f8e139] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/employer/introduction
+            - listitem [ref=f8e140]:
+              - link "Responsibilities" [ref=f8e141] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/employer/responsibilities
+            - listitem [ref=f8e142]:
+              - link "Online Platform" [ref=f8e143] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/employer/online-platform
+            - listitem [ref=f8e144]:
+              - link "Employers Education Programme" [ref=f8e145] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/epf-learning-campus
+        - generic [ref=f8e146]:
+          - paragraph [ref=f8e147]: Corporate
+          - list [ref=f8e153]:
+            - listitem [ref=f8e154]:
+              - link "About Us" [ref=f8e155] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/about-us
+            - listitem [ref=f8e156]:
+              - link "Organisational Structure" [ref=f8e157] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/about-us/organisation-structure
+            - listitem [ref=f8e158]:
+              - link "News & Highlights" [ref=f8e159] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/news-highlights
+            - listitem [ref=f8e160]:
+              - link "Publications & Research" [ref=f8e161] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/publications
+            - listitem [ref=f8e162]:
+              - link "Investment" [ref=f8e163] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/investment
+            - listitem [ref=f8e164]:
+              - link "Sustainability" [ref=f8e165] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/sustainability
+            - listitem [ref=f8e166]:
+              - link "Corporate Governance" [ref=f8e167] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/about-us/governance
+            - listitem [ref=f8e168]:
+              - link "Careers" [ref=f8e169] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/careers
+            - listitem [ref=f8e170]:
+              - link "Procurement" [ref=f8e171] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/procurement
+            - listitem [ref=f8e172]:
+              - link "Business Partners" [ref=f8e173] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/business-partners
+            - listitem [ref=f8e174]:
+              - link "Whistleblowing & Anti‑Fraud" [ref=f8e175] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/anti-fraud
+            - listitem [ref=f8e176]:
+              - link "Contact Us" [ref=f8e177] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/corporate/connect-with-us
+        - generic [ref=f8e178]:
+          - paragraph [ref=f8e179]: Others
+          - list [ref=f8e185]:
+            - listitem [ref=f8e186]:
+              - link "Terms & Conditions" [ref=f8e187] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/terms-and-conditions
+            - listitem [ref=f8e188]:
+              - link "Privacy Policy" [ref=f8e189] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/privacy-policy
+            - listitem [ref=f8e190]:
+              - link "Security Policy" [ref=f8e191] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/security-policy
+            - listitem [ref=f8e192]:
+              - link "Disclaimer" [ref=f8e193] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/disclaimer
+            - listitem [ref=f8e194]:
+              - link "Online Security Tips" [ref=f8e195] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/security-tips
+            - listitem [ref=f8e196]:
+              - link "Other Links" [ref=f8e197] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/other-links
+            - listitem [ref=f8e198]:
+              - link "Forms" [ref=f8e199] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/forms
+            - listitem [ref=f8e200]:
+              - link "Resource Centre" [ref=f8e201] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/resource-centre
+            - listitem [ref=f8e202]:
+              - link "Achievements" [ref=f8e203] [cursor=pointer]:
+                - /url: https://www.kwsp.gov.my/en/others/achievements
+  - generic [ref=f8e204]:
+    - img "WhatsApp Us" [ref=f8e205] [cursor=pointer]
+    - img "Connect With Us" [ref=f8e206] [cursor=pointer]

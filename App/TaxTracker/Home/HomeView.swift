@@ -139,33 +139,69 @@ struct OpportunityRowView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(row.shortName)
-                ProgressView(value: Double(row.usedPercent), total: 100)
-                    .tint(.accentColor)
-            }
-            Spacer(minLength: 12)
-            VStack(alignment: .trailing, spacing: 2) {
-                MoneyText(amount: row.headroom, font: .subheadline, weight: .semibold)
-                if let saved = row.taxSaved {
-                    HStack(spacing: 2) {
-                        Text("→")
-                        MoneyText(amount: saved, font: .caption)
-                    }
-                    .foregroundStyle(.secondary)
+                // A bar at zero is not information, it is a horizontal rule sitting
+                // under a label — and every untouched relief drew one, so the list read
+                // as a stack of underlined headings. Shown only once there is progress
+                // to show.
+                if row.usedPercent > 0 && !row.needsAnswer {
+                    ProgressView(value: Double(row.usedPercent), total: 100)
+                        .tint(.accentColor)
                 }
             }
+            Spacer(minLength: 12)
+            trailing
         }
         // Spec §11.8: VoiceOver reads the amounts, never "68 percent".
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
 
+    /// `OpportunityRow.needsAnswer` has always documented that such a row "renders as a
+    /// question rather than a figure". Until now nothing rendered it: an unanswered
+    /// relief showed the same bold ringgit figure as money already sitting there, and its
+    /// figure is the whole cap — what the relief *would* be worth if the answer went the
+    /// user's way. Two different kinds of number in one typeface reads as one kind.
+    @ViewBuilder
+    private var trailing: some View {
+        if row.needsAnswer {
+            HStack(spacing: 6) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Answer to unlock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    MoneyText(amount: row.headroom, font: .subheadline, weight: .regular)
+                        .foregroundStyle(.secondary)
+                }
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.tint)
+            }
+        } else {
+            VStack(alignment: .trailing, spacing: 2) {
+                MoneyText(amount: row.headroom, font: .subheadline, weight: .semibold)
+                if let saved = row.taxSaved {
+                    // "→ RM 1,520.00" said nothing about what the smaller figure was.
+                    // It is the tax the headroom above is worth, and the row now says so.
+                    HStack(spacing: 3) {
+                        MoneyText(amount: saved, font: .caption)
+                        Text("in tax").font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// The full LHDN name, not the short one: length costs a screen reader nothing, and
+    /// "Serious medical" is less use than the name that says which treatments count.
     private var accessibilityLabel: String {
+        guard !row.needsAnswer else {
+            // "Still claimable" was the old wording here too, and it was the same lie the
+            // visible row told: this money is not claimable until a question is answered.
+            return "\(row.name), answer one question to unlock \(row.headroom.formatted())"
+        }
         var label = "\(row.name), \(row.headroom.formatted()) still claimable"
         if let saved = row.taxSaved {
             label += ", worth \(saved.formatted()) in tax"
-        }
-        if row.needsAnswer {
-            label += ", needs an answer first"
         }
         return label
     }

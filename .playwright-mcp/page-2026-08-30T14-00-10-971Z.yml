@@ -1,0 +1,177 @@
+- generic [active] [ref=f16e1]:
+  - link "Skip to content" [ref=f16e2] [cursor=pointer]:
+    - /url: "#content"
+  - banner [ref=f16e3]:
+    - generic [ref=f16e7]:
+      - img "🌐" [ref=f16e9]
+      - link "BM" [ref=f16e10] [cursor=pointer]:
+        - /url: /individual/individual-life-cycle/income-declaration/tax-reliefs
+      - generic [ref=f16e11]: "|"
+      - link "ENG" [ref=f16e12] [cursor=pointer]:
+        - /url: /en/individual/individual-life-cycle/income-declaration/tax-reliefs
+    - generic [ref=f16e16]:
+      - generic [ref=f16e18]:
+        - link [ref=f16e20] [cursor=pointer]:
+          - /url: https://www.hasil.gov.my/en
+        - link [ref=f16e22] [cursor=pointer]:
+          - /url: /en/
+      - generic [ref=f16e25]:
+        - link [ref=f16e28] [cursor=pointer]:
+          - /url: https://mytax.hasil.gov.my/
+          - img "myTax Logo" [ref=f16e29]
+        - link "STR" [ref=f16e30] [cursor=pointer]:
+          - /url: https://bantuantunai.hasil.gov.my/
+        - link "EduZone" [ref=f16e33] [cursor=pointer]:
+          - /url: /en/eduzone/
+        - link "FAQ" [ref=f16e36] [cursor=pointer]:
+          - /url: /en/tanya-hafy/
+      - generic [ref=f16e40]:
+        - link [ref=f16e43] [cursor=pointer]:
+          - /url: "#elementor-action%3Aaction%3Doff_canvas%3Aopen%26settings%3DeyJpZCI6IjQ5ZjgzMTkiLCJkaXNwbGF5TW9kZSI6Im9wZW4ifQ%3D%3D"
+        - link [ref=f16e49] [cursor=pointer]:
+          - /url: "#elementor-action%3Aaction%3Doff_canvas%3Aopen%26settings%3DeyJpZCI6IjM1NmFmOTAiLCJkaXNwbGF5TW9kZSI6Im9wZW4ifQ%3D%3D"
+    - generic: ">"
+  - generic [ref=f16e51]:
+    - heading "404" [level=1] [ref=f16e55]
+    - heading "# Page Not Found (404)" [level=5] [ref=f16e59]
+    - generic [ref=f16e62]:
+      - paragraph [ref=f16e63]: Sorry, we couldn't find the page you're looking for.
+      - paragraph [ref=f16e64]: The HASiL Official Portal has recently been upgraded. The page you are looking for may have been moved, its URL may have changed, or it is no longer available.
+      - paragraph [ref=f16e65]: Please use the search function on the HASiL Official Portal to locate the information or document you are looking for.
+    - link "Back to Homepage" [ref=f16e69] [cursor=pointer]:
+      - /url: /en/
+  - contentinfo [ref=f16e73]:
+    - generic [ref=f16e76]:
+      - generic [ref=f16e77]:
+        - generic [ref=f16e78]:
+          - generic [ref=f16e80]:
+            - figure [ref=f16e81]:
+              - img "LOGO HASiL OFFICIAL (R) W" [ref=f16e82]
+            - generic [ref=f16e83]:
+              - paragraph [ref=f16e84]: Inland Revenue Board of Malaysia (IRBM)
+              - paragraph [ref=f16e85]: Ibu Pejabat Lembaga Hasil Dalam Negeri Malaysia, Menara Hasil, Persiaran Rimba Permai, Cyber 8, 63000 Cyberjaya Selangor.
+          - list [ref=f16e87]:
+            - listitem [ref=f16e88]:
+              - link [ref=f16e89] [cursor=pointer]:
+                - /url: https://www.facebook.com/HASiLMalaysia%20
+            - listitem [ref=f16e93]:
+              - link [ref=f16e94] [cursor=pointer]:
+                - /url: https://x.com/HASiLMalaysia
+            - listitem [ref=f16e99]:
+              - link [ref=f16e100] [cursor=pointer]:
+                - /url: https://www.youtube.com/@HASiL_Malaysia
+            - listitem [ref=f16e105]:
+              - link [ref=f16e106] [cursor=pointer]:
+                - /url: https://www.instagram.com/hasilmalaysia
+            - listitem [ref=f16e112]:
+              - link [ref=f16e113] [cursor=pointer]:
+                - /url: https://www.tiktok.com/@hasilmalaysia
+        - navigation "fmenu-1" [ref=f16e119]:
+          - list [ref=f16e120]:
+            - listitem [ref=f16e121]:
+              - link "About HASiL" [ref=f16e122] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/
+            - listitem [ref=f16e123]:
+              - link "Corporate Profile" [ref=f16e124] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/profil-korporat/
+            - listitem [ref=f16e125]:
+              - link "Corporate Culture" [ref=f16e126] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/budaya-korporat/
+            - listitem [ref=f16e127]:
+              - link "IRBM Governance Framework" [ref=f16e128] [cursor=pointer]:
+                - /url: /en/mengenai-hasil/rangka-kerja-tadbir-urus-lhdnm/
+            - listitem [ref=f16e129]:
+              - link "HASiL Directory" [ref=f16e130] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/direktori-hasil/
+            - listitem [ref=f16e131]:
+              - link "Academy" [ref=f16e132] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/akademi/
+            - listitem [ref=f16e133]:
+              - link "Career" [ref=f16e134] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/kerjaya/
+            - listitem [ref=f16e135]:
+              - link "HASiL Integrity" [ref=f16e136] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/integriti-hasil/
+            - listitem [ref=f16e137]:
+              - link "Best Tax Payer Award" [ref=f16e138] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/anugerah-pembayar-cukai-terbaik/
+        - navigation "fmenu-1" [ref=f16e141]:
+          - list [ref=f16e142]:
+            - listitem [ref=f16e143]:
+              - link "Portal Policy" [ref=f16e144] [cursor=pointer]:
+                - /url: /en/polisi-portal/
+            - listitem [ref=f16e145]:
+              - link "Policy Privacy" [ref=f16e146] [cursor=pointer]:
+                - /url: /en/polisi-portal/dasar-privasi/
+            - listitem [ref=f16e147]:
+              - link "Security Policy" [ref=f16e148] [cursor=pointer]:
+                - /url: /en/polisi-portal/polisi-keselamatan/
+            - listitem [ref=f16e149]:
+              - link "Online Security" [ref=f16e150] [cursor=pointer]:
+                - /url: /en/polisi-portal/keselamatan-dalam-talian/
+            - listitem [ref=f16e151]:
+              - link "Scam Alert" [ref=f16e152] [cursor=pointer]:
+                - /url: /en/polisi-portal/peringatan-penipuan/
+        - navigation "fmenu-1" [ref=f16e155]:
+          - list [ref=f16e156]:
+            - listitem [ref=f16e157]:
+              - link "Contact Us" [ref=f16e158] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/
+            - listitem [ref=f16e159]:
+              - link "e-Janji Temu" [ref=f16e160] [cursor=pointer]:
+                - /url: https://ejanjitemu.hasil.gov.my/
+            - listitem [ref=f16e161]:
+              - link "Customer Care Officer" [ref=f16e162] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/pegawai-perhubungan-awam/
+            - listitem [ref=f16e163]:
+              - link "Customer Feedback Form" [ref=f16e164] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/borang-maklumbalas-pelanggan/
+            - listitem [ref=f16e165]:
+              - link "Helpdesk" [ref=f16e166] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/meja-bantuan-hasil/
+            - listitem [ref=f16e167]:
+              - link "Report Tax Evasion" [ref=f16e168] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/laporkan-pelarian-cukai/
+            - listitem [ref=f16e169]:
+              - link "Report Misconduct of HASiL Officer" [ref=f16e170] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/aduan-integriti-pegawai-lhdnm/
+            - listitem [ref=f16e171]:
+              - link "Location" [ref=f16e172] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/lokasi/
+        - generic [ref=f16e174]:
+          - paragraph [ref=f16e176]: HASiL Contact Centre
+          - paragraph [ref=f16e178]: 603-8911 1000
+          - paragraph [ref=f16e180]: Government's Special Aid Helpline
+          - paragraph [ref=f16e182]: 1800-88-2747
+          - paragraph [ref=f16e187]: Operating Hours
+          - paragraph [ref=f16e189]: 9:00 morning - 5:00 afternoon
+          - paragraph [ref=f16e191]: Monday - Friday (except public holidays)
+      - generic [ref=f16e194]:
+        - heading "Visitor Statistics" [level=2] [ref=f16e195]
+        - generic [ref=f16e196]:
+          - generic [ref=f16e197]:
+            - paragraph [ref=f16e198]: Today's Visitors
+            - heading "7,409" [level=3] [ref=f16e199]
+          - generic [ref=f16e200]:
+            - paragraph [ref=f16e201]: Monthly Visitors ( 08 / 2026 )
+            - heading "1,878,561" [level=3] [ref=f16e202]
+          - generic [ref=f16e203]:
+            - paragraph [ref=f16e204]: Monthly Visitors ( 07 / 2026 )
+            - heading "4,463,886" [level=3] [ref=f16e205]
+          - generic [ref=f16e206]:
+            - paragraph [ref=f16e207]: Year-to-Date Visitors ( 2026 )
+            - heading "34,565,212" [level=3] [ref=f16e208]
+          - generic [ref=f16e209]:
+            - paragraph [ref=f16e210]: Year-to-Date Visitors ( 2025 )
+            - heading "79,747,945" [level=3] [ref=f16e211]
+          - generic [ref=f16e212]:
+            - paragraph [ref=f16e213]: Total Visitors
+            - heading "492,910,062" [level=3] [ref=f16e214]
+      - paragraph [ref=f16e216]: "Best viewed using Chrome, Microsoft Edge or Mozilla Firefox with 1920x1080 screen resolution DISCLAIMER : Inland Revenue Board of Malaysia shall not be liable for any loss or damage caused by the usage of any information obtained from this website."
+      - generic [ref=f16e220]:
+        - paragraph [ref=f16e222]: © 2026 Lembaga HASiL Dalam Negeri Malaysia. All Right Reserved
+        - link "Sitemap" [ref=f16e224] [cursor=pointer]:
+          - /url: /en/peta-laman/
+        - link "HASiLIAN" [ref=f16e228] [cursor=pointer]:
+          - /url: https://hasil.sharepoint.com
+  - generic [ref=f16e231]: desktop

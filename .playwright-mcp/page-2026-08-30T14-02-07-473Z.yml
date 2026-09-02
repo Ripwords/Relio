@@ -1,0 +1,397 @@
+- generic [active] [ref=f21e1]:
+  - link "Skip to content" [ref=f21e2] [cursor=pointer]:
+    - /url: "#content"
+  - banner [ref=f21e3]:
+    - generic [ref=f21e7]:
+      - img "🌐" [ref=f21e9]
+      - link "BM" [ref=f21e10] [cursor=pointer]:
+        - /url: /individu/pelepasan-cukai
+      - generic [ref=f21e11]: "|"
+      - link "ENG" [ref=f21e12] [cursor=pointer]:
+        - /url: /en/individu/pelepasan-cukai
+    - generic [ref=f21e16]:
+      - generic [ref=f21e18]:
+        - link [ref=f21e20] [cursor=pointer]:
+          - /url: https://www.hasil.gov.my/en
+        - link [ref=f21e22] [cursor=pointer]:
+          - /url: /en/
+      - generic [ref=f21e25]:
+        - link [ref=f21e28] [cursor=pointer]:
+          - /url: https://mytax.hasil.gov.my/
+          - img "myTax Logo" [ref=f21e29]
+        - link "STR" [ref=f21e30] [cursor=pointer]:
+          - /url: https://bantuantunai.hasil.gov.my/
+        - link "EduZone" [ref=f21e33] [cursor=pointer]:
+          - /url: /en/eduzone/
+        - link "FAQ" [ref=f21e36] [cursor=pointer]:
+          - /url: /en/tanya-hafy/
+      - generic [ref=f21e40]:
+        - link [ref=f21e43] [cursor=pointer]:
+          - /url: "#elementor-action%3Aaction%3Doff_canvas%3Aopen%26settings%3DeyJpZCI6IjQ5ZjgzMTkiLCJkaXNwbGF5TW9kZSI6Im9wZW4ifQ%3D%3D"
+        - link [ref=f21e49] [cursor=pointer]:
+          - /url: "#elementor-action%3Aaction%3Doff_canvas%3Aopen%26settings%3DeyJpZCI6IjM1NmFmOTAiLCJkaXNwbGF5TW9kZSI6Im9wZW4ifQ%3D%3D"
+    - paragraph [ref=f21e54]:
+      - generic [ref=f21e55]:
+        - generic [ref=f21e56]:
+          - link "Home" [ref=f21e57] [cursor=pointer]:
+            - /url: https://www.hasil.gov.my/en
+          - text: ">"
+        - generic [ref=f21e58]:
+          - link "Individual" [ref=f21e59] [cursor=pointer]:
+            - /url: https://www.hasil.gov.my/en/individu/
+          - text: ">"
+        - generic [ref=f21e60]: Tax Relief
+  - generic [ref=f21e63]:
+    - generic [ref=f21e70]:
+      - heading "Individual" [level=2] [ref=f21e72]
+      - navigation "Menu" [ref=f21e74]:
+        - list [ref=f21e75]:
+          - listitem [ref=f21e76]:
+            - link "Introduction Individual Income Tax" [ref=f21e77] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/pengenalan-cukai-pendapatan-individu/
+          - listitem [ref=f21e78]:
+            - link "Registration" [ref=f21e79] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/pendaftaran/
+          - listitem [ref=f21e80]:
+            - link "Residence Status" [ref=f21e81] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/taraf-mastautin/
+          - listitem [ref=f21e82]:
+            - link "Income Declaration" [ref=f21e83] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/lapor-pendapatan/
+          - listitem [ref=f21e84]:
+            - link "Tax Relief" [ref=f21e85] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/pelepasan-cukai/
+          - listitem [ref=f21e86]:
+            - link "Rebates" [ref=f21e87] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/rebat/
+          - listitem [ref=f21e88]:
+            - link "Donations / Gifts" [ref=f21e89] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/derma-hadiah/
+          - listitem [ref=f21e90]:
+            - link "Tax Rate" [ref=f21e91] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/kadar-cukai/
+          - listitem [ref=f21e92]:
+            - link "Fee" [ref=f21e93] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/bayaran/
+          - listitem [ref=f21e94]:
+            - link "Amended Assessment" [ref=f21e95] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/pindaan-taksiran/
+          - listitem [ref=f21e96]:
+            - link "Appeal" [ref=f21e97] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/rayuan/
+          - listitem [ref=f21e98]:
+            - link "Review and Update" [ref=f21e99] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/semakan-dan-kemaskini/
+          - listitem [ref=f21e100]:
+            - link "Termination of Service / Employment" [ref=f21e101] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/penamatan-perkhidmatan/
+          - listitem [ref=f21e102]:
+            - link "Offences" [ref=f21e103] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/kesalahan/
+          - listitem [ref=f21e104]:
+            - link "Stoppage Order" [ref=f21e105] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/sekatan-perjalanan/
+          - listitem [ref=f21e106]:
+            - link "Frequently Asked Question (Individual)" [ref=f21e107] [cursor=pointer]:
+              - /url: https://www.hasil.gov.my/en/individu/soalan-lazim-individu/
+    - generic [ref=f21e108]:
+      - heading "Tax Relief" [level=2] [ref=f21e110]
+      - generic [ref=f21e112]:
+        - link "Expand All" [ref=f21e115] [cursor=pointer]:
+          - /url: javascript:void(0);
+        - generic "Question 25 - What is Pioneer Status?" [ref=f21e117]:
+          - group [ref=f21e118]:
+            - generic "Year of Assessment 2025" [ref=f21e119] [cursor=pointer]
+            - region [ref=f21e123]:
+              - table [ref=f21e126]:
+                - rowgroup [ref=f21e127]:
+                  - row [ref=f21e128]:
+                    - columnheader "No." [ref=f21e129]
+                    - columnheader "Individual Relief Types" [ref=f21e130]
+                    - columnheader "Amount (RM)" [ref=f21e131]
+                - rowgroup [ref=f21e132]:
+                  - row [ref=f21e133]:
+                    - cell "1" [ref=f21e134]
+                    - cell "Individual and dependent relatives" [ref=f21e135]
+                    - cell "9,000" [ref=f21e136]
+                  - row [ref=f21e137]:
+                    - cell "2" [ref=f21e138]
+                    - cell [ref=f21e139]:
+                      - text: Expenses for parents and grandparents:1. Medical treatment, dental treatment, special needs and carer expenses(Medical condition certified by medical practitioner)2. Complete medical examination (
+                      - strong [ref=f21e140]: Restricted to RM1,000
+                      - text: )
+                    - cell "8,000 (Restricted)" [ref=f21e141]
+                  - row [ref=f21e142]:
+                    - cell "3" [ref=f21e143]
+                    - cell "Purchase of basic supporting equipment for disabled self, spouse, child or parent" [ref=f21e144]
+                    - cell "6,000 (Restricted)" [ref=f21e145]
+                  - row [ref=f21e146]:
+                    - cell "4" [ref=f21e147]
+                    - cell "Disabled individual" [ref=f21e148]
+                    - cell "7,000" [ref=f21e149]
+                  - row [ref=f21e150]:
+                    - cell "5" [ref=f21e151]
+                    - cell [ref=f21e152]:
+                      - text: Education fees (Self):1. Other than a degree at masters or doctorate level – Course of study in law, accounting, islamic financing, tehcnical, vocational, industrial, scientific or technology2. Degree at masters or doctorate level – Any course of study3. Course of study undertaken for the purpose of upskilling or self-enhancement (
+                      - strong [ref=f21e153]: Restricted to RM2,000
+                      - text: )
+                    - cell "7,000 (Restricted)" [ref=f21e154]
+                  - row [ref=f21e155]:
+                    - cell "6" [ref=f21e156]
+                    - cell [ref=f21e157]:
+                      - text: Medical expenses on:1. Serious diseases for self, spouse or child2. Fertility treatment for self or spouse3. Vaccination for self, spouse and child (
+                      - strong [ref=f21e158]: Restricted to RM1,000
+                      - text: )4. Dental examination and treatment (
+                      - strong [ref=f21e159]: Restricted to RM1,000
+                      - text: )
+                    - cell "10,000 (Restricted)" [ref=f21e160]
+                  - row [ref=f21e161]:
+                    - cell "7" [ref=f21e162]
+                    - cell [ref=f21e163]:
+                      - text: Expenses (
+                      - strong [ref=f21e164]: Restricted to RM1,000
+                      - text: ) on:1. Complete medical examination for self, spouse or child2. COVID-19 detection test including purchase of self-detection test kit for self, spouse or child3. Mental health examination or consultation for self, spouse or child4. Purchase of self-health monitoring equipment5. Fees for disease detection tests
+                    - cell "10,000 (Restricted)" [ref=f21e165]
+                  - row [ref=f21e166]:
+                    - cell "8" [ref=f21e167]
+                    - cell [ref=f21e168]:
+                      - text: Expenses (
+                      - strong [ref=f21e169]: Restricted to RM6,000
+                      - text: ) for child aged 18 and below:1. Assessment of intellectual disability diagnosis2. Early intervention programme / intellectual disability rehabilitation treatment
+                    - cell "10,000 (Restricted)" [ref=f21e170]
+                  - row [ref=f21e171]:
+                    - cell "9" [ref=f21e172]
+                    - 'cell "Lifestyle Expenses for the use / benefit of self, spouse or child in respect of: 1. Purchase or subscription of books / journals / magazines / newspapers / other similar publications (Not banned reading materials) 2. Purchase of personal computer, smartphone or tablet (Not for business use) 3. Payment of monthly bill for internet subscription (Under own name) 4. Skill improvement / personal development course fee" [ref=f21e173]': LifestyleExpenses for the use / benefit of self, spouse or child in respect of:1. Purchase or subscription of books / journals / magazines / newspapers / other similar publications (Not banned reading materials)2. Purchase of personal computer, smartphone or tablet (Not for business use)3. Payment of monthly bill for internet subscription (Under own name)4. Skill improvement / personal development course fee
+                    - cell "2,500 (Restricted)" [ref=f21e174]
+                  - row [ref=f21e175]:
+                    - cell "10" [ref=f21e176]
+                    - 'cell "Lifestyle Additional relief for the use / benefit of self, spouse, child and parents in respect of: 1. Purchase of sports equipment for any sports activity as defined under the Sports Development Act 1997 2. Payment of rental or entrance fee to any sports facility 3. Payment of registration fee for any sports competition where the organizer is approved and licensed by the Commissioner of Sports under the Sports Development Act 1997 4. Gymnasium membership fee / sports training" [ref=f21e177]': LifestyleAdditional relief for the use / benefit of self, spouse, child and parents in respect of:1. Purchase of sports equipment for any sports activity as defined under the Sports Development Act 19972. Payment of rental or entrance fee to any sports facility3. Payment of registration fee for any sports competition where the organizer is approved and licensed by the Commissioner of Sports under the Sports Development Act 19974. Gymnasium membership fee / sports training
+                    - cell "1,000 (Restricted)" [ref=f21e178]
+                  - row [ref=f21e179]:
+                    - cell "11" [ref=f21e180]
+                    - cell [ref=f21e181]:
+                      - text: Purchase of breastfeeding equipment for own use for a child aged 2 years and below (Deduction allowed
+                      - strong [ref=f21e182]: once in every TWO (2)
+                      - text: years of assessment
+                    - cell "1,000 (Restricted)" [ref=f21e183]
+                  - row [ref=f21e184]:
+                    - cell "12" [ref=f21e185]
+                    - cell "Child care fees to a registered child care centre / kindergarten for a child aged 6 years and below" [ref=f21e186]
+                    - cell "3,000 (Restricted)" [ref=f21e187]
+                  - row [ref=f21e188]:
+                    - cell "13" [ref=f21e189]
+                    - cell "Net deposit in Skim Simpanan Pendidikan Nasional (SSPN) (Net deposit is the total deposit in 2025 MINUS total withdrawal in 2025)" [ref=f21e190]
+                    - cell "8,000 (Restricted)" [ref=f21e191]
+                  - row [ref=f21e192]:
+                    - cell "14" [ref=f21e193]
+                    - cell "Husband / wife / payment of alimony to former wife" [ref=f21e194]
+                    - cell "4,000 (Restricted)" [ref=f21e195]
+                  - row [ref=f21e196]:
+                    - cell "15" [ref=f21e197]
+                    - cell "Disabled husband / wife" [ref=f21e198]
+                    - cell "6,000" [ref=f21e199]
+                  - row [ref=f21e200]:
+                    - cell "16a" [ref=f21e201]
+                    - cell "Each unmarried child and under the age of 18 years old" [ref=f21e202]
+                    - cell "2,000" [ref=f21e203]
+                  - row [ref=f21e204]:
+                    - cell "16b" [ref=f21e205]
+                    - cell "Each unmarried child of 18 years and above who is receiving full-time education (\"A-Level\", certificate, matriculation or preparatory courses)." [ref=f21e206]
+                    - cell "2,000" [ref=f21e207]
+                  - row [ref=f21e208]:
+                    - cell [ref=f21e209]
+                    - 'cell "Each unmarried child of 18 years and above that: 1. receiving further education in Malaysia in respect of an award of diploma or higher (excluding matriculation/ preparatory courses). 2. receiving further education outside Malaysia in respect of an award of degree or its equivalent (including Master or Doctorate). 3. the instruction and educational establishment shall be approved by the relevant government authority." [ref=f21e210]': Each unmarried child of 18 years and above that:1. receiving further education in Malaysia in respect of an award of diploma or higher (excluding matriculation/ preparatory courses).2. receiving further education outside Malaysia in respect of an award of degree or its equivalent (including Master or Doctorate).3. the instruction and educational establishment shall be approved by the relevant government authority.
+                    - cell "8,000" [ref=f21e211]
+                  - row [ref=f21e212]:
+                    - cell "16c" [ref=f21e213]
+                    - cell "Disabled child" [ref=f21e214]
+                    - cell "8,000" [ref=f21e215]
+                  - row [ref=f21e216]:
+                    - cell [ref=f21e217]
+                    - cell "Additional exemption of RM8,000 disable child age 18 years old and above, not married and pursuing diplomas or above qualification in Malaysia @ bachelor degree or above outside Malaysia in program and in Higher Education Institute that is accredited by related Government authorities" [ref=f21e218]
+                    - cell "8,000" [ref=f21e219]
+                  - row [ref=f21e220]:
+                    - cell "17" [ref=f21e221]
+                    - cell [ref=f21e222]:
+                      - text: Life insurance and EPFCivil servants pension schemes, non-civil servants pension schemes and self-employed category:1. Mandatory contributions to approved schemes or voluntary contributions to EPF (excluding private retirement schemes) or contributions under any written law (
+                      - strong [ref=f21e223]: Restricted to RM4,000
+                      - text: )2. Life insurance premium payments or family takaful contributions or additional voluntary contributions to EPF (
+                      - strong [ref=f21e224]: Restricted to RM3,000
+                      - text: )
+                    - cell "7,000 (Restricted)" [ref=f21e225]
+                  - row [ref=f21e226]:
+                    - cell "18" [ref=f21e227]
+                    - cell "Deferred Annuity and Private Retirement Scheme (PRS)" [ref=f21e228]
+                    - cell "3,000 (Restricted)" [ref=f21e229]
+                  - row [ref=f21e230]:
+                    - cell "19" [ref=f21e231]
+                    - cell "Insurance premium for education or medical benefit" [ref=f21e232]
+                    - cell "4,000 (Restricted)" [ref=f21e233]
+                  - row [ref=f21e234]:
+                    - cell "20" [ref=f21e235]
+                    - cell "Contribution to the Social Security Organization (SOCSO)" [ref=f21e236]
+                    - cell "350 (Restricted)" [ref=f21e237]
+                  - row [ref=f21e238]:
+                    - cell "21" [ref=f21e239]
+                    - cell "Expenses on charging facilities for Electric Vehicle and domestic food waste composting machine (Not for business use)" [ref=f21e240]
+                    - cell "2,500 (Restricted)" [ref=f21e241]
+                  - row [ref=f21e242]:
+                    - cell "22" [ref=f21e243]
+                    - 'cell "Payment of housing loan interest for first home ownership (Sale and purchase agreement from 1 January 2025 to 31 December 2027) Relief Limit: 1. Residential house price up to RM500,000 or Residential house price exceeding RM500,000 up to RM750,000" [ref=f21e244]': Payment of housing loan interest for first home ownership(Sale and purchase agreement from 1 January 2025 to 31 December 2027)Relief Limit:1. Residential house price up to RM500,000 orResidential house price exceeding RM500,000 up to RM750,000
+                    - cell "7,000 or 5,000" [ref=f21e245]: 7,000or5,000
+          - group [ref=f21e246]:
+            - generic "Year of Assessment 2024" [ref=f21e247] [cursor=pointer]
+          - group [ref=f21e251]:
+            - generic "Year of Assessment 2023" [ref=f21e252] [cursor=pointer]
+          - group [ref=f21e256]:
+            - generic "Year of Assessment 2022" [ref=f21e257] [cursor=pointer]
+          - group [ref=f21e261]:
+            - generic "Year of Assessment 2021" [ref=f21e262] [cursor=pointer]
+          - group [ref=f21e266]:
+            - generic "Year of Assessment 2020" [ref=f21e267] [cursor=pointer]
+          - group [ref=f21e271]:
+            - generic "Year of Assessment 2019" [ref=f21e272] [cursor=pointer]
+          - group [ref=f21e276]:
+            - generic "Year of Assessment 2018" [ref=f21e277] [cursor=pointer]
+          - group [ref=f21e281]:
+            - generic "Year of Assessment 2017" [ref=f21e282] [cursor=pointer]
+          - group [ref=f21e286]:
+            - generic "Year of Assessment 2016" [ref=f21e287] [cursor=pointer]
+          - group [ref=f21e291]:
+            - generic "Year of Assessment 2016" [ref=f21e292] [cursor=pointer]
+  - contentinfo [ref=f21e296]:
+    - generic [ref=f21e297]: "Last updated on: 26/06/2026 04:10 PM"
+    - generic [ref=f21e304]:
+      - generic [ref=f21e305]:
+        - generic [ref=f21e306]:
+          - generic [ref=f21e308]:
+            - figure:
+              - img "LOGO HASiL OFFICIAL (R) W"
+            - generic [ref=f21e309]:
+              - paragraph [ref=f21e310]: Inland Revenue Board of Malaysia (IRBM)
+              - paragraph [ref=f21e311]: Ibu Pejabat Lembaga Hasil Dalam Negeri Malaysia, Menara Hasil, Persiaran Rimba Permai, Cyber 8, 63000 Cyberjaya Selangor.
+          - list [ref=f21e313]:
+            - listitem [ref=f21e314]:
+              - link [ref=f21e315] [cursor=pointer]:
+                - /url: https://www.facebook.com/HASiLMalaysia%20
+            - listitem [ref=f21e319]:
+              - link [ref=f21e320] [cursor=pointer]:
+                - /url: https://x.com/HASiLMalaysia
+            - listitem [ref=f21e325]:
+              - link [ref=f21e326] [cursor=pointer]:
+                - /url: https://www.youtube.com/@HASiL_Malaysia
+            - listitem [ref=f21e331]:
+              - link [ref=f21e332] [cursor=pointer]:
+                - /url: https://www.instagram.com/hasilmalaysia
+            - listitem [ref=f21e338]:
+              - link [ref=f21e339] [cursor=pointer]:
+                - /url: https://www.tiktok.com/@hasilmalaysia
+        - navigation "fmenu-1" [ref=f21e345]:
+          - list [ref=f21e346]:
+            - listitem [ref=f21e347]:
+              - link "About HASiL" [ref=f21e348] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/
+            - listitem [ref=f21e349]:
+              - link "Corporate Profile" [ref=f21e350] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/profil-korporat/
+            - listitem [ref=f21e351]:
+              - link "Corporate Culture" [ref=f21e352] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/budaya-korporat/
+            - listitem [ref=f21e353]:
+              - link "IRBM Governance Framework" [ref=f21e354] [cursor=pointer]:
+                - /url: /en/mengenai-hasil/rangka-kerja-tadbir-urus-lhdnm/
+            - listitem [ref=f21e355]:
+              - link "HASiL Directory" [ref=f21e356] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/direktori-hasil/
+            - listitem [ref=f21e357]:
+              - link "Academy" [ref=f21e358] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/akademi/
+            - listitem [ref=f21e359]:
+              - link "Career" [ref=f21e360] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/kerjaya/
+            - listitem [ref=f21e361]:
+              - link "HASiL Integrity" [ref=f21e362] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/integriti-hasil/
+            - listitem [ref=f21e363]:
+              - link "Best Tax Payer Award" [ref=f21e364] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/mengenai-hasil/anugerah-pembayar-cukai-terbaik/
+        - navigation "fmenu-1" [ref=f21e367]:
+          - list [ref=f21e368]:
+            - listitem [ref=f21e369]:
+              - link "Portal Policy" [ref=f21e370] [cursor=pointer]:
+                - /url: /en/polisi-portal/
+            - listitem [ref=f21e371]:
+              - link "Policy Privacy" [ref=f21e372] [cursor=pointer]:
+                - /url: /en/polisi-portal/dasar-privasi/
+            - listitem [ref=f21e373]:
+              - link "Security Policy" [ref=f21e374] [cursor=pointer]:
+                - /url: /en/polisi-portal/polisi-keselamatan/
+            - listitem [ref=f21e375]:
+              - link "Online Security" [ref=f21e376] [cursor=pointer]:
+                - /url: /en/polisi-portal/keselamatan-dalam-talian/
+            - listitem [ref=f21e377]:
+              - link "Scam Alert" [ref=f21e378] [cursor=pointer]:
+                - /url: /en/polisi-portal/peringatan-penipuan/
+        - navigation "fmenu-1" [ref=f21e381]:
+          - list [ref=f21e382]:
+            - listitem [ref=f21e383]:
+              - link "Contact Us" [ref=f21e384] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/
+            - listitem [ref=f21e385]:
+              - link "e-Janji Temu" [ref=f21e386] [cursor=pointer]:
+                - /url: https://ejanjitemu.hasil.gov.my/
+            - listitem [ref=f21e387]:
+              - link "Customer Care Officer" [ref=f21e388] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/pegawai-perhubungan-awam/
+            - listitem [ref=f21e389]:
+              - link "Customer Feedback Form" [ref=f21e390] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/borang-maklumbalas-pelanggan/
+            - listitem [ref=f21e391]:
+              - link "Helpdesk" [ref=f21e392] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/meja-bantuan-hasil/
+            - listitem [ref=f21e393]:
+              - link "Report Tax Evasion" [ref=f21e394] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/laporkan-pelarian-cukai/
+            - listitem [ref=f21e395]:
+              - link "Report Misconduct of HASiL Officer" [ref=f21e396] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/aduan-integriti-pegawai-lhdnm/
+            - listitem [ref=f21e397]:
+              - link "Location" [ref=f21e398] [cursor=pointer]:
+                - /url: https://www.hasil.gov.my/en/hubungi-kami/lokasi/
+        - generic [ref=f21e400]:
+          - paragraph [ref=f21e402]: HASiL Contact Centre
+          - paragraph [ref=f21e404]: 603-8911 1000
+          - paragraph [ref=f21e406]: Government's Special Aid Helpline
+          - paragraph [ref=f21e408]: 1800-88-2747
+          - paragraph [ref=f21e413]: Operating Hours
+          - paragraph [ref=f21e415]: 9:00 morning - 5:00 afternoon
+          - paragraph [ref=f21e417]: Monday - Friday (except public holidays)
+      - generic [ref=f21e420]:
+        - heading "Visitor Statistics" [level=2] [ref=f21e421]
+        - generic [ref=f21e422]:
+          - generic [ref=f21e423]:
+            - paragraph [ref=f21e424]: Today's Visitors
+            - heading "7,336" [level=3] [ref=f21e425]
+          - generic [ref=f21e426]:
+            - paragraph [ref=f21e427]: Monthly Visitors ( 08 / 2026 )
+            - heading "1,878,447" [level=3] [ref=f21e428]
+          - generic [ref=f21e429]:
+            - paragraph [ref=f21e430]: Monthly Visitors ( 07 / 2026 )
+            - heading "4,463,886" [level=3] [ref=f21e431]
+          - generic [ref=f21e432]:
+            - paragraph [ref=f21e433]: Year-to-Date Visitors ( 2026 )
+            - heading "34,565,098" [level=3] [ref=f21e434]
+          - generic [ref=f21e435]:
+            - paragraph [ref=f21e436]: Year-to-Date Visitors ( 2025 )
+            - heading "79,747,945" [level=3] [ref=f21e437]
+          - generic [ref=f21e438]:
+            - paragraph [ref=f21e439]: Total Visitors
+            - heading "492,909,948" [level=3] [ref=f21e440]
+      - paragraph [ref=f21e442]: "Best viewed using Chrome, Microsoft Edge or Mozilla Firefox with 1920x1080 screen resolution DISCLAIMER : Inland Revenue Board of Malaysia shall not be liable for any loss or damage caused by the usage of any information obtained from this website."
+      - generic [ref=f21e446]:
+        - paragraph [ref=f21e448]: © 2026 Lembaga HASiL Dalam Negeri Malaysia. All Right Reserved
+        - link "Sitemap" [ref=f21e450] [cursor=pointer]:
+          - /url: /en/peta-laman/
+        - link "HASiLIAN" [ref=f21e454] [cursor=pointer]:
+          - /url: https://hasil.sharepoint.com
+  - generic [ref=f21e457]: desktop

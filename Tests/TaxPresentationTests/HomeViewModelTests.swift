@@ -80,6 +80,59 @@ import TaxData
         #expect(asked.needsAnswer == true)
     }
 
+    @Test("money you can claim today outranks money a question might unlock")
+    func claimableOutranksUnlockable() {
+        // Plan 1's decision stands — a .needsInfo relief stays listed, because answering
+        // one question may recover real money. Where it sits is the part that was wrong.
+        //
+        // Such a relief reports headroom equal to its full cap, so on a pure value sort it
+        // outranks every relief the user can actually claim. Home shipped with "Disabled
+        // individual, RM 7,000" as the top opportunity for a household that had never said
+        // anyone was disabled, above reliefs with real room left. That is not an
+        // opportunity, it is a guess, and it was being ranked as though it were the surest
+        // money on the screen.
+        //
+        // ASK is worth more than RICH here and still ranks below it.
+        let ranked = HomeViewModel.rankedCandidates(in: Self.unlockableOutweighsClaimable)
+        #expect(ranked.map(\.code) == [ReliefCode("RICH"), ReliefCode("ASK")])
+    }
+
+    /// A relief needing an answer that is worth strictly more than the claimable one, so
+    /// ordering by value alone and ordering by claimability disagree.
+    static var unlockableOutweighsClaimable: EvaluationResult {
+        func assessment(_ code: String,
+                        eligibility: Eligibility,
+                        headroom: Money,
+                        taxSaved: Money) -> ReliefAssessment {
+            ReliefAssessment(code: ReliefCode(code),
+                             name: code.capitalized,
+                             cap: headroom,
+                             claimed: .zero,
+                             allowed: .zero,
+                             headroom: headroom,
+                             eligibility: eligibility,
+                             requirements: [],
+                             taxSaved: taxSaved,
+                             unverified: false,
+                             sourceURL: URL(string: "https://www.hasil.gov.my/")!,
+                             notes: nil,
+                             children: [])
+        }
+
+        return EvaluationResult(
+            yearOfAssessment: 2025,
+            assessments: [
+                assessment("ASK", eligibility: .needsInfo(questions: []),
+                           headroom: Money(ringgit: 7_000), taxSaved: Money(ringgit: 1_330)),
+                assessment("RICH", eligibility: .eligible,
+                           headroom: Money(ringgit: 800), taxSaved: Money(ringgit: 152))
+            ],
+            unresolved: [],
+            chargeableIncome: Money(ringgit: 100_000),
+            estimatedTax: Money(ringgit: 10_000),
+            totalOpportunity: Money(ringgit: 1_482))
+    }
+
     /// Three reliefs with identical headroom and differing eligibility, so the filter and
     /// the ordering are both observable without depending on any shipped rulebook.
     static var syntheticResult: EvaluationResult {

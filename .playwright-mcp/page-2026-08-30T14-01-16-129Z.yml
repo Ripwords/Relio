@@ -1,0 +1,1048 @@
+- generic [active] [ref=f18e1]:
+  - link:
+    - /url: "#site-content"
+  - generic [ref=f18e3]:
+    - banner [ref=f18e4]:
+      - generic [ref=f18e6]:
+        - link "Lembaga Hasil Dalam Negeri Malaysia" [ref=f18e8] [cursor=pointer]:
+          - /url: /web/20250414100531/https://www.hasil.gov.my/en/
+        - navigation "Main Navigation" [ref=f18e10]:
+          - list [ref=f18e11]:
+            - listitem [ref=f18e12]:
+              - generic [ref=f18e13]:
+                - link "About HASiL" [ref=f18e14] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/
+                - text: 
+              - list [ref=f18e15]:
+                - listitem [ref=f18e16]:
+                  - link " Corporate Profile" [ref=f18e18] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/corporate-profile/
+                    - generic [ref=f18e19]: 
+                    - text: Corporate Profile
+                - listitem [ref=f18e20]:
+                  - link " Corporate Culture" [ref=f18e22] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/corporate-culture/
+                    - generic [ref=f18e23]: 
+                    - text: Corporate Culture
+                - listitem [ref=f18e24]:
+                  - link " IRBM Governance Framework" [ref=f18e26] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/media/ehklczop/rangka-kerja-tadbir-urus-lhdnm.png
+                    - generic [ref=f18e27]: 
+                    - text: IRBM Governance Framework
+                - listitem [ref=f18e28]:
+                  - generic [ref=f18e29]:
+                    - link " HASiL Integrity" [ref=f18e30] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/hasil-integrity/
+                      - generic [ref=f18e31]: 
+                      - text: HASiL Integrity
+                    - text: 
+                  - list [ref=f18e32]:
+                    - listitem [ref=f18e33]:
+                      - link " PeARL Book" [ref=f18e35] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/tvxo2xio/buku-pearl-pelan-antirasuah-lhdnm.pdf
+                        - generic [ref=f18e36]: 
+                        - text: PeARL Book
+                    - listitem [ref=f18e37]:
+                      - link " Dasar Pemberian Maklumat ( Whistleblowing ) LHDNM" [ref=f18e39] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/vyukw2ju/dasar-pemberian-maklumat-whistleblowing-lembaga-hasil-dalam-negeri-malaysia.pdf
+                        - generic [ref=f18e40]: 
+                        - text: Dasar Pemberian Maklumat ( Whistleblowing ) LHDNM
+                    - listitem [ref=f18e41]:
+                      - link " IRBM Anti Corruption Policy Statement" [ref=f18e43] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/fephrdh5/irbm-anti-corruption-policy-statement-2024.pdf
+                        - generic [ref=f18e44]: 
+                        - text: IRBM Anti Corruption Policy Statement
+                    - listitem [ref=f18e45]:
+                      - link " Conflict of Interest Policy Statement of the IRBM" [ref=f18e47] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/vzgmoqlc/pernyataan-polisi-konflik-kepentingan-lhdnm.pdf
+                        - generic [ref=f18e48]: 
+                        - text: Conflict of Interest Policy Statement of the IRBM
+                - listitem [ref=f18e49]:
+                  - link " Academy" [ref=f18e51] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/academy/
+                    - generic [ref=f18e52]: 
+                    - text: Academy
+                - listitem [ref=f18e53]:
+                  - link " Best Tax Payer Award" [ref=f18e55] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/best-tax-payer-award/
+                    - generic [ref=f18e56]: 
+                    - text: Best Tax Payer Award
+                - listitem [ref=f18e57]:
+                  - link " HASiL Directory" [ref=f18e59] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/about-hasil/hasil-directory/
+                    - generic [ref=f18e60]: 
+                    - text: HASiL Directory
+            - listitem [ref=f18e61]:
+              - generic [ref=f18e62]:
+                - link "Service" [ref=f18e63] [cursor=pointer]:
+                  - /url: https://web.archive.org/web/20250414100531/http://www.hasil.gov.my/perkhidmatan/
+                - text: 
+              - list [ref=f18e64]:
+                - listitem [ref=f18e65]:
+                  - generic [ref=f18e66]:
+                    - link " Individual" [ref=f18e67] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+                      - generic [ref=f18e68]: 
+                      - text: Individual
+                    - text: 
+                  - list [ref=f18e69]:
+                    - listitem [ref=f18e70]:
+                      - link "Introduction Individual Income Tax" [ref=f18e72] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/
+                    - listitem [ref=f18e73]:
+                      - link " What is Income Tax?" [ref=f18e75] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/what-is-income-tax/
+                        - generic [ref=f18e76]: 
+                        - text: What is Income Tax?
+                    - listitem [ref=f18e77]:
+                      - link " Who is Taxable ?" [ref=f18e79] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/who-is-taxable/
+                        - generic [ref=f18e80]: 
+                        - text: Who is Taxable ?
+                    - listitem [ref=f18e81]:
+                      - link " When is Taxable?" [ref=f18e83] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/when-is-taxable/
+                        - generic [ref=f18e84]: 
+                        - text: When is Taxable?
+                    - listitem [ref=f18e85]:
+                      - link " How to file your Tax?" [ref=f18e87] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/how-to-file-your-tax/
+                        - generic [ref=f18e88]: 
+                        - text: How to file your Tax?
+                    - listitem [ref=f18e89]:
+                      - link " Why must we pay Tax?" [ref=f18e91] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/why-must-we-pay-tax/
+                        - generic [ref=f18e92]: 
+                        - text: Why must we pay Tax?
+                    - listitem [ref=f18e93]:
+                      - link " How to submit your ITRF?" [ref=f18e95] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/how-to-submit-your-itrf/
+                        - generic [ref=f18e96]: 
+                        - text: How to submit your ITRF?
+                    - listitem [ref=f18e97]:
+                      - link "‎" [ref=f18e99] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+                    - listitem [ref=f18e100]:
+                      - link "Individual Life Cycle" [ref=f18e102] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/
+                    - listitem [ref=f18e103]:
+                      - link " Registration" [ref=f18e105] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/registration/
+                        - generic [ref=f18e106]: 
+                        - text: Registration
+                    - listitem [ref=f18e107]:
+                      - link " Residence Status" [ref=f18e109] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/residence-status/
+                        - generic [ref=f18e110]: 
+                        - text: Residence Status
+                    - listitem [ref=f18e111]:
+                      - link " How to Declare Income?" [ref=f18e113] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/
+                        - generic [ref=f18e114]: 
+                        - text: How to Declare Income?
+                    - listitem [ref=f18e115]:
+                      - link " Payment" [ref=f18e117] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/payment/
+                        - generic [ref=f18e118]: 
+                        - text: Payment
+                    - listitem [ref=f18e119]:
+                      - link "‎" [ref=f18e121] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+                    - listitem [ref=f18e122]:
+                      - link "Others" [ref=f18e124] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/
+                    - listitem [ref=f18e125]:
+                      - link " Amended Assessment" [ref=f18e127] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/amended-assessment/
+                        - generic [ref=f18e128]: 
+                        - text: Amended Assessment
+                    - listitem [ref=f18e129]:
+                      - link " Appeal" [ref=f18e131] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/appeal/
+                        - generic [ref=f18e132]: 
+                        - text: Appeal
+                    - listitem [ref=f18e133]:
+                      - link " Review & Update" [ref=f18e135] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/review-update/
+                        - generic [ref=f18e136]: 
+                        - text: Review & Update
+                    - listitem [ref=f18e137]:
+                      - link " Termination of Service / Employment" [ref=f18e139] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/termination-of-service-employment/
+                        - generic [ref=f18e140]: 
+                        - text: Termination of Service / Employment
+                    - listitem [ref=f18e141]:
+                      - link " Offences" [ref=f18e143] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/offences/
+                        - generic [ref=f18e144]: 
+                        - text: Offences
+                    - listitem [ref=f18e145]:
+                      - link " Stoppage Order" [ref=f18e147] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/stoppage-order/
+                        - generic [ref=f18e148]: 
+                        - text: Stoppage Order
+                    - listitem [ref=f18e149]:
+                      - link " Frequently Asked Question (Individual)" [ref=f18e151] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/frequently-asked-question-individual/
+                        - generic [ref=f18e152]: 
+                        - text: Frequently Asked Question (Individual)
+                - listitem [ref=f18e153]:
+                  - generic [ref=f18e154]:
+                    - link " Company" [ref=f18e155] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/
+                      - generic [ref=f18e156]: 
+                      - text: Company
+                    - text: 
+                  - list [ref=f18e157]:
+                    - listitem [ref=f18e158]:
+                      - link " Taxpayer Responsibilities" [ref=f18e160] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/taxpayer-responsibilities/
+                        - generic [ref=f18e161]: 
+                        - text: Taxpayer Responsibilities
+                    - listitem [ref=f18e162]:
+                      - link " Tax Rate of Company" [ref=f18e164] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/tax-rate-of-company/
+                        - generic [ref=f18e165]: 
+                        - text: Tax Rate of Company
+                    - listitem [ref=f18e166]:
+                      - link " Tax Payment" [ref=f18e168] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/tax-payment/
+                        - generic [ref=f18e169]: 
+                        - text: Tax Payment
+                    - listitem [ref=f18e170]:
+                      - link " Update Company Information" [ref=f18e172] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/update-company-information/
+                        - generic [ref=f18e173]: 
+                        - text: Update Company Information
+                    - listitem [ref=f18e174]:
+                      - link " Appeal" [ref=f18e176] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/appeal/
+                        - generic [ref=f18e177]: 
+                        - text: Appeal
+                    - listitem [ref=f18e178]:
+                      - link " Corporate Tax" [ref=f18e180] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/corporate-tax/
+                        - generic [ref=f18e181]: 
+                        - text: Corporate Tax
+                    - listitem [ref=f18e182]:
+                      - link " Cooporative Tax" [ref=f18e184] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/cooporative-tax/
+                        - generic [ref=f18e185]: 
+                        - text: Cooporative Tax
+                    - listitem [ref=f18e186]:
+                      - link " Non-Resident Company" [ref=f18e188] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/non-resident-company/
+                        - generic [ref=f18e189]: 
+                        - text: Non-Resident Company
+                    - listitem [ref=f18e190]:
+                      - link " Company Resident Status" [ref=f18e192] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/company-resident-status/
+                        - generic [ref=f18e193]: 
+                        - text: Company Resident Status
+                    - listitem [ref=f18e194]:
+                      - link " Certificate of Resident" [ref=f18e196] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/certificate-of-resident/
+                        - generic [ref=f18e197]: 
+                        - text: Certificate of Resident
+                    - listitem [ref=f18e198]:
+                      - link " Amending the Income Tax Return Form" [ref=f18e200] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/amending-the-income-tax-return-form/
+                        - generic [ref=f18e201]: 
+                        - text: Amending the Income Tax Return Form
+                    - listitem [ref=f18e202]:
+                      - link " Change In Accounting Period" [ref=f18e204] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/change-in-accounting-period/
+                        - generic [ref=f18e205]: 
+                        - text: Change In Accounting Period
+                    - listitem [ref=f18e206]:
+                      - link " Basis Period for Company" [ref=f18e208] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/basis-period-for-company/
+                        - generic [ref=f18e209]: 
+                        - text: Basis Period for Company
+                    - listitem [ref=f18e210]:
+                      - link " Tax File Registration" [ref=f18e212] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/tax-file-registration/
+                        - generic [ref=f18e213]: 
+                        - text: Tax File Registration
+                    - listitem [ref=f18e214]:
+                      - link " Tax Estimation" [ref=f18e216] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/tax-estimation/
+                        - generic [ref=f18e217]: 
+                        - text: Tax Estimation
+                    - listitem [ref=f18e218]:
+                      - link " Other Situation" [ref=f18e220] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/other-situation/
+                        - generic [ref=f18e221]: 
+                        - text: Other Situation
+                    - listitem [ref=f18e222]:
+                      - link " Digital Business" [ref=f18e224] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/digital-business/
+                        - generic [ref=f18e225]: 
+                        - text: Digital Business
+                    - listitem [ref=f18e226]:
+                      - link " Frequently Asked Question (Company)" [ref=f18e228] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/frequently-asked-question-company/
+                        - generic [ref=f18e229]: 
+                        - text: Frequently Asked Question (Company)
+                    - listitem [ref=f18e230]:
+                      - link " SME" [ref=f18e232] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/company/sme/
+                        - generic [ref=f18e233]: 
+                        - text: SME
+                - listitem [ref=f18e234]:
+                  - link " e-Services" [ref=f18e236] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/e-services/
+                    - generic [ref=f18e237]: 
+                    - text: e-Services
+                - listitem [ref=f18e238]:
+                  - generic [ref=f18e239]:
+                    - link " Employers" [ref=f18e240] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/
+                      - generic [ref=f18e241]: 
+                      - text: Employers
+                    - text: 
+                  - list [ref=f18e242]:
+                    - listitem [ref=f18e243]:
+                      - link " Responsibility of Employer:" [ref=f18e245] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/responsibility-of-employer/
+                        - generic [ref=f18e246]: 
+                        - text: "Responsibility of Employer:"
+                    - listitem [ref=f18e247]:
+                      - link " Guideline" [ref=f18e249] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/guideline/
+                        - generic [ref=f18e250]: 
+                        - text: Guideline
+                    - listitem [ref=f18e251]:
+                      - link " MTD Schedular" [ref=f18e253] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/mtd-schedular/
+                        - generic [ref=f18e254]: 
+                        - text: MTD Schedular
+                    - listitem [ref=f18e255]:
+                      - link " Employer (Payroll)-Data Specification" [ref=f18e257] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/employer-payroll-data-specification/
+                        - generic [ref=f18e258]: 
+                        - text: Employer (Payroll)-Data Specification
+                    - listitem [ref=f18e259]:
+                      - link " MTD Payment" [ref=f18e261] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/mtd-payment/
+                        - generic [ref=f18e262]: 
+                        - text: MTD Payment
+                    - listitem [ref=f18e263]:
+                      - link " List Of Software Provider or Employer" [ref=f18e265] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/list-of-software-provider-or-employer/
+                        - generic [ref=f18e266]: 
+                        - text: List Of Software Provider or Employer
+                    - listitem [ref=f18e267]:
+                      - link " Method" [ref=f18e269] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/method/
+                        - generic [ref=f18e270]: 
+                        - text: Method
+                    - listitem [ref=f18e271]:
+                      - link " Frequently Asked Question" [ref=f18e273] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/frequently-asked-question/
+                        - generic [ref=f18e274]: 
+                        - text: Frequently Asked Question
+                    - listitem [ref=f18e275]:
+                      - link " Notifications of New Employee" [ref=f18e277] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/notifications-of-new-employee/
+                        - generic [ref=f18e278]: 
+                        - text: Notifications of New Employee
+                    - listitem [ref=f18e279]:
+                      - link " Termination Of Service" [ref=f18e281] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/employers/notifications-of-termination-of-service/
+                        - generic [ref=f18e282]: 
+                        - text: Termination Of Service
+                - listitem [ref=f18e283]:
+                  - link " e-Invoice" [ref=f18e285] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/e-invoice/
+                    - generic [ref=f18e286]: 
+                    - text: e-Invoice
+                - listitem [ref=f18e287]:
+                  - generic [ref=f18e288]:
+                    - link " Stamp Duty" [ref=f18e289] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/
+                      - generic [ref=f18e290]: 
+                      - text: Stamp Duty
+                    - text: 
+                  - list [ref=f18e291]:
+                    - listitem [ref=f18e292]:
+                      - link " Relief From Stamp Duty" [ref=f18e294] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/relief-from-stamp-duty/
+                        - generic [ref=f18e295]: 
+                        - text: Relief From Stamp Duty
+                    - listitem [ref=f18e296]:
+                      - link " Amendments To The Stamps Act 1949" [ref=f18e298] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/amendments-to-the-stamps-act-1949/
+                        - generic [ref=f18e299]: 
+                        - text: Amendments To The Stamps Act 1949
+                    - listitem [ref=f18e300]:
+                      - link " Method of Payment" [ref=f18e302] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/method-of-payment/
+                        - generic [ref=f18e303]: 
+                        - text: Method of Payment
+                    - listitem [ref=f18e304]:
+                      - link " Responsibility of Solicitors" [ref=f18e306] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/responsibility-of-solicitors/
+                        - generic [ref=f18e307]: 
+                        - text: Responsibility of Solicitors
+                    - listitem [ref=f18e308]:
+                      - link " Penalty (Stamp Duty)" [ref=f18e310] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/penalty-stamp-duty/
+                        - generic [ref=f18e311]: 
+                        - text: Penalty (Stamp Duty)
+                    - listitem [ref=f18e312]:
+                      - link " Primary Customer Responsibilities (Lawyer / Company Secretary / Registrar / Banking and Financial Institutions) & STAMPS System" [ref=f18e314] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/primary-customer-responsibilities-lawyer-company-secretary-registrar-banking-and-financial-institutions-stamps-system/
+                        - generic [ref=f18e315]: 
+                        - text: Primary Customer Responsibilities (Lawyer / Company Secretary / Registrar / Banking and Financial Institutions) & STAMPS System
+                    - listitem [ref=f18e316]:
+                      - link " Stamp Duty Order" [ref=f18e318] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/stamp-duty-order/
+                        - generic [ref=f18e319]: 
+                        - text: Stamp Duty Order
+                    - listitem [ref=f18e320]:
+                      - link " Stamp Duty Exemption Order & Explanation" [ref=f18e322] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/stamp-duty/stamp-duty-exemption-order-explanation/
+                        - generic [ref=f18e323]: 
+                        - text: Stamp Duty Exemption Order & Explanation
+                - listitem [ref=f18e324]:
+                  - link " Special Voluntary Disclosure Program (SVDP) 2.0" [ref=f18e326] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/special-voluntary-disclosure-programme-svdp-20/
+                    - generic [ref=f18e327]: 
+                    - text: Special Voluntary Disclosure Program (SVDP) 2.0
+                - listitem [ref=f18e328]:
+                  - generic [ref=f18e329]:
+                    - link " Tax Agent" [ref=f18e330] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/tax-agent/
+                      - generic [ref=f18e331]: 
+                      - text: Tax Agent
+                    - text: 
+                  - list [ref=f18e332]:
+                    - listitem [ref=f18e333]:
+                      - link " Profession As A Tax Agent" [ref=f18e335] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/tax-agent/profession-as-a-tax-agent/
+                        - generic [ref=f18e336]: 
+                        - text: Profession As A Tax Agent
+                    - listitem [ref=f18e337]:
+                      - link " Appointment Of Tax Agent By Taxpayer" [ref=f18e339] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/tax-agent/appointment-of-tax-agent-by-taxpayer/
+                        - generic [ref=f18e340]: 
+                        - text: Appointment Of Tax Agent By Taxpayer
+                    - listitem [ref=f18e341]:
+                      - link " Consultation With HASiL" [ref=f18e343] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/tax-agent/consultation-with-hasil/
+                        - generic [ref=f18e344]: 
+                        - text: Consultation With HASiL
+                    - listitem [ref=f18e345]:
+                      - link " Non-Compliance And Offences" [ref=f18e347] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/tax-agent/non-compliance-and-offences/
+                        - generic [ref=f18e348]: 
+                        - text: Non-Compliance And Offences
+                - listitem [ref=f18e349]:
+                  - link " Government's Special Aid" [ref=f18e351] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/quick-links/governments-special-aid/
+                    - generic [ref=f18e352]: 
+                    - text: Government's Special Aid
+                - listitem [ref=f18e353]:
+                  - generic [ref=f18e354]:
+                    - link " RPGT" [ref=f18e355] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/
+                      - generic [ref=f18e356]: 
+                      - text: RPGT
+                    - text: 
+                  - list [ref=f18e357]:
+                    - listitem [ref=f18e358]:
+                      - link " Real Property Gains Tax (RPGT) Rates" [ref=f18e360] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/real-property-gains-tax-rpgt-rates/
+                        - generic [ref=f18e361]: 
+                        - text: Real Property Gains Tax (RPGT) Rates
+                    - listitem [ref=f18e362]:
+                      - link " Disposal Date And Acquisition Date" [ref=f18e364] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/disposal-date-and-acquisition-date/
+                        - generic [ref=f18e365]: 
+                        - text: Disposal Date And Acquisition Date
+                    - listitem [ref=f18e366]:
+                      - link " Disposal Price And Acquisition Price" [ref=f18e368] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/disposal-price-and-acquisition-price/
+                        - generic [ref=f18e369]: 
+                        - text: Disposal Price And Acquisition Price
+                    - listitem [ref=f18e370]:
+                      - link " Determination Of Chargeable Gain / Allowable Loss" [ref=f18e372] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/determination-of-chargeable-gain-allowable-loss/
+                        - generic [ref=f18e373]: 
+                        - text: Determination Of Chargeable Gain / Allowable Loss
+                    - listitem [ref=f18e374]:
+                      - link " Exemption" [ref=f18e376] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/exemption/
+                        - generic [ref=f18e377]: 
+                        - text: Exemption
+                    - listitem [ref=f18e378]:
+                      - link " Disposal Price Deemed To Be Equal To Acquisition Price (Available in Malay Language Only)" [ref=f18e380] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/disposal-price-deemed-to-be-equal-to-acquisition-price/
+                        - generic [ref=f18e381]: 
+                        - text: Disposal Price Deemed To Be Equal To Acquisition Price (Available in Malay Language Only)
+                    - listitem [ref=f18e382]:
+                      - link " Transfer Of Asset Inherited From Deceased Estate" [ref=f18e384] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/transfer-of-asset-inherited-from-deceased-estate/
+                        - generic [ref=f18e385]: 
+                        - text: Transfer Of Asset Inherited From Deceased Estate
+                    - listitem [ref=f18e386]:
+                      - link " Pengenalan Sistem Taksir Sendiri CKHT (STS CKHT)" [ref=f18e388] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/pengenalan-sistem-taksir-sendiri-ckht-sts-ckht/
+                        - generic [ref=f18e389]: 
+                        - text: Pengenalan Sistem Taksir Sendiri CKHT (STS CKHT)
+                    - listitem [ref=f18e390]:
+                      - link " Jenis Borang Nyata CKHT" [ref=f18e392] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/jenis-borang-nyata-ckht/
+                        - generic [ref=f18e393]: 
+                        - text: Jenis Borang Nyata CKHT
+                    - listitem [ref=f18e394]:
+                      - link " Responsibility Of Disposer And Acquirer" [ref=f18e396] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/responsibility-of-disposer-and-acquirer/
+                        - generic [ref=f18e397]: 
+                        - text: Responsibility Of Disposer And Acquirer
+                    - listitem [ref=f18e398]:
+                      - link " Assessment Of Real Property Gain Tax" [ref=f18e400] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/assessment-of-real-property-gain-tax/
+                        - generic [ref=f18e401]: 
+                        - text: Assessment Of Real Property Gain Tax
+                    - listitem [ref=f18e402]:
+                      - link " Pindaan Borang Nyata CKHT" [ref=f18e404] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/pindaan-borang-nyata-ckht/
+                        - generic [ref=f18e405]: 
+                        - text: Pindaan Borang Nyata CKHT
+                    - listitem [ref=f18e406]:
+                      - link " Imposition Of Penalties And Increases Of Tax" [ref=f18e408] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/imposition-of-penalties-and-increases-of-tax/
+                        - generic [ref=f18e409]: 
+                        - text: Imposition Of Penalties And Increases Of Tax
+                    - listitem [ref=f18e410]:
+                      - link " Pegangan Dan Remitan Wang Oleh Pemeroleh (Available in Malay Language Only)" [ref=f18e412] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/pegangan-dan-remitan-wang-oleh-pemeroleh-available-in-malay-language-only/
+                        - generic [ref=f18e413]: 
+                        - text: Pegangan Dan Remitan Wang Oleh Pemeroleh (Available in Malay Language Only)
+                    - listitem [ref=f18e414]:
+                      - link " Shares In Real Property Company (RPC)" [ref=f18e416] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/shares-in-real-property-company-rpc/
+                        - generic [ref=f18e417]: 
+                        - text: Shares In Real Property Company (RPC)
+                    - listitem [ref=f18e418]:
+                      - link " Procedures For Submission Of Real Porperty Gains Tax Form" [ref=f18e420] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/procedures-for-submission-of-real-property-gains-tax-form/
+                        - generic [ref=f18e421]: 
+                        - text: Procedures For Submission Of Real Porperty Gains Tax Form
+                    - listitem [ref=f18e422]:
+                      - link " Prosedur Bayaran CKHT" [ref=f18e424] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/rpgt/prosedur-bayaran-ckht/
+                        - generic [ref=f18e425]: 
+                        - text: Prosedur Bayaran CKHT
+                - listitem [ref=f18e426]:
+                  - generic [ref=f18e427]:
+                    - link " Institutions/Organizations/Funds Primarily Is Not For Profit" [ref=f18e428] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/institutionsorganizationsfunds-primarily-is-not-for-profit/
+                      - generic [ref=f18e429]: 
+                      - text: Institutions/Organizations/Funds Primarily Is Not For Profit
+                    - text: 
+                  - list [ref=f18e430]:
+                    - listitem [ref=f18e431]:
+                      - link " Public Info" [ref=f18e433] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/institutionsorganizationsfunds-primarily-is-not-for-profit/public-info/
+                        - generic [ref=f18e434]: 
+                        - text: Public Info
+                    - listitem [ref=f18e435]:
+                      - link " Application Info" [ref=f18e437] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/institutionsorganizationsfunds-primarily-is-not-for-profit/application-info/
+                        - generic [ref=f18e438]: 
+                        - text: Application Info
+                    - listitem [ref=f18e439]:
+                      - link " Donation Receipts" [ref=f18e441] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/institutionsorganizationsfunds-primarily-is-not-for-profit/donation-receipts/
+                        - generic [ref=f18e442]: 
+                        - text: Donation Receipts
+                    - listitem [ref=f18e443]:
+                      - link " Frequently Asked Questions (FAQ)" [ref=f18e445] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/en/institutionsorganizationsfunds-primarily-is-not-for-profit/frequently-asked-questions/
+                        - generic [ref=f18e446]: 
+                        - text: Frequently Asked Questions (FAQ)
+            - listitem [ref=f18e447]:
+              - generic [ref=f18e448]:
+                - link "International" [ref=f18e449] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/
+                - text: 
+              - list [ref=f18e450]:
+                - listitem [ref=f18e451]:
+                  - link " Global Minimum Tax (GMT)" [ref=f18e453] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/global-minimum-tax-gmt/
+                    - generic [ref=f18e454]: 
+                    - text: Global Minimum Tax (GMT)
+                - listitem [ref=f18e455]:
+                  - link " Exchange of Information" [ref=f18e457] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/exchange-of-information/
+                    - generic [ref=f18e458]: 
+                    - text: Exchange of Information
+                - listitem [ref=f18e459]:
+                  - link " Automatic Exchange of Information (AEOI)" [ref=f18e461] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/automatic-exchange-of-information-aeoi/
+                    - generic [ref=f18e462]: 
+                    - text: Automatic Exchange of Information (AEOI)
+                - listitem [ref=f18e463]:
+                  - link " Double Taxation Avoidance Agreement (DTA)" [ref=f18e465] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/double-taxation-avoidance-agreement-dta/
+                    - generic [ref=f18e466]: 
+                    - text: Double Taxation Avoidance Agreement (DTA)
+                - listitem [ref=f18e467]:
+                  - link " Transfer Pricing" [ref=f18e469] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/transfer-pricing/
+                    - generic [ref=f18e470]: 
+                    - text: Transfer Pricing
+                - listitem [ref=f18e471]:
+                  - link " Mutual Agreement Procedure (MAP)" [ref=f18e473] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/mutual-agreement-procedure-map/
+                    - generic [ref=f18e474]: 
+                    - text: Mutual Agreement Procedure (MAP)
+                - listitem [ref=f18e475]:
+                  - link " Multilateral Instrument (MLI)" [ref=f18e477] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/multilateral-instrument-mli/
+                    - generic [ref=f18e478]: 
+                    - text: Multilateral Instrument (MLI)
+                - listitem [ref=f18e479]:
+                  - link " Non-Resident" [ref=f18e481] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/non-resident/
+                    - generic [ref=f18e482]: 
+                    - text: Non-Resident
+                - listitem [ref=f18e483]:
+                  - link " Certificate of Residence / e-Residence" [ref=f18e485] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/certificate-of-residence-e-residence/
+                    - generic [ref=f18e486]: 
+                    - text: Certificate of Residence / e-Residence
+                - listitem [ref=f18e487]:
+                  - link " Advance Pricing Arrangement (APA)" [ref=f18e489] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/advance-pricing-arrangement-apa/
+                    - generic [ref=f18e490]: 
+                    - text: Advance Pricing Arrangement (APA)
+                - listitem [ref=f18e491]:
+                  - link " Foreign Exchange Rate" [ref=f18e493] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/foreign-exchange-rate/
+                    - generic [ref=f18e494]: 
+                    - text: Foreign Exchange Rate
+                - listitem [ref=f18e495]:
+                  - link " Incentives" [ref=f18e497] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/incentives/
+                    - generic [ref=f18e498]: 
+                    - text: Incentives
+                - listitem [ref=f18e499]:
+                  - link " Average Lending Rate Bank Negara Malaysia Schedule Section 140B" [ref=f18e501] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/average-lending-rate-bank-negara-malaysia-schedule-section-140b/
+                    - generic [ref=f18e502]: 
+                    - text: Average Lending Rate Bank Negara Malaysia Schedule Section 140B
+                - listitem [ref=f18e503]:
+                  - link " Restriction On Deductibility of Interest [Section 140C, Income Tax Act 1967]" [ref=f18e505] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/restriction-on-deductibility-of-interest-section-140c-income-tax-act-1967/
+                    - generic [ref=f18e506]: 
+                    - text: Restriction On Deductibility of Interest [Section 140C, Income Tax Act 1967]
+                - listitem [ref=f18e507]:
+                  - link " International Affairs" [ref=f18e509] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/international-affairs/
+                    - generic [ref=f18e510]: 
+                    - text: International Affairs
+                - listitem [ref=f18e511]:
+                  - link " HiDEF Prod Portal" [ref=f18e513] [cursor=pointer]:
+                    - /url: https://web.archive.org/web/20250414100531/https://hidef-support.hasil.gov.my/
+                    - generic [ref=f18e514]: 
+                    - text: HiDEF Prod Portal
+                - listitem [ref=f18e515]:
+                  - link " IRBM Public Key" [ref=f18e517] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/international/irbm-public-key/
+                    - generic [ref=f18e518]: 
+                    - text: IRBM Public Key
+            - listitem [ref=f18e519]:
+              - generic [ref=f18e520]:
+                - link "Legislation" [ref=f18e521] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/
+                - text: 
+              - list [ref=f18e522]:
+                - listitem [ref=f18e523]:
+                  - link " Act" [ref=f18e525] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/act/
+                    - generic [ref=f18e526]: 
+                    - text: Act
+                - listitem [ref=f18e527]:
+                  - link " Public Rulings" [ref=f18e529] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/public-rulings/
+                    - generic [ref=f18e530]: 
+                    - text: Public Rulings
+                - listitem [ref=f18e531]:
+                  - link " Guidelines" [ref=f18e533] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/guidelines/
+                    - generic [ref=f18e534]: 
+                    - text: Guidelines
+                - listitem [ref=f18e535]:
+                  - link " Framework" [ref=f18e537] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/framework/
+                    - generic [ref=f18e538]: 
+                    - text: Framework
+                - listitem [ref=f18e539]:
+                  - link " Tax Case" [ref=f18e541] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/tax-case/
+                    - generic [ref=f18e542]: 
+                    - text: Tax Case
+                - listitem [ref=f18e543]:
+                  - link " Withholding Tax" [ref=f18e545] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/withholding-tax/
+                    - generic [ref=f18e546]: 
+                    - text: Withholding Tax
+                - listitem [ref=f18e547]:
+                  - link " Practice Note" [ref=f18e549] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/practice-note/
+                    - generic [ref=f18e550]: 
+                    - text: Practice Note
+                - listitem [ref=f18e551]:
+                  - link " Dialog Minutes For Operational & Technical Issues" [ref=f18e553] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/dialog-minutes-for-operational-technical-issues/
+                    - generic [ref=f18e554]: 
+                    - text: Dialog Minutes For Operational & Technical Issues
+                - listitem [ref=f18e555]:
+                  - link " Offences, Fines and Penalties" [ref=f18e557] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/offences-fines-and-penalties/
+                    - generic [ref=f18e558]: 
+                    - text: Offences, Fines and Penalties
+                - listitem [ref=f18e559]:
+                  - link " Budget" [ref=f18e561] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/legislation/budget/
+                    - generic [ref=f18e562]: 
+                    - text: Budget
+            - listitem [ref=f18e563]:
+              - generic [ref=f18e564]:
+                - link "Forms" [ref=f18e565] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/
+                - text: 
+              - list [ref=f18e566]:
+                - listitem [ref=f18e567]:
+                  - link " Criteria on Incomplete ITRF" [ref=f18e569] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/criteria-on-incomplete-itrf/
+                    - generic [ref=f18e570]: 
+                    - text: Criteria on Incomplete ITRF
+                - listitem [ref=f18e571]:
+                  - link " Contoh Format Baucar Dividen" [ref=f18e573] [cursor=pointer]:
+                    - /url: https://web.archive.org/web/20250414100531/http://phl.hasil.gov.my/pdf/pdfam/BaucarDividen.pdf
+                    - generic [ref=f18e574]: 
+                    - text: Contoh Format Baucar Dividen
+                - listitem [ref=f18e575]:
+                  - generic [ref=f18e576]:
+                    - link " Return Form (RF) Filing Programme" [ref=f18e577] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/return-form-rf-filing-programme/
+                      - generic [ref=f18e578]: 
+                      - text: Return Form (RF) Filing Programme
+                    - text: 
+                  - list [ref=f18e579]:
+                    - listitem [ref=f18e580]:
+                      - link " Return Form (RF) Filing Programme For The Year 2025" [ref=f18e582] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/tvojk1ho/rf-filing-programme-for-2025.pdf
+                        - generic [ref=f18e583]: 
+                        - text: Return Form (RF) Filing Programme For The Year 2025
+                    - listitem [ref=f18e584]:
+                      - link " Return Form (RF) Filing Programme For The Year 2024" [ref=f18e586] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/fw2jk2fd/rf-filing-programme-for-the-year-2024.pdf
+                        - generic [ref=f18e587]: 
+                        - text: Return Form (RF) Filing Programme For The Year 2024
+                    - listitem [ref=f18e588]:
+                      - link " Return Form (RF) Filing Programme For The Year 2023" [ref=f18e590] [cursor=pointer]:
+                        - /url: /web/20250414100531/https://www.hasil.gov.my/media/phsnq1fd/return-form-filing-programme-for-the-year-2023.pdf
+                        - generic [ref=f18e591]: 
+                        - text: Return Form (RF) Filing Programme For The Year 2023
+                    - listitem [ref=f18e592]:
+                      - link " Return Form (RF) Filing Programme For The Year 2022" [ref=f18e594] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://phl.hasil.gov.my/pdf/pdfam/ProgramMemfailBN_2022_2.pdf
+                        - generic [ref=f18e595]: 
+                        - text: Return Form (RF) Filing Programme For The Year 2022
+                    - listitem [ref=f18e596]:
+                      - link " Return Form (RF) Filing Programme For The Year 2021" [ref=f18e598] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/http://phl.hasil.gov.my/pdf/pdfam/ProgramMemfailBN_2021_Pin.4_1.pdf
+                        - generic [ref=f18e599]: 
+                        - text: Return Form (RF) Filing Programme For The Year 2021
+                - listitem [ref=f18e600]:
+                  - link " Filing Program For Documents Specified Under Section 82B Through MITRS" [ref=f18e602] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/filing-programme-for-documents-specified-under-section-82b-through-mitrs/
+                    - generic [ref=f18e603]: 
+                    - text: Filing Program For Documents Specified Under Section 82B Through MITRS
+                - listitem [ref=f18e604]:
+                  - link " CGT Return Form (RF) Filing Programme" [ref=f18e606] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/cgt-return-form-filing-programme/
+                    - generic [ref=f18e607]: 
+                    - text: CGT Return Form (RF) Filing Programme
+                - listitem [ref=f18e608]:
+                  - link " RPGT Return Form Filing Programme" [ref=f18e610] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/rpgt-return-form-filing-programme/
+                    - generic [ref=f18e611]: 
+                    - text: RPGT Return Form Filing Programme
+                - listitem [ref=f18e612]:
+                  - link " Download Forms" [ref=f18e614] [cursor=pointer]:
+                    - /url: /web/20250414100531/https://www.hasil.gov.my/en/forms/download-forms/
+                    - generic [ref=f18e615]: 
+                    - text: Download Forms
+            - listitem [ref=f18e616]:
+              - link "Career" [ref=f18e618] [cursor=pointer]:
+                - /url: /web/20250414100531/https://www.hasil.gov.my/en/career/
+            - listitem [ref=f18e619]:
+              - link "Contact Us" [ref=f18e621] [cursor=pointer]:
+                - /url: /web/20250414100531/https://www.hasil.gov.my/en/contact-us/
+        - navigation "Secondary Navigation" [ref=f18e622]:
+          - list [ref=f18e623]:
+            - listitem [ref=f18e624]:
+              - link "English " [ref=f18e625] [cursor=pointer]:
+                - /url: "#"
+      - generic:
+        - generic [ref=f18e626] [cursor=pointer]
+        - text:    
+    - main [ref=f18e628]:
+      - navigation "Breadcrumb Navigation" [ref=f18e631]:
+        - list [ref=f18e632]:
+          - listitem [ref=f18e633]:
+            - link " Home (en)" [ref=f18e634] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/
+              - generic [ref=f18e635]:
+                - generic [ref=f18e636]: 
+                - text: Home (en)
+          - listitem [ref=f18e637]:
+            - link " Individual" [ref=f18e638] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+              - generic [ref=f18e639]:
+                - generic [ref=f18e640]: 
+                - text: Individual
+          - listitem [ref=f18e641]:
+            - link " Individual Life Cycle" [ref=f18e642] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/
+              - generic [ref=f18e643]:
+                - generic [ref=f18e644]: 
+                - text: Individual Life Cycle
+          - listitem [ref=f18e645]:
+            - link " How to Declare Income?" [ref=f18e646] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/
+              - generic [ref=f18e647]:
+                - generic [ref=f18e648]: 
+                - text: How to Declare Income?
+          - listitem [ref=f18e649]:
+            - generic [ref=f18e650]:
+              - generic [ref=f18e651]: 
+              - text: Tax Reliefs
+      - search [ref=f18e659]:
+        - group [ref=f18e660]:
+          - textbox "Search" [ref=f18e662]
+          - button "Search" [ref=f18e663] [cursor=pointer]:
+            - generic [ref=f18e665]: 
+      - heading "Tax Reliefs" [level=4] [ref=f18e676]
+      - generic [ref=f18e678]:
+        - text: 
+        - generic [ref=f18e679]:
+          - generic [ref=f18e683]:
+            - paragraph [ref=f18e684]:
+              - generic [ref=f18e685] [cursor=pointer]: Year of Assessment 2024 (Last updated on 17th December 2024) 
+            - paragraph [ref=f18e686]:
+              - generic [ref=f18e687] [cursor=pointer]: Year of Assessment 2023 (Last updated on 6th November 2023) 
+            - paragraph [ref=f18e688]:
+              - generic [ref=f18e689] [cursor=pointer]: Year of Assessment 2022 
+            - paragraph [ref=f18e690]:
+              - generic [ref=f18e691] [cursor=pointer]: Year of Assessment 2021 
+            - paragraph [ref=f18e692]:
+              - generic [ref=f18e693] [cursor=pointer]: Year of Assessment 2020 
+            - paragraph [ref=f18e694]:
+              - generic [ref=f18e695] [cursor=pointer]: Year of Assessment 2019 
+            - paragraph [ref=f18e696]:
+              - generic [ref=f18e697] [cursor=pointer]: Year of Assessment 2018 
+            - paragraph [ref=f18e698]:
+              - generic [ref=f18e699] [cursor=pointer]: Year of Assessment 2017 
+            - paragraph [ref=f18e700]:
+              - generic [ref=f18e701] [cursor=pointer]: Year of Assessment 2016 
+            - paragraph [ref=f18e702]:
+              - generic [ref=f18e703] [cursor=pointer]: Year of Assessment 2014 & 2015 
+          - navigation "Sub Page Navigation" [ref=f18e705]:
+            - paragraph [ref=f18e706]:
+              - link "Individual" [ref=f18e707] [cursor=pointer]:
+                - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+            - list [ref=f18e708]:
+              - listitem [ref=f18e709]:
+                - link "Introduction Individual Income Tax" [ref=f18e711] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/introduction-individual-income-tax/
+              - listitem [ref=f18e712]:
+                - link "Individual Life Cycle" [ref=f18e714] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/
+                - list [ref=f18e715]:
+                  - listitem [ref=f18e716]:
+                    - link "Registration" [ref=f18e718] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/registration/
+                  - listitem [ref=f18e719]:
+                    - link "Residence Status" [ref=f18e721] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/residence-status/
+                  - listitem [ref=f18e722]:
+                    - link "How to Declare Income?" [ref=f18e724] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/
+                    - list [ref=f18e725]:
+                      - listitem [ref=f18e726]:
+                        - link "Manual" [ref=f18e728] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/manual/
+                      - listitem [ref=f18e729]:
+                        - link "Online" [ref=f18e731] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/online/
+                      - listitem [ref=f18e732]:
+                        - link "ITRF Deadlines" [ref=f18e734] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/itrf-deadlines/
+                      - listitem [ref=f18e735]:
+                        - link "Tax Reliefs" [ref=f18e737] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-reliefs/
+                      - listitem [ref=f18e738]:
+                        - link "Rebates" [ref=f18e740] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/rebates/
+                      - listitem [ref=f18e741]:
+                        - link "Donations / Gifts" [ref=f18e743] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/donations-gifts/
+                      - listitem [ref=f18e744]:
+                        - link "Tax Rate" [ref=f18e746] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-rate/
+                      - listitem [ref=f18e747]:
+                        - link "Type of Assessment" [ref=f18e749] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/type-of-assessment/
+                      - listitem [ref=f18e750]:
+                        - link "Business Code" [ref=f18e752] [cursor=pointer]:
+                          - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/business-code/
+                  - listitem [ref=f18e753]:
+                    - link "Payment" [ref=f18e755] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/payment/
+              - listitem [ref=f18e756]:
+                - link "Others" [ref=f18e758] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/others/
+      - generic [ref=f18e764]:
+        - generic [ref=f18e766]:
+          - text: "Hit(s) :"
+          - generic [ref=f18e767]: "4746895"
+        - generic [ref=f18e769]:
+          - text: "Updated :"
+          - generic [ref=f18e770]: "10 / 01 / 2025 16: 11: 53"
+        - button "Print" [ref=f18e772] [cursor=pointer]
+    - contentinfo [ref=f18e773]:
+      - navigation "Breadcrumb Navigation" [ref=f18e776]:
+        - list [ref=f18e777]:
+          - listitem [ref=f18e778]:
+            - link " Home (en)" [ref=f18e779] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/
+              - generic [ref=f18e780]:
+                - generic [ref=f18e781]: 
+                - text: Home (en)
+          - listitem [ref=f18e782]:
+            - link " Individual" [ref=f18e783] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/
+              - generic [ref=f18e784]:
+                - generic [ref=f18e785]: 
+                - text: Individual
+          - listitem [ref=f18e786]:
+            - link " Individual Life Cycle" [ref=f18e787] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/
+              - generic [ref=f18e788]:
+                - generic [ref=f18e789]: 
+                - text: Individual Life Cycle
+          - listitem [ref=f18e790]:
+            - link " How to Declare Income?" [ref=f18e791] [cursor=pointer]:
+              - /url: /web/20250414100531/https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/
+              - generic [ref=f18e792]:
+                - generic [ref=f18e793]: 
+                - text: How to Declare Income?
+          - listitem [ref=f18e794]:
+            - generic [ref=f18e795]:
+              - generic [ref=f18e796]: 
+              - text: Tax Reliefs
+      - generic [ref=f18e797]:
+        - generic [ref=f18e798]:
+          - generic [ref=f18e801]:
+            - paragraph [ref=f18e802]: Headquarters Location
+            - generic [ref=f18e803]:
+              - paragraph [ref=f18e804]: Ibu Pejabat Lembaga Hasil Dalam Negeri Malaysia,Menara Hasil, Persiaran Rimba Permai,Cyber 8, 63000 Cyberjaya Selangor.
+              - paragraph [ref=f18e805]
+              - paragraph [ref=f18e806]:
+                - link "HASiL Contact Centre" [ref=f18e807] [cursor=pointer]:
+                  - /url: /web/20250414100531/https://www.hasil.gov.my/en/contact-us/
+          - generic [ref=f18e810]:
+            - paragraph [ref=f18e811]: Agency
+            - generic [ref=f18e812]:
+              - table [ref=f18e813]:
+                - rowgroup [ref=f18e814]:
+                  - row [ref=f18e815]:
+                    - cell [ref=f18e816]:
+                      - link [ref=f18e817] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/http://www.malaysia.gov.my/
+                    - cell [ref=f18e818]:
+                      - link [ref=f18e819] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/http://www.customs.gov.my/
+                    - cell [ref=f18e820]:
+                      - link [ref=f18e821] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/http://www.treasury.gov.my/
+                    - cell [ref=f18e822]:
+                      - link [ref=f18e823] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://www.fmm.org.my/
+              - paragraph [ref=f18e824]:
+                - generic [ref=f18e825]: Follow Us
+              - table [ref=f18e826]:
+                - rowgroup [ref=f18e827]:
+                  - row [ref=f18e828]:
+                    - cell [ref=f18e829]:
+                      - link [ref=f18e830] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://www.facebook.com/HASiLMalaysia
+                    - cell [ref=f18e831]:
+                      - link [ref=f18e832] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://www.tiktok.com/@hasil_malaysia
+                    - cell [ref=f18e833]:
+                      - link [ref=f18e834] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://www.instagram.com/hasil_malaysia
+                    - cell [ref=f18e835]:
+                      - link [ref=f18e836] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://www.youtube.com/@HASiL_Malaysia
+                    - cell [ref=f18e837]:
+                      - link [ref=f18e838] [cursor=pointer]:
+                        - /url: https://web.archive.org/web/20250414100531/https://twitter.com/HASiL_Malaysia
+          - generic [ref=f18e841]:
+            - paragraph [ref=f18e843]: Total Visitors
+            - generic [ref=f18e844]:
+              - paragraph [ref=f18e845]:
+                - generic [ref=f18e846]: "Visitors Today:"
+              - paragraph [ref=f18e848]: 215,145
+            - generic [ref=f18e849]:
+              - paragraph [ref=f18e850]:
+                - generic [ref=f18e851]: "Visitors This Month : ( 04 / 2025 )"
+              - paragraph [ref=f18e853]: 4,298,641
+            - generic [ref=f18e854]:
+              - paragraph [ref=f18e855]:
+                - generic [ref=f18e856]: "Visitors This Month : ( 03 / 2025 )"
+              - paragraph [ref=f18e858]: 11,389,925
+            - generic [ref=f18e859]:
+              - paragraph [ref=f18e860]:
+                - generic [ref=f18e861]: "Visitors This Year : ( 2025 )"
+              - paragraph [ref=f18e863]: 25,129,520
+            - generic [ref=f18e864]:
+              - paragraph [ref=f18e865]:
+                - generic [ref=f18e866]: "Visitors This Year : ( 2024 )"
+              - paragraph [ref=f18e868]: 46,980,166
+            - generic [ref=f18e869]:
+              - paragraph [ref=f18e870]:
+                - generic [ref=f18e871]: "Total Visitors :"
+              - paragraph [ref=f18e873]: 403,726,425
+          - generic [ref=f18e880]:
+            - generic [ref=f18e881]: Best viewed using Chrome,Internet Explorer(Latest Version) or Mozilla Firefox with 1920x1080 screen resolution
+            - generic [ref=f18e882]: "DISCLAIMER : Inland Revenue Board of Malaysia shall not be liable for any loss or damage caused by the usage of any information obtained from this website."
+            - table [ref=f18e884]:
+              - rowgroup [ref=f18e885]:
+                - row [ref=f18e886]:
+                  - cell [ref=f18e887]:
+                    - link "Privacy Policy" [ref=f18e889] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/privacy-policy/?bt_kump=20&bt_skum=1&bt_posi=1&bt_unit=2&bt_sequ=1
+                  - cell [ref=f18e890]:
+                    - link "Security Policy" [ref=f18e892] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/security-policy/?bt_kump=20&bt_skum=1&bt_posi=1&bt_unit=3&bt_sequ=1
+                  - cell [ref=f18e893]:
+                    - link "Online Security" [ref=f18e895] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/online-security/?bt_kump=20&bt_skum=1&bt_posi=1&bt_unit=4&bt_sequ=1
+                  - cell [ref=f18e896]:
+                    - link "Sitemap" [ref=f18e898] [cursor=pointer]:
+                      - /url: /web/20250414100531/https://www.hasil.gov.my/en/sitemap/
+        - navigation "Footer Navigation" [ref=f18e901]:
+          - list [ref=f18e902]:
+            - listitem [ref=f18e903]: © 2025 Hak Cipta Terpelihara LHDNM
+        - button "Back to top" [ref=f18e905] [cursor=pointer]:
+          - generic [ref=f18e907]: 
