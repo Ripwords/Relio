@@ -43,11 +43,16 @@ struct DocumentsView: View {
                         // The stake, stated once. Not a per-row figure: repeating it on
                         // every row would read as eight separate risks rather than one
                         // total.
-                        HStack(spacing: 4) {
-                            Text("Together these claims are worth")
-                            MoneyText(amount: model.totalAtRisk, font: .footnote, weight: .semibold)
-                        }
-                        .font(.footnote)
+                        // "Come to", not "are worth". This is the sum of what was
+                        // entered, and an entry above its relief's cap is worth less than
+                        // it says — the same overstatement Home was fixed out of, in one
+                        // word. Saying what the figure actually is costs nothing.
+                        //
+                        // One Text, per the rule on MoneyText: a figure inside a sentence
+                        // wraps with its words.
+                        Text("Together these claims come to \(model.totalAtRisk.formatted()).")
+                            .font(.footnote)
+                            .monospacedDigit()
                     }
                 }
             }

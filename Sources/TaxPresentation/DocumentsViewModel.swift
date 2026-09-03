@@ -35,7 +35,10 @@ public struct OutstandingDocument: Hashable, Sendable, Identifiable {
 public final class DocumentsViewModel {
 
     public private(set) var outstanding: [OutstandingDocument] = []
-    /// The money riding on claims that are not yet supported. Each claim counted once.
+    /// What the unsupported claims add up to, as entered. Each claim counted once.
+    ///
+    /// Deliberately not called "worth": an entry above its relief's cap is allowed less
+    /// than it claims, so this is a total rather than a valuation, and the screen says so.
     public private(set) var totalAtRisk: Money = .zero
 
     public let context: YearContext
