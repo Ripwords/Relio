@@ -94,16 +94,18 @@ struct HomeView: View {
     // The only large number on the screen. Spec §11.
     private var headline: some View {
         VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                MoneyText(amount: model.headline, font: .system(size: headlineSize), weight: .bold)
-                    // Spec §11.3: rolling digits are motion. Reduce Motion swaps the
-                    // value outright instead.
-                    .contentTransition(reduceMotion ? .identity : .numericText())
-                Text(model.headlineKind == .taxSaved ? "in tax still claimable" : "of relief still claimable")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            // The figure is the way in to how it was worked out, the same move the relief
+            // detail makes. Only when income is known: without it there is no tax
+            // calculation to show, and the label below already says the number is relief
+            // rather than tax.
+            if model.headlineKind == .taxSaved {
+                NavigationLink(value: TaxSummaryRoute()) {
+                    headlineFigure
+                }
+                .buttonStyle(.plain)
+            } else {
+                headlineFigure
             }
-            .accessibilityElement(children: .combine)
 
             // Spec §13: the largest computed figure in the app had nothing anywhere on
             // the screen saying it is an estimate. A footnote, not a banner — it has to
@@ -114,6 +116,31 @@ struct HomeView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// The number and its label, with a chevron when it leads somewhere.
+    private var headlineFigure: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            MoneyText(amount: model.headline, font: .system(size: headlineSize), weight: .bold)
+                // Spec §11.3: rolling digits are motion. Reduce Motion swaps the value
+                // outright instead.
+                .contentTransition(reduceMotion ? .identity : .numericText())
+            HStack(spacing: 4) {
+                Text(model.headlineKind == .taxSaved
+                     ? "in tax still claimable"
+                     : "of relief still claimable")
+                if model.headlineKind == .taxSaved {
+                    Text("· see the whole sum")
+                        .foregroundStyle(.tint)
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(model.headlineKind == .taxSaved
+                           ? "Shows your gross income, relief and estimated tax"
+                           : "")
     }
 
     @ViewBuilder

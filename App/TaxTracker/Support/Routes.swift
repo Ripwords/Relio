@@ -35,3 +35,6 @@ struct CompareRoute: Hashable {}
 
 /// Navigation value for the dependants list.
 struct DependentsRoute: Hashable {}
+
+/// Navigation value for the full tax calculation.
+struct TaxSummaryRoute: Hashable {}

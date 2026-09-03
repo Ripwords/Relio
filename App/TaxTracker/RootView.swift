@@ -124,6 +124,7 @@ struct RootView: View {
         case "dependents", "dependent-editor", "dependent-new":
             path.append(DependentsRoute())
         case "compare": path.append(CompareRoute())
+        case "summary": path.append(TaxSummaryRoute())
         case "reliefs": selectedTab = .reliefs
         case "income", "income-add-source", "income-add-change", "income-edit-record":
             path.append(IncomeRoute())
@@ -246,6 +247,18 @@ struct RootView: View {
                     .navigationDestination(for: DependentsRoute.self) { _ in
                         DependentsView(model: DependentsViewModel(store: store,
                                                                   year: context.year))
+                    }
+                    .navigationDestination(for: TaxSummaryRoute.self) { _ in
+                        if let result = context.result, let summary = TaxSummary(result) {
+                            TaxSummaryView(summary: summary, year: context.year)
+                        } else {
+                            // Reachable only from a headline that is showing relief rather
+                            // than tax, which is the no-income case.
+                            ContentUnavailableView(
+                                "No income recorded",
+                                systemImage: "banknote",
+                                description: Text("Add what you earn and Relio can work out the tax as well as the relief."))
+                        }
                     }
                     .navigationDestination(for: CompareRoute.self) { _ in
                         CompareView(model: CompareViewModel(store: store,
