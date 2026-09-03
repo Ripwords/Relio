@@ -21,7 +21,11 @@ import TaxData
         let model = await Self.model(store)
 
         let titles = model.sections.map(\.title)
-        let expected = ["Needs an answer", "Still claimable", "Fully claimed", "Not applicable to you"]
+        let expected = ["Needs an answer",
+                        "Add a dependant to claim these",
+                        "Still claimable",
+                        "Fully claimed",
+                        "Not applicable to you"]
         // Alphabetical order would bury the two groups the user can act on.
         #expect(titles == expected.filter(titles.contains))
         #expect(titles == titles.sorted { expected.firstIndex(of: $0)! < expected.firstIndex(of: $1)! })
@@ -276,8 +280,29 @@ struct ReliefDetailLoggingTests {
 
     @Test("nothing to claim against is not the same as having claimed it all")
     func zeroCapIsNotExhausted() {
-        let row = ReliefsListViewModel.row(from: Self.assessment(cap: .zero, headroom: .zero))
+        let row = ReliefsListViewModel.row(from: Self.assessment(cap: .zero, headroom: .zero),
+                                           isPerDependent: true)
         #expect(row.state != .exhausted)
+        #expect(row.state == .needsDependent)
+    }
+
+    /// "Not applicable to you" is a claim about the user. For a per-dependent relief with
+    /// nobody recorded, nobody has established that — the user may simply not have entered
+    /// their children yet, and telling them it does not apply is the discouraging kind of
+    /// wrong.
+    @Test("a per-dependent relief with nobody recorded is not called inapplicable")
+    func perDependentIsNotInapplicable() {
+        let row = ReliefsListViewModel.row(from: Self.assessment(cap: .zero, headroom: .zero),
+                                           isPerDependent: true)
+        #expect(row.state != .unavailable)
+    }
+
+    /// A zero cap that is not per-dependent has no dependant to add, so it stays where it
+    /// was.
+    @Test("a zero cap that is not per-dependent stays unavailable")
+    func otherZeroCapsStayUnavailable() {
+        let row = ReliefsListViewModel.row(from: Self.assessment(cap: .zero, headroom: .zero),
+                                           isPerDependent: false)
         #expect(row.state == .unavailable)
     }
 

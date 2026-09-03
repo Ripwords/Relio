@@ -7,6 +7,14 @@ public enum ReliefRowState: Hashable, Sendable {
     case needsAnswer
     case claimable
     case exhausted
+    /// Eligible, counted once per dependant, and no dependant recorded — so its cap is
+    /// zero and there is nothing to claim against yet.
+    ///
+    /// Distinct from `unavailable`, which is a statement about the user: this relief does
+    /// not apply to you. For a parent who has simply not entered their children that is
+    /// false, and it is the discouraging kind of false — it says do not bother with the
+    /// one action that would unlock RM 2,000 a child.
+    case needsDependent
     case unavailable
 }
 
@@ -48,6 +56,7 @@ public final class ReliefsListViewModel {
     /// Alphabetical order would bury them.
     private static let sectionOrder: [(String, ReliefRowState)] = [
         ("Needs an answer", .needsAnswer),
+        ("Add a dependant to claim these", .needsDependent),
         ("Still claimable", .claimable),
         ("Fully claimed", .exhausted),
         ("Not applicable to you", .unavailable)
@@ -70,7 +79,10 @@ public final class ReliefsListViewModel {
                 || ReliefCopy.shortName(for: $0.code, fullName: $0.name)
                     .lowercased().contains(needle)
                 || $0.code.rawValue.lowercased().contains(needle) }
-            .map(Self.row(from:))
+            .map { assessment in
+                Self.row(from: assessment,
+                         isPerDependent: Self.isPerDependent(context.rule(for: assessment.code)))
+            }
 
         sections = Self.sectionOrder.compactMap { title, state in
             let matching = rows
@@ -83,7 +95,14 @@ public final class ReliefsListViewModel {
         }
     }
 
-    static func row(from assessment: ReliefAssessment) -> ReliefRow {
+    /// Whether a rule's ceiling is counted once per dependant. See `ReliefRowState`.
+    static func isPerDependent(_ rule: ReliefRule?) -> Bool {
+        guard case .perDependent = rule?.cap else { return false }
+        return true
+    }
+
+    static func row(from assessment: ReliefAssessment,
+                    isPerDependent: Bool = false) -> ReliefRow {
         let state: ReliefRowState
         switch assessment.eligibility {
         case .ineligible:
@@ -95,7 +114,10 @@ public final class ReliefsListViewModel {
             // nothing to claim against yet — a per-dependent relief with no dependants
             // recorded is exactly this, and CHILD_UNDER_18 sat in "Fully claimed"
             // telling a user with no children on file that they had used all of it.
-            state = .unavailable
+            //
+            // Nor is it "not applicable to you", which is a claim about the user that
+            // nobody has established. `isPerDependent` separates the two.
+            state = isPerDependent ? .needsDependent : .unavailable
         case .eligible:
             state = assessment.headroom > .zero ? .claimable : .exhausted
         }

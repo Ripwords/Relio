@@ -81,6 +81,10 @@ struct ReliefRowView: View {
             Text("Full").font(.subheadline).foregroundStyle(.secondary)
         case .needsAnswer:
             Image(systemName: "questionmark.circle").foregroundStyle(.tint)
+        case .needsDependent:
+            // A person rather than a question mark: what is missing is somebody to claim
+            // for, not an answer about the user.
+            Image(systemName: "person.badge.plus").foregroundStyle(.tint)
         case .unavailable:
             Text("N/A").font(.subheadline).foregroundStyle(.secondary)
         }
@@ -93,6 +97,8 @@ struct ReliefRowView: View {
             return "\(row.name), \(row.allowed.formatted()) of \(row.cap.formatted()) used"
         case .needsAnswer:
             return "\(row.name), needs an answer before it can be claimed"
+        case .needsDependent:
+            return "\(row.name), add a dependant before it can be claimed"
         case .unavailable:
             return "\(row.name), not applicable to you"
         }
