@@ -26,7 +26,9 @@ if [ $# -ge 1 ] && [ "$1" != "--" ]; then SHOT="$1"; shift; fi
 if [ "${1:-}" = "--" ]; then shift; APP_ARGS=("$@"); fi
 
 DEVICE="${RELIO_SIM_DEVICE:-Relio Test Phone}"
-DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17"
+# Overridable so the same script can drive an iPad. The app declares UIDeviceFamily
+# [1, 2], so how it looks on a big screen is not an optional question.
+DEVICE_TYPE="${RELIO_SIM_DEVICE_TYPE:-com.apple.CoreSimulator.SimDeviceType.iPhone-17}"
 BUNDLE_ID="my.relio.TaxTracker"
 SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 TARGET="arm64-apple-ios26.0-simulator"

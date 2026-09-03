@@ -40,7 +40,17 @@ struct HomeView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // A readable measure, centred. Home is the one screen built from a ScrollView
+            // and a VStack rather than a List, so it is the one screen that stretched to
+            // the full width of an iPad: a relief name at the left edge and its figure a
+            // thousand points away at the right, with the eye asked to connect them.
+            // `List` already does this for itself, which is why the other screens did not
+            // need it.
+            //
+            // Not the three-column layout spec §11 describes for iPad — that is a
+            // navigation change, not a width one, and remains to do.
+            .frame(maxWidth: 700, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .task {
             await model.refresh()
