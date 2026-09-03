@@ -196,9 +196,18 @@ public final class EntryEditorViewModel {
     /// its own eligibility turns on some fact about a dependent even with no claimant
     /// restriction of its own — CHILDCARE and BREASTFEEDING are exactly this shape.
     public var allowsDependent: Bool {
+        // Naming a person is only meaningful once the claim is *for* one. LIFESTYLE
+        // admits self, spouse and child, so the rule below is satisfied — but with
+        // "Claimed for" left at Self, "Which person" was a row asking which of the
+        // user's children this receipt of their own belonged to.
+        //
+        // Not folded into the rule check: a relief whose own eligibility turns on a
+        // dependent fact — CHILDCARE, BREASTFEEDING — is about a dependant however the
+        // claim is attributed, and those keep the row.
         let admitted = admittedClaimants
         let claimantAdmitsADependent = !admitted.isEmpty
             && !Set(admitted).isDisjoint(with: [.child, .parent, .grandparent])
+            && [.child, .parent, .grandparent].contains(claimant)
         let ownRuleTurnsOnADependentFact = selectedCode
             .flatMap { context.rule(for: $0) }
             .map { Self.mentionsDependentFact($0.eligibility) } ?? false

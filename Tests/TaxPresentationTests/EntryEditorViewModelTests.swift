@@ -670,3 +670,49 @@ struct EntryEditorCapGuidanceTests {
         #expect(model.canSave == true)
     }
 }
+
+/// "Which person" asks which dependant a claim is for. LIFESTYLE admits a child claimant,
+/// so the row appeared on every lifestyle entry — including one claimed for yourself,
+/// where it asked which of your children this receipt of your own belonged to.
+@Suite("Entry editor: naming a dependant") @MainActor struct EntryEditorDependentRowTests {
+
+    static func editor(_ store: TaxStore) async -> EntryEditorViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = EntryEditorViewModel(context: context, store: store, editing: nil)
+        await model.load()
+        return model
+    }
+
+    @Test("a claim for yourself does not ask which person it is for")
+    func selfClaimNamesNoOne() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.claimant = .individual
+        #expect(model.allowsDependent == false)
+    }
+
+    @Test("a claim for a child does ask which one")
+    func childClaimNamesTheChild() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.claimant = .child
+        #expect(model.allowsDependent == true)
+    }
+
+    /// A relief whose own eligibility turns on a dependant is about one however the claim
+    /// is attributed, so it keeps the row regardless of claimant.
+    @Test("a relief that is inherently about a dependant keeps the row")
+    func inherentlyDependentReliefKeepsTheRow() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await Self.editor(store)
+        model.selectedCode = .childcare
+        model.claimant = .individual
+        #expect(model.allowsDependent == true)
+    }
+}

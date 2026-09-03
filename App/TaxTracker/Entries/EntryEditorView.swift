@@ -121,12 +121,25 @@ struct EntryEditorView: View {
 
             Section {
                 TextField("Vendor", text: $model.vendor)
-                Toggle("Has a date", isOn: $hasDate)
+                // A button that reveals the picker, not a toggle labelled "Has a date" —
+                // the same shape the dependant editor uses, and better for the same
+                // reason: it asks the user to do the thing they want rather than to
+                // classify whether the thing is true of their receipt.
+                //
+                // The three-state care is unchanged. `spentOn` stays nil until the picker
+                // is actually moved, so an entry with no date keeps having no date.
                 if hasDate {
                     DatePicker("Spent on",
                                selection: Binding(get: { model.spentOn ?? Date() },
                                                   set: { model.spentOn = $0 }),
                                displayedComponents: .date)
+                    Button("Remove the date") {
+                        hasDate = false
+                        model.spentOn = nil
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Button("Set the date spent") { hasDate = true }
                 }
                 TextField("Note", text: $model.note, axis: .vertical)
             }
