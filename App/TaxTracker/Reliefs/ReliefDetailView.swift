@@ -173,7 +173,13 @@ struct ReliefDetailView: View {
                         }
                     }
 
-                    if model.entries.isEmpty {
+                    if model.entries.isEmpty, model.isAutomatic {
+                        // Not an absence to be filled. The editor refuses an entry against
+                        // an automatic relief, so "nothing logged yet" would read as a
+                        // gap the user could close and cannot.
+                        Text("Nothing to log — this relief is granted rather than claimed.")
+                            .foregroundStyle(.secondary)
+                    } else if model.entries.isEmpty {
                         // A parent relief holds no entries of its own — they sit under its
                         // sub-limits. Saying "nothing logged" beneath a "Claimed
                         // RM 3,000.00" three rows above reads as a contradiction, and the
@@ -328,6 +334,17 @@ struct ReliefDetailView: View {
                 Text("Not available to you")
                     .font(.title2.weight(.semibold))
                 Text("Your details put this relief out of reach for this year.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else if model.isAutomatic {
+                // Granted, not claimed. "You have used all of this relief" credits the
+                // user with an action they did not take, and sat directly above "Nothing
+                // logged for this relief yet".
+                MoneyText(amount: assessment.allowed, font: .largeTitle, weight: .bold)
+                Text("granted automatically")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("Relio works this out from your household details. There is nothing to log.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {

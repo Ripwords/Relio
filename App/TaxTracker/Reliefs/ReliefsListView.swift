@@ -79,6 +79,10 @@ struct ReliefRowView: View {
             MoneyText(amount: row.headroom, font: .subheadline, weight: .semibold)
         case .exhausted:
             Text("Full").font(.subheadline).foregroundStyle(.secondary)
+        case .granted:
+            // The amount, not a status word: it is real relief the user is getting, and
+            // the section heading already says it arrived without being claimed.
+            MoneyText(amount: row.allowed, font: .subheadline).foregroundStyle(.secondary)
         case .needsAnswer:
             Image(systemName: "questionmark.circle").foregroundStyle(.tint)
         case .needsDependent:
@@ -95,6 +99,8 @@ struct ReliefRowView: View {
         switch row.state {
         case .claimable, .exhausted:
             return "\(row.name), \(row.allowed.formatted()) of \(row.cap.formatted()) used"
+        case .granted:
+            return "\(row.name), \(row.allowed.formatted()) granted automatically"
         case .needsAnswer:
             return "\(row.name), needs an answer before it can be claimed"
         case .needsDependent:

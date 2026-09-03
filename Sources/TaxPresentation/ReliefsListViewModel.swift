@@ -7,14 +7,25 @@ public enum ReliefRowState: Hashable, Sendable {
     case needsAnswer
     case claimable
     case exhausted
-    /// Eligible, counted once per dependant, and no dependant recorded — so its cap is
+    /// Eligible, counted once per dependant, and nobody on file qualifies — so its cap is
     /// zero and there is nothing to claim against yet.
+    ///
+    /// "Nobody qualifies" is not the same as "nobody is recorded", and the section is
+    /// worded for both. A household with three children and none of them disabled has a
+    /// zero cap on the disabled-child relief; telling that user to "add a dependant" would
+    /// be advice they have already followed.
     ///
     /// Distinct from `unavailable`, which is a statement about the user: this relief does
     /// not apply to you. For a parent who has simply not entered their children that is
     /// false, and it is the discouraging kind of false — it says do not bother with the
     /// one action that would unlock RM 2,000 a child.
     case needsDependent
+    /// Granted from household facts rather than from anything the user logs.
+    ///
+    /// Several reliefs in the rulebook are `automatic`, and grouping them under "Fully
+    /// claimed" credits the user with claims they never made — and puts them among the
+    /// reliefs they did make, where they are the ones that cannot be added to.
+    case granted
     case unavailable
 }
 
@@ -56,8 +67,9 @@ public final class ReliefsListViewModel {
     /// Alphabetical order would bury them.
     private static let sectionOrder: [(String, ReliefRowState)] = [
         ("Needs an answer", .needsAnswer),
-        ("Add a dependant to claim these", .needsDependent),
+        ("No one to claim for yet", .needsDependent),
         ("Still claimable", .claimable),
+        ("Granted automatically", .granted),
         ("Fully claimed", .exhausted),
         ("Not applicable to you", .unavailable)
     ]
@@ -80,8 +92,10 @@ public final class ReliefsListViewModel {
                     .lowercased().contains(needle)
                 || $0.code.rawValue.lowercased().contains(needle) }
             .map { assessment in
-                Self.row(from: assessment,
-                         isPerDependent: Self.isPerDependent(context.rule(for: assessment.code)))
+                let rule = context.rule(for: assessment.code)
+                return Self.row(from: assessment,
+                                isPerDependent: Self.isPerDependent(rule),
+                                isAutomatic: rule?.automatic ?? false)
             }
 
         sections = Self.sectionOrder.compactMap { title, state in
@@ -102,7 +116,8 @@ public final class ReliefsListViewModel {
     }
 
     static func row(from assessment: ReliefAssessment,
-                    isPerDependent: Bool = false) -> ReliefRow {
+                    isPerDependent: Bool = false,
+                    isAutomatic: Bool = false) -> ReliefRow {
         let state: ReliefRowState
         switch assessment.eligibility {
         case .ineligible:
@@ -118,8 +133,12 @@ public final class ReliefsListViewModel {
             // Nor is it "not applicable to you", which is a claim about the user that
             // nobody has established. `isPerDependent` separates the two.
             state = isPerDependent ? .needsDependent : .unavailable
+        case .eligible where assessment.headroom > .zero:
+            state = .claimable
         case .eligible:
-            state = assessment.headroom > .zero ? .claimable : .exhausted
+            // No room left, and how it came to have none is the difference between "you
+            // spent up to the cap" and "the engine granted you the cap".
+            state = isAutomatic ? .granted : .exhausted
         }
 
         return ReliefRow(code: assessment.code,

@@ -32,6 +32,17 @@ public final class ReliefDetailViewModel {
     /// declared on the same type, where `private` is already visible.
     public var yearOfAssessment: Int { context.year }
 
+    /// Whether the engine grants this relief from household facts rather than from
+    /// anything the user logs.
+    ///
+    /// SELF_AND_DEPENDENTS is the clearest case: RM 9,000 to every resident individual,
+    /// no claim required. The screen said "Fully claimed. You have used all of this relief
+    /// for this year" above "Nothing logged for this relief yet" — two sentences that
+    /// cannot both be about the same thing, and neither describing what happened.
+    public var isAutomatic: Bool {
+        context.rule(for: code)?.automatic ?? false
+    }
+
     /// Whether this relief's ceiling is counted once per dependant.
     ///
     /// Such a relief has a cap of zero until a dependant is recorded, and zero headroom

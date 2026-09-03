@@ -22,8 +22,9 @@ import TaxData
 
         let titles = model.sections.map(\.title)
         let expected = ["Needs an answer",
-                        "Add a dependant to claim these",
+                        "No one to claim for yet",
                         "Still claimable",
+                        "Granted automatically",
                         "Fully claimed",
                         "Not applicable to you"]
         // Alphabetical order would bury the two groups the user can act on.
@@ -306,12 +307,23 @@ struct ReliefDetailLoggingTests {
         #expect(row.state == .unavailable)
     }
 
-    /// The genuine case still reads as exhausted: a real cap, all of it used.
+    /// The genuine case still reads as exhausted: a real cap the user spent up to.
     @Test("a relief with a real cap and no room left is still fully claimed")
     func usedUpReliefIsExhausted() {
         let row = ReliefsListViewModel.row(
             from: Self.assessment(cap: Money(ringgit: 2_000), headroom: .zero))
         #expect(row.state == .exhausted)
+    }
+
+    /// An automatic relief also has no room left, and got there without the user doing
+    /// anything. "Fully claimed" credits them with a claim they never made.
+    @Test("an automatic relief is granted, not claimed")
+    func automaticReliefIsGranted() {
+        let row = ReliefsListViewModel.row(
+            from: Self.assessment(cap: Money(ringgit: 9_000), headroom: .zero),
+            isAutomatic: true)
+        #expect(row.state == .granted)
+        #expect(row.state != .exhausted)
     }
 
     @Test("a relief with room left is claimable")
