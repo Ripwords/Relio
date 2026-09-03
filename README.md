@@ -28,6 +28,7 @@ and for what remains unverified.
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started — the Docs tab lists what each claim still needs, but nothing can attach one yet |
 | On-device AI assistant | Not started |
+| iPad | Runs, and every screen is usable; not the three-column layout spec §11 describes |
 | watchOS, macOS, widgets | Not started |
 
 ## What TaxKit does
@@ -115,6 +116,14 @@ forces the welcome flow, `-relio-empty` completes it and seeds nothing (every em
 lives there), and `-relio-year 2023` opens on another Year of Assessment. Combine with `xcrun simctl ui <device>
 appearance dark` and `content_size accessibility-extra-extra-extra-large` to check both
 of the axes the spec requires.
+
+`RELIO_SIM_DEVICE_TYPE` drives the same script from an iPad:
+
+```bash
+RELIO_SIM_DEVICE="Relio Test Pad" \
+RELIO_SIM_DEVICE_TYPE=com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M4-16GB \
+  ./Scripts/run-app.sh shot.png -- -relio-demo
+```
 
 **Proper Xcode build (once first-launch is done):**
 ```bash
