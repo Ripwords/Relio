@@ -120,6 +120,22 @@ struct DocumentsViewModelTests {
             unresolved: [], chargeableIncome: nil, estimatedTax: nil, totalOpportunity: nil)
     }
 
+    /// An empty list has two causes and they are not the same news. "Every claim is
+    /// supported" is vacuously true of nobody's claims, and under a green tick it told a
+    /// user who had logged nothing that their filing was in order.
+    @Test("nothing logged is not the same as everything supported")
+    func emptyBecauseNothingLoggedIsDistinct() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.model(store)
+        #expect(model.outstanding.isEmpty)
+        #expect(model.hasAnyClaims == false)
+
+        _ = try await store.save(EntryDraft(year: 2025, code: .lifestyle,
+                                            amount: Money(ringgit: 100), vendor: "Books"))
+        await model.refresh()
+        #expect(model.hasAnyClaims == true)
+    }
+
     static let entryID = UUID(uuidString: "11111111-2222-4333-8444-555555555555")!
 
     static var entries: [EntryDraft] {

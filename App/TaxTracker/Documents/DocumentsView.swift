@@ -21,12 +21,23 @@ struct DocumentsView: View {
     var body: some View {
         Group {
             if model.outstanding.isEmpty {
-                // Spec §11.5: empty states are the design. This one is a result, not a
-                // blank — every claim being supported is the state the screen wants.
-                ContentUnavailableView(
-                    "Every claim is supported",
-                    systemImage: "checkmark.seal",
-                    description: Text("Nothing you have logged is missing a document LHDN asks for."))
+                // Two different empty states, and they were one. "Every claim is
+                // supported" under a green tick is vacuously true of nobody's claims, and
+                // it told a user who had logged nothing that their filing was in order.
+                //
+                // Spec §11.5: empty states are the design. A result and a blank are not
+                // the same design.
+                if model.hasAnyClaims {
+                    ContentUnavailableView(
+                        "Every claim is supported",
+                        systemImage: "checkmark.seal",
+                        description: Text("Nothing you have logged is missing a document LHDN asks for."))
+                } else {
+                    ContentUnavailableView(
+                        "Nothing logged yet",
+                        systemImage: "doc.text",
+                        description: Text("Log a receipt and Relio will list any document LHDN would want alongside it."))
+                }
             } else {
                 List {
                     Section {

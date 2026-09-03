@@ -41,6 +41,14 @@ public final class DocumentsViewModel {
     /// than it claims, so this is a total rather than a valuation, and the screen says so.
     public private(set) var totalAtRisk: Money = .zero
 
+    /// Whether anything has been logged this year at all.
+    ///
+    /// "Every claim is supported" is vacuously true of nobody's claims, and it reads as an
+    /// achievement — a green tick telling a user who has logged nothing that their filing
+    /// is in order. The same distinction Home draws with `hasLoggedAnything`, for the same
+    /// reason: an empty state and a clean bill of health are different things.
+    public private(set) var hasAnyClaims = false
+
     public let context: YearContext
     private let store: TaxStore
 
@@ -53,9 +61,11 @@ public final class DocumentsViewModel {
         guard let result = context.result else {
             outstanding = []
             totalAtRisk = .zero
+            hasAnyClaims = false
             return
         }
         let entries = (try? await store.entryDrafts(forYear: context.year)) ?? []
+        hasAnyClaims = !entries.isEmpty
         outstanding = Self.rows(in: result, entries: entries)
         totalAtRisk = Self.totalAtRisk(outstanding)
     }
