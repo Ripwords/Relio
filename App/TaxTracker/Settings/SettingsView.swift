@@ -16,6 +16,12 @@ struct SettingsView: View {
     let context: YearContext
     let store: TaxStore
 
+    /// Told when an answer here changed the evaluation. Household facts decide
+    /// eligibility, so editing one moves every figure on Home — and Home copies out of
+    /// the shared evaluation rather than reading it live, so reloading that is not enough
+    /// on its own. Same contract the entry editor and the dependants list have.
+    let onChanged: () -> Void
+
     @State private var isEditingHousehold = false
     @State private var isEditingContributor = false
 
@@ -96,7 +102,8 @@ struct SettingsView: View {
                                                  // A profile to edit, not a prompt to
                                                  // clear — see `requiresEveryAnswer`.
                                                  requiresEveryAnswer: false),
-                title: "Household") {}
+                title: "Household",
+                onSaved: onChanged)
         }
         .sheet(isPresented: $isEditingContributor) {
             ContributionQuestionsSheet(

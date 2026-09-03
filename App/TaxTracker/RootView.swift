@@ -242,7 +242,9 @@ struct RootView: View {
                                          restrictedTo: route.restrictedTo)
                     }
                     .navigationDestination(for: SettingsRoute.self) { _ in
-                        SettingsView(context: context, store: store)
+                        SettingsView(context: context, store: store) {
+                            Task { await home.refresh(); await documents.refresh() }
+                        }
                     }
                     .navigationDestination(for: DependentsRoute.self) { _ in
                         DependentsView(model: DependentsViewModel(context: context,
