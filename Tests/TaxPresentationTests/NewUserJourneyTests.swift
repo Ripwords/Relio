@@ -20,6 +20,50 @@ import TaxData
         return cal.date(from: c)!
     }
 
+    /// The three writes that are not entries, each of which changed the evaluation and
+    /// each of which shipped without telling the screens that copy out of it.
+    ///
+    /// Adding a dependant, answering a household question, and undoing either one all
+    /// move what Home should say. Every one of those was a separate bug; this asserts the
+    /// behaviour they broke rather than the plumbing that fixes it, so a fourth instance
+    /// fails here instead of shipping.
+    @Test("a household change reaches the screens that copy out of the evaluation")
+    func householdChangesReachEveryScreen() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+
+        let home = HomeViewModel(context: context, store: store)
+        await home.refresh()
+        let questionsBefore = home.prompts.unansweredQuestions.count
+        #expect(questionsBefore > 0)
+
+        // Answering one of Home's own questions must reduce Home's own count, which is
+        // only true if the evaluation reloaded and Home re-read it.
+        let questions = ProfileQuestionsViewModel(context: context,
+                                                  store: store,
+                                                  questions: [.disabilityStatus],
+                                                  requiresEveryAnswer: false)
+        await questions.load()
+        questions.selfIsDisabled = false
+        await questions.save()
+        await home.refresh()
+        #expect(home.prompts.unansweredQuestions.count < questionsBefore)
+
+        // Adding a child makes a relief claimable that was not, which Home ranks.
+        let dependants = DependentsViewModel(context: context, store: store)
+        await dependants.refresh()
+        _ = await dependants.save(DependentDraft(name: "Zara",
+                                                 kind: .child,
+                                                 dateOfBirth: Self.date(2018, 5, 2),
+                                                 isDisabled: false,
+                                                 yearStatuses: [DependentYearStatus(year: 2025)]))
+        await home.refresh()
+        #expect(home.opportunities.contains { $0.code == .childUnder18 }
+                || context.result?.assessment(for: .childUnder18)?.cap ?? .zero > .zero)
+    }
+
     @Test("nothing logged, one child, one receipt — every screen keeps up")
     func theWholeWayThrough() async throws {
         let store = try await PresentationFixture.store()
