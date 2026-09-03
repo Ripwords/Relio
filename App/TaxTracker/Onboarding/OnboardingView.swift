@@ -62,6 +62,17 @@ struct OnboardingView: View {
             }
             .padding(24)
         }
+        #if DEBUG
+        // Steps two and three were unreachable from a screenshot run — onboarding always
+        // opens on the welcome screen — so they had never been looked at.
+        .task {
+            switch DemoHarness.screen {
+            case "onboarding-household": model.advance()
+            case "onboarding-income": model.advance(); model.advance()
+            default: break
+            }
+        }
+        #endif
     }
 
     /// Three dots, so the user can see how long this is before deciding to sit through
@@ -123,20 +134,35 @@ struct OnboardingView: View {
             Form {
                 Section {
                     Picker("Marital status", selection: $model.facts.maritalStatus) {
-                        Text("Prefer not to say").tag(MaritalStatus?.none)
+                        // "Not said", not "Prefer not to say". The latter reads as a
+                        // deliberate refusal, and this app is careful about the difference
+                        // between a fact refused and a fact not yet asked — the whole
+                        // three-valued eligibility design turns on it. It is also the
+                        // wording the dependant editor uses for the same state.
+                        Text("Not said").tag(MaritalStatus?.none)
                         ForEach(MaritalStatus.allCases, id: \.self) { status in
                             Text(status.rawValue.capitalized).tag(MaritalStatus?.some(status))
                         }
                     }
                     if model.facts.maritalStatus == .married {
-                        Toggle("My spouse has income",
-                               isOn: Binding(get: { model.facts.spouseHasIncome ?? false },
-                                             set: { model.facts.spouseHasIncome = $0 }))
+                        // A picker, not a Toggle. A Toggle has two states and this fact has
+                        // three; unanswered, it drew itself "off", showing a user who had
+                        // said nothing an answer of "no". The same reason the dependant
+                        // editor asks about disability this way.
+                        Picker("My spouse has income", selection: $model.facts.spouseHasIncome) {
+                            Text("Not said").tag(Bool?.none)
+                            Text("Yes").tag(Bool?.some(true))
+                            Text("No").tag(Bool?.some(false))
+                        }
                     }
                 } header: {
                     Text("Your household")
                 } footer: {
-                    Text("You can leave these blank. Relio will ask again when an answer would unlock a relief.")
+                    // What the answer is for, then that it is optional. Saying only the
+                    // latter left the screen with one control and no reason to use it.
+                    Text("\(ReliefCopy.reasonForAsking(.maritalStatus)) "
+                         + "You can leave this blank — Relio asks again on the home screen "
+                         + "when an answer would unlock a relief, and says what it is worth.")
                 }
             }
             .scrollContentBackground(.hidden)
