@@ -125,7 +125,8 @@ struct RootView: View {
             path.append(DependentsRoute())
         case "compare": path.append(CompareRoute())
         case "reliefs": selectedTab = .reliefs
-        case "income": path.append(IncomeRoute())
+        case "income", "income-add-source", "income-add-change", "income-edit-record":
+            path.append(IncomeRoute())
         case "history": path.append(EntryHistoryRoute())
         case "entry", "relief-picker":
             editingEntry = EntryEditorViewModel(context: context, store: store, editing: nil)

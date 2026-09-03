@@ -228,6 +228,31 @@ struct IncomeView: View {
         .task {
             await model.refresh()
             overrideText = model.overrideEditingText
+            #if DEBUG
+            // The editor is presented from this view's own state, so RootView's route
+            // switch cannot reach it. Its four modes are four different screens.
+            switch DemoHarness.screen {
+            case "income-add-source":
+                editing = IncomeRecordEditorViewModel(mode: .addSource,
+                                                      today: model.newRecordDate)
+            case "income-add-change":
+                if let source = model.sources.first {
+                    editing = IncomeRecordEditorViewModel(
+                        mode: .addRecord(sourceID: source.id),
+                        today: model.newRecordDate(forSource: source.id),
+                        occupiedDays: model.occupiedDays(forSource: source.id))
+                }
+            case "income-edit-record":
+                if let source = model.sources.first, let record = source.records.first {
+                    editing = IncomeRecordEditorViewModel(
+                        mode: .edit(record),
+                        today: record.effectiveFrom,
+                        occupiedDays: model.occupiedDays(forSource: source.id,
+                                                         excluding: record.id))
+                }
+            default: break
+            }
+            #endif
         }
         // Leaving the field is the commit. The user can also get here from the keyboard's
         // Done button, which resigns focus.

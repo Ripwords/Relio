@@ -20,17 +20,30 @@ struct IncomeRecordEditor: View {
                 if editor.isSourceMode {
                     Section {
                         TextField("Name", text: $editor.name)
+                    }
+
+                    Section {
                         // Inline, not the default menu: a menu picker shows its
                         // selection on one line and truncates it — "Part-time or
                         // occasional work" becomes "Part-ti…work" at the largest
                         // Dynamic Type sizes, which is the choice the user most needs
                         // to read.
+                        //
+                        // Its own section, with the label as the header and hidden on the
+                        // picker itself. Sharing a section with the name put "Kind" in the
+                        // card as a plain row directly under "Name", where it read as a
+                        // second field with nothing in it rather than as the heading for
+                        // the five options below it. `labelsHidden` only drops the
+                        // duplicate row; VoiceOver still gets the label from the picker.
                         Picker("Kind", selection: $editor.kind) {
                             ForEach(IncomeKind.allCases, id: \.self) { kind in
                                 Text(IncomeRecordEditorViewModel.label(for: kind)).tag(kind)
                             }
                         }
                         .pickerStyle(.inline)
+                        .labelsHidden()
+                    } header: {
+                        Text("Kind")
                     } footer: {
                         Text(IncomeRecordEditorViewModel.footnote(for: editor.kind))
                     }
@@ -54,11 +67,22 @@ struct IncomeRecordEditor: View {
                     Section {
                         // Inline for the same reason as the kind picker above: the menu
                         // style rendered this as "A mo…ly rate" at AX5.
+                        //
+                        // Its own section, like the kind picker. Sharing one with the
+                        // amount and the date put five rows in a single card — a label,
+                        // two options and two fields — with nothing saying which two were
+                        // the choice.
                         Picker("This is", selection: $editor.shape) {
                             Text("A monthly rate").tag(IncomeShape.recurring)
                             Text("A one-off payment").tag(IncomeShape.oneOff)
                         }
                         .pickerStyle(.inline)
+                        .labelsHidden()
+                    } header: {
+                        Text("This is")
+                    }
+
+                    Section {
                         LabeledContent(editor.shape == .recurring ? "Amount a month" : "Amount") {
                             TextField("0.00", text: $editor.amountText)
                                 .keyboardType(.decimalPad)
