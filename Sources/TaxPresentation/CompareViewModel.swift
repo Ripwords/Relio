@@ -21,12 +21,21 @@ public final class CompareViewModel {
         case betterOff
         case worseOff
         case noDifference
+        /// Nothing logged in the year being viewed, so there is nothing to replay.
+        ///
+        /// Distinct from `noDifference`, which is a finding: the two rulebooks treat this
+        /// user's spending identically. With no entries that sentence is vacuously true
+        /// and reads as though a comparison had been run — the fourth time this session a
+        /// zero has had to be told apart from an achievement.
+        case nothingLogged
     }
 
     /// The year being viewed. Comparisons are read as "against" this one.
     public let baselineYear: Int
     public private(set) var comparisonYear: Int
     public private(set) var result: CounterfactualResult?
+    /// Whether the year being viewed has anything to replay.
+    public private(set) var hasEntries = false
 
     /// Published rule changes that this user's own entries do not price.
     ///
@@ -78,6 +87,7 @@ public final class CompareViewModel {
             // The user's own entries, replayed. Both evaluations run over the same
             // projection — the point is that only the rulebook differs.
             let projected = try await store.project(year: baselineYear)
+            hasEntries = !projected.entries.isEmpty
             let evaluated = counterfactual(entries: projected.entries,
                                            year: projected.snapshot,
                                            under: baseline,
@@ -95,6 +105,7 @@ public final class CompareViewModel {
         } catch {
             result = nil
             ruleChanges = []
+            hasEntries = false
             status = .unavailable("Could not compare \(String(baselineYear)) with \(String(year)).")
         }
     }
@@ -102,6 +113,7 @@ public final class CompareViewModel {
     /// `totalReliefDifference` is `baseline - comparison`, so positive means the year being
     /// viewed allows more relief than the year compared against.
     public var direction: Direction {
+        guard hasEntries else { return .nothingLogged }
         guard let result else { return .noDifference }
         if result.totalReliefDifference.sen > 0 { return .betterOff }
         if result.totalReliefDifference.sen < 0 { return .worseOff }

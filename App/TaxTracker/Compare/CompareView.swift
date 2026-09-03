@@ -29,7 +29,9 @@ struct CompareView: View {
                 Section {
                     headline
                 } footer: {
-                    Text("Your \(String(model.baselineYear)) entries, evaluated under \(String(model.comparisonYear))'s rules. Estimate only.")
+                    Text(model.direction == .nothingLogged
+                         ? "There is nothing to replay under \(String(model.comparisonYear))'s rules. What changed in the rules themselves is below."
+                         : "Your \(String(model.baselineYear)) entries, evaluated under \(String(model.comparisonYear))'s rules. Estimate only.")
                 }
 
                 if !result.lines.isEmpty {
@@ -99,7 +101,7 @@ struct CompareView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(headlineText)
                 .font(.headline)
-            if model.direction != .noDifference {
+            if model.direction != .noDifference, model.direction != .nothingLogged {
                 // One Text each, not a figure beside a label. Side by side these wrapped
                 // into "RM 500.00 | more" over "relief" at the largest type sizes — the
                 // same break the entry editor's cap note and Home's unlock row had.
@@ -126,6 +128,8 @@ struct CompareView: View {
             "\(String(model.comparisonYear))'s rules would have left you better off"
         case .noDifference:
             "These two years treat your entries the same"
+        case .nothingLogged:
+            "Nothing logged in \(String(model.baselineYear)) yet"
         }
     }
 }

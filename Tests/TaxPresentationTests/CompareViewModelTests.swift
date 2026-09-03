@@ -84,3 +84,44 @@ struct CompareViewModelTests {
         #expect(result.lines.allSatisfy { $0.difference != .zero })
     }
 }
+
+/// "These two years treat your entries the same" is a finding: the rulebooks treat this
+/// user's spending identically. Said to someone with no entries it is vacuously true and
+/// reads as though a comparison had been run on their data.
+@Suite("Compare: nothing to compare") @MainActor struct CompareNothingLoggedTests {
+
+    @Test("no entries reads as nothing logged, not as no difference")
+    func nothingLoggedIsItsOwnState() async throws {
+        let store = try await PresentationFixture.store()
+        let model = CompareViewModel(store: store,
+                                     loader: BundledRuleSetLoader(),
+                                     baselineYear: 2025)
+        await model.refresh()
+        #expect(model.hasEntries == false)
+        #expect(model.direction == .nothingLogged)
+    }
+
+    /// The rule changes are still worth showing — what a Budget did is useful whether or
+    /// not this user has spent anything against it.
+    @Test("the rule changes still show when there is nothing to replay")
+    func ruleChangesStillShow() async throws {
+        let store = try await PresentationFixture.store()
+        let model = CompareViewModel(store: store,
+                                     loader: BundledRuleSetLoader(),
+                                     baselineYear: 2025)
+        await model.refresh()
+        #expect(!model.ruleChanges.isEmpty)
+    }
+
+    @Test("an entry makes it a real comparison again")
+    func entriesRestoreTheComparison() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = CompareViewModel(store: store,
+                                     loader: BundledRuleSetLoader(),
+                                     baselineYear: 2025)
+        await model.refresh()
+        #expect(model.hasEntries == true)
+        #expect(model.direction != .nothingLogged)
+    }
+}
