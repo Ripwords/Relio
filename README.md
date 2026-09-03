@@ -134,6 +134,9 @@ This requires `sudo xcodebuild -runFirstLaunch` to have been run once on the mac
 (for interactive admin authentication). Once that completes, `build-app.sh` is the
 proper gate.
 
+**Devices read on:** iPhone 17 and iPhone SE (3rd generation) — the narrowest screen
+still sold — in light and dark at default and largest Dynamic Type, plus iPad Pro 11-inch.
+
 **Not yet verified:** VoiceOver and Reduce Motion (the simulator control tool cannot
 toggle either) — the accessibility labels are unit-tested and read correct, but no one
 has heard them. CloudKit sync
