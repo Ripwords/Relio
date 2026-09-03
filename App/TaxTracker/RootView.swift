@@ -245,8 +245,12 @@ struct RootView: View {
                         SettingsView(context: context, store: store)
                     }
                     .navigationDestination(for: DependentsRoute.self) { _ in
-                        DependentsView(model: DependentsViewModel(store: store,
-                                                                  year: context.year))
+                        DependentsView(model: DependentsViewModel(context: context,
+                                                                  store: store)) {
+                            // A child changes which reliefs are claimable, so every screen
+                            // that copies out of the evaluation has to copy again.
+                            Task { await home.refresh(); await documents.refresh() }
+                        }
                     }
                     .navigationDestination(for: TaxSummaryRoute.self) { _ in
                         if let result = context.result, let summary = TaxSummary(result) {

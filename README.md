@@ -24,7 +24,7 @@ and for what remains unverified.
 | **TaxData** — SwiftData models, TaxStore, dedupe, reconciliation, income as a dated timeline (not one figure per year) | ✅ Done |
 | **TaxPresentation** — tested view models | ✅ Done |
 | iOS app — Home, Reliefs, entry CRUD, Income, onboarding | ✅ Built; every screen read on the simulator |
-| Settings, Compare, Documents outstanding, Dependants | ✅ Built and read on the simulator |
+| Settings, Compare, Documents outstanding, Dependants, Tax summary | ✅ Built and read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
 | Receipt capture, OCR, MyInvois e-invoices | Not started — the Docs tab lists what each claim still needs, but nothing can attach one yet |
 | On-device AI assistant | Not started |

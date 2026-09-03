@@ -18,9 +18,42 @@ import TaxData
     }
 
     static func model(_ store: TaxStore, year: Int = 2025) async -> DependentsViewModel {
-        let model = DependentsViewModel(store: store, year: year)
+        let context = PresentationFixture.context(store, year: year)
+        await context.load()
+        let model = DependentsViewModel(context: context, store: store)
         await model.refresh()
         return model
+    }
+
+    /// A dependant is an input to eligibility, not just a row in a list. Adding a child
+    /// under 18 is what makes CHILD_UNDER_18 claimable at all.
+    ///
+    /// The first cut of this model held only a store and a year, so it could refresh its
+    /// own list and nothing else. The user added a child, watched the list grow, and saw
+    /// every child relief stay exactly as unavailable as it had been — until the app was
+    /// relaunched.
+    @Test("adding a child re-evaluates the year, not just this list")
+    func savingReEvaluatesTheYear() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = DependentsViewModel(context: context, store: store)
+        await model.refresh()
+
+        func childReliefIsClaimable() -> Bool {
+            guard let child = context.result?.assessment(for: .childUnder18) else { return false }
+            if case .eligible = child.eligibility { return child.cap > .zero }
+            return false
+        }
+        #expect(childReliefIsClaimable() == false)
+
+        _ = await model.save(DependentDraft(name: "Zara",
+                                            kind: .child,
+                                            dateOfBirth: Self.date(2018, 5, 2),
+                                            isDisabled: false,
+                                            yearStatuses: [DependentYearStatus(year: 2025)]))
+        #expect(childReliefIsClaimable() == true)
     }
 
     @Test("a saved dependant comes back with the year's status attached")

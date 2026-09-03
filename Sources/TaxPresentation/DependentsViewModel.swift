@@ -33,12 +33,16 @@ public final class DependentsViewModel {
     /// What the last delete removed, so the toast can put it back. Spec §11.6.
     public private(set) var lastDeleted: DependentDraft?
 
-    public let year: Int
+    /// The year the ages and statuses are read for. Taken from the context rather than
+    /// passed alongside it, so the two cannot drift apart when the user switches year.
+    public var year: Int { context.year }
+
+    private let context: YearContext
     private let store: TaxStore
 
-    public init(store: TaxStore, year: Int) {
+    public init(context: YearContext, store: TaxStore) {
+        self.context = context
         self.store = store
-        self.year = year
     }
 
     public func refresh() async {
@@ -70,10 +74,17 @@ public final class DependentsViewModel {
         }
     }
 
+    /// Saving re-evaluates the year, not just this list.
+    ///
+    /// A dependant is an input to eligibility — a child under 18 is what makes
+    /// CHILD_UNDER_18 claimable at all — so adding one changes what every other screen
+    /// should say. Without the reload the user added a child, watched the list grow, and
+    /// saw the child reliefs stay exactly as unavailable as they were.
     @discardableResult
     public func save(_ draft: DependentDraft) async -> Bool {
         do {
             _ = try await store.save(draft)
+            await context.reload()
             await refresh()
             return true
         } catch {
@@ -91,6 +102,7 @@ public final class DependentsViewModel {
         do {
             try await store.softDeleteDependent(id: id)
             lastDeleted = removed
+            await context.reload()
             await refresh()
             return true
         } catch {
@@ -103,6 +115,7 @@ public final class DependentsViewModel {
         guard let lastDeleted else { return }
         try? await store.restoreDependent(id: lastDeleted.id)
         self.lastDeleted = nil
+        await context.reload()
         await refresh()
     }
 

@@ -29,7 +29,7 @@ import TaxData
         let home = HomeViewModel(context: context, store: store)
         let documents = DocumentsViewModel(context: context, store: store)
         let reliefs = ReliefsListViewModel(context: context)
-        let dependants = DependentsViewModel(store: store, year: 2025)
+        let dependants = DependentsViewModel(context: context, store: store)
 
         // 1. Straight out of onboarding, having skipped it. Home must not lead with a
         //    headline summing every cap in the rulebook.

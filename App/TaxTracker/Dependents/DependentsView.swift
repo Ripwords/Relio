@@ -13,10 +13,17 @@ struct DependentsView: View {
     @State private var model: DependentsViewModel
     @State private var editing: DependentDraft?
 
+    /// Told when the household changed, so the screens the user walks back to are not
+    /// showing figures worked out before this child existed. `context.reload()` refreshes
+    /// the shared evaluation; Home and Documents copy out of it and have to be told to
+    /// copy again, exactly as they are after an entry is saved.
+    let onChanged: () -> Void
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(model: DependentsViewModel) {
+    init(model: DependentsViewModel, onChanged: @escaping () -> Void) {
         _model = State(initialValue: model)
+        self.onChanged = onChanged
     }
 
     var body: some View {
@@ -39,7 +46,9 @@ struct DependentsView: View {
                         .buttonStyle(.plain)
                         .swipeActions {
                             Button("Delete", role: .destructive) {
-                                Task { await model.delete(id: row.id) }
+                                Task {
+                                    if await model.delete(id: row.id) { onChanged() }
+                                }
                             }
                         }
                     }
@@ -55,7 +64,9 @@ struct DependentsView: View {
         }
         .sheet(item: $editing) { draft in
             DependentEditorView(draft: draft, year: model.year) { edited in
-                await model.save(edited)
+                let saved = await model.save(edited)
+                if saved { onChanged() }
+                return saved
             }
         }
         .task {
@@ -75,7 +86,7 @@ struct DependentsView: View {
         .overlay(alignment: .bottom) {
             if let removed = model.lastDeleted {
                 UndoToast(message: "Deleted \(removed.name.isEmpty ? "dependant" : removed.name)",
-                          undo: { await model.undoDelete() },
+                          undo: { await model.undoDelete(); onChanged() },
                           isPresented: Binding(get: { model.lastDeleted != nil },
                                                set: { if !$0 { model.clearUndo() } }))
                     .padding(.bottom, 12)
