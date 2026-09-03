@@ -25,6 +25,11 @@ enum DemoHarness {
     /// stops at onboarding.
     static var wantsEmpty: Bool { arguments.contains("-relio-empty") }
 
+    /// Seed the household *and* answer every question it leaves open, which is the state
+    /// a diligent user reaches and the only one where Home has no prompts at all. It had
+    /// never been looked at.
+    static var wantsComplete: Bool { arguments.contains("-relio-complete") }
+
     /// Force the welcome flow even though the seeded profile has completed it, so
     /// onboarding stays reviewable after seeding.
     static var wantsOnboarding: Bool { arguments.contains("-relio-onboarding") }
@@ -74,6 +79,13 @@ enum DemoHarness {
             facts.assessmentType = .separate
             facts.employmentType = .privateSector
             facts.gender = .female
+            if wantsComplete {
+                // The three the seed deliberately leaves open, so Home's prompt row has
+                // something to show. Answered, Home should have no prompts at all.
+                facts.selfIsDisabled = false
+                facts.spouseIsDisabled = false
+                facts.propertyPrice = Money(ringgit: 450_000)
+            }
             try await store.saveYearFacts(facts, for: year)
 
             let employment = try await store.seedPrimaryEmployment(
