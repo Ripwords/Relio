@@ -1,0 +1,99 @@
+# Ledger — UX pass over the shipped iOS app
+
+No plan document. This was an open-ended pass: "what's next, UX wise — there are still
+so many issues". Worked directly on `master`, one atomic commit per finding.
+
+Baseline at start: **568 tests**, 15 app source files. At the end of the pass:
+**635 tests**, none removed.
+
+---
+
+## The tool that made the rest possible
+
+This machine has no simulator tap automation. `simctl` installs, launches and
+screenshots, and that is all — so the only screen anyone could ever look at was the one a
+fresh install opens on, which is onboarding. Every other screen had been type-checked and
+unit-tested and never seen.
+
+That is the root cause of most of what follows. The first commit was a DEBUG-only
+`DemoHarness` reading launch arguments: `-relio-demo` seeds a household, `-relio-empty`
+completes onboarding and seeds nothing, `-relio-year` opens on another YA, and
+`-relio-screen` opens any named screen or sheet. Almost every defect below was found by
+looking at a screen for the first time.
+
+---
+
+## Two defect families, found repeatedly
+
+### 1. The engine was more honest than the interface
+
+TaxKit and TaxData were built and tested first, and the UI never caught up. In every case
+the correct answer was already computed and simply not shown, or contradicted by the
+screen above it.
+
+| Built and tested | Surfaced |
+|---|---|
+| `counterfactual(entries:year:under:versus:)` | nowhere — Compare did not exist |
+| `diff(from:to:)` | nowhere |
+| `chargeableIncome`, `estimatedTax` | nowhere — Home showed only the last line of the sum |
+| Requirement checks | nowhere — the Docs tab was a placeholder |
+| Three-valued eligibility | "answer N questions" was a dead tap since the first build |
+| `DependentDraft` and the whole dependant model | nothing in the app could add one, so five child reliefs were unclaimable |
+| `verifiedOn` (spec §13 mitigation) | nowhere — there was no Settings screen |
+| `softDeleteIncomeSource` | no restore existed, so spec §11.6's undo could not be honoured |
+
+### 2. A zero rendered as an achievement
+
+Five instances, each telling the user something good about a state that was simply empty.
+
+| Screen | Said | To someone who |
+|---|---|---|
+| Home headline | "RM 87,350.00 of relief still claimable" | had entered nothing — the sum of every cap in the rulebook |
+| Relief detail | "Fully claimed — you have used all of this relief" | had entered no children (per-dependent cap = 0) |
+| Relief detail | "Fully claimed" | is *granted* the relief automatically and claimed nothing |
+| Docs tab | "Every claim is supported" under a green tick | had logged nothing at all |
+| Compare | "These two years treat your entries the same" | had no entries to compare |
+
+The child-relief one was the worst: it told a parent they had claimed all RM 2,000 of a
+relief they had never been able to touch, discouraging the one action that unlocks it.
+
+Worth noting: **the Income screen already got this right** — "Not recorded", never
+"RM 0.00", with a footer saying why. The discipline existed in this codebase; it had not
+reached the screens written since.
+
+### 3. Copy-out-of-the-evaluation staleness
+
+Three instances of one shape: a screen writes to the store, the evaluation reloads, and
+the screens that *copy* out of it keep showing what they copied before. Documents after an
+entry; Home after a dependant; Home after a household answer. Two were in code written
+earlier the same session.
+
+Found the second and third by auditing every model that writes to the store rather than
+waiting to trip over them. `NewUserJourneyTests` now covers all three paths.
+
+---
+
+## Structural fixes, so a defect class cannot recur
+
+| Encoded | Instead of |
+|---|---|
+| `AdaptiveRow` | the fourth hand-written `ViewThatFits` — every new row now stacks correctly at AX5 by construction |
+| A rule written on `MoneyText` itself | fixing a fifth screen where a figure beside a label could not wrap as a sentence |
+| `ProfileQuestionsViewModel.hasLoaded` | trusting every future caller to remember `load()` before `save()` |
+| `ProfileQuestionsViewModel.answerable`, shared by Home's count and the sheet | two code paths counting the same questions and disagreeing |
+| `DocumentsViewModel.rows`, shared by Home's count and the Docs tab | Home saying 8 while the screen it opened showed 6 |
+
+---
+
+## What is still not done
+
+- **Spec §11's three-column iPad layout.** Home now uses a readable measure rather than
+  the full width, and every screen is usable, but the sidebar-and-detail shape is a
+  navigation change and remains to do. `.tabViewStyle(.sidebarAdaptable)` was tried and
+  reverted: it adds a control whose expanded state cannot be reached without tapping.
+- **The zoom row-to-detail transition is unwatched.** It compiles and both screens render,
+  but no one has seen the animation — there is no way to tap this simulator.
+- **VoiceOver and Reduce Motion.** The labels are unit-tested and read correct; nobody has
+  heard them.
+- **Receipt capture.** The Docs tab names the documents each claim needs and cannot attach
+  one, which is said plainly on the screen.
