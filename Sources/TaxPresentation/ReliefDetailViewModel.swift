@@ -32,6 +32,16 @@ public final class ReliefDetailViewModel {
     /// declared on the same type, where `private` is already visible.
     public var yearOfAssessment: Int { context.year }
 
+    /// Whether this relief's ceiling is counted once per dependant.
+    ///
+    /// Such a relief has a cap of zero until a dependant is recorded, and zero headroom
+    /// with it — which the screen used to read as "fully claimed". Knowing the cap's shape
+    /// is what lets it say the true thing instead: there is nobody to claim for yet.
+    public var isPerDependent: Bool {
+        guard case .perDependent = context.rule(for: code)?.cap else { return false }
+        return true
+    }
+
     /// Whether logging an entry against this relief would do anything.
     ///
     /// An `automatic` relief is granted in full from household facts and the evaluator

@@ -158,7 +158,15 @@ struct ReliefDetailView: View {
                     //
                     // Hidden once the relief is full or blocked on an answer, because
                     // "add an entry" is not the next step in either case.
-                    if assessment.headroom > .zero, model.canLogEntries {
+                    if assessment.cap == .zero, model.isPerDependent {
+                        // The screen has just said there is nobody to claim for. This is
+                        // the way to change that — Dependants is otherwise three taps deep
+                        // in Settings, where someone reading about a child relief would
+                        // never think to look.
+                        NavigationLink(value: DependentsRoute()) {
+                            Label("Add a dependant", systemImage: "person.2")
+                        }
+                    } else if assessment.headroom > .zero, model.canLogEntries {
                         NavigationLink(value: PrefilledEntryRoute(code: model.code,
                                                                  amount: .zero)) {
                             Label("Add an entry", systemImage: "plus.circle")
@@ -301,6 +309,19 @@ struct ReliefDetailView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
+            } else if assessment.cap == .zero {
+                // A cap of zero is not a relief that has been used up — it is one there is
+                // nothing to claim against yet. CHILD_UNDER_18 with no children on file
+                // said "Fully claimed. You have used all of this relief for this year",
+                // which is false and, worse, tells the user not to bother with the very
+                // thing that would unlock it.
+                Text(model.isPerDependent ? "Nobody to claim for yet" : "Nothing to claim yet")
+                    .font(.title2.weight(.semibold))
+                Text(model.isPerDependent
+                     ? "This relief is counted once for each dependant. Add the people it applies to and Relio will work out what it comes to."
+                     : "This relief has no ceiling for you this year.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             } else if case .ineligible = assessment.eligibility {
                 // Reached the "fully claimed" branch before, which congratulated the user
                 // for using up a relief they were never able to claim.

@@ -90,6 +90,12 @@ public final class ReliefsListViewModel {
             state = .unavailable
         case .needsInfo:
             state = .needsAnswer
+        case .eligible where assessment.cap == .zero:
+            // A cap of zero is not a relief that has been used up. It is one there is
+            // nothing to claim against yet — a per-dependent relief with no dependants
+            // recorded is exactly this, and CHILD_UNDER_18 sat in "Fully claimed"
+            // telling a user with no children on file that they had used all of it.
+            state = .unavailable
         case .eligible:
             state = assessment.headroom > .zero ? .claimable : .exhausted
         }

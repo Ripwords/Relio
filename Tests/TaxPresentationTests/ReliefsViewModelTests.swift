@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-import TaxKit
+@testable import TaxKit
 import TaxData
 @testable import TaxPresentation
 
@@ -256,5 +256,43 @@ struct ReliefDetailLoggingTests {
         try await PresentationFixture.seedTypicalHousehold(store)
         let model = await Self.model(store, .disabledSelf)
         #expect(model.canLogEntries == false)
+    }
+}
+
+/// A per-dependent relief with no dependants recorded has a cap of zero, and zero headroom
+/// with it. Read as "used up", that put CHILD_UNDER_18 under "Fully claimed" and told a
+/// user with no children on file that they had claimed all RM 2,000 of it — which is both
+/// false and discouraging, since adding a child is exactly what unlocks it.
+@Suite("Relief rows: a cap of zero") @MainActor struct ReliefZeroCapTests {
+
+    static func assessment(cap: Money, headroom: Money) -> ReliefAssessment {
+        ReliefAssessment(code: .childUnder18, name: "Child under 18",
+                         cap: cap, claimed: .zero, allowed: .zero, headroom: headroom,
+                         eligibility: .eligible, requirements: [], taxSaved: nil,
+                         unverified: false,
+                         sourceURL: URL(string: "https://www.hasil.gov.my/")!,
+                         notes: nil, children: [])
+    }
+
+    @Test("nothing to claim against is not the same as having claimed it all")
+    func zeroCapIsNotExhausted() {
+        let row = ReliefsListViewModel.row(from: Self.assessment(cap: .zero, headroom: .zero))
+        #expect(row.state != .exhausted)
+        #expect(row.state == .unavailable)
+    }
+
+    /// The genuine case still reads as exhausted: a real cap, all of it used.
+    @Test("a relief with a real cap and no room left is still fully claimed")
+    func usedUpReliefIsExhausted() {
+        let row = ReliefsListViewModel.row(
+            from: Self.assessment(cap: Money(ringgit: 2_000), headroom: .zero))
+        #expect(row.state == .exhausted)
+    }
+
+    @Test("a relief with room left is claimable")
+    func reliefWithRoomIsClaimable() {
+        let row = ReliefsListViewModel.row(
+            from: Self.assessment(cap: Money(ringgit: 2_000), headroom: Money(ringgit: 500)))
+        #expect(row.state == .claimable)
     }
 }
