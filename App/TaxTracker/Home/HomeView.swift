@@ -19,11 +19,11 @@ struct HomeView: View {
     /// leaving it unscaled while every label around it grows inverts the hierarchy at the
     /// larger accessibility sizes — the headline ends up smaller than its own caption.
     /// `relativeTo: .largeTitle` ties its growth curve to the closest built-in style.
-    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = 44
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = 40
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 24) {
                 // With nothing logged the headline is the sum of every relief's whole cap
                 // — the rulebook's theoretical maximum, not this person's money. Showing
                 // it as "still claimable" on a first launch was the most overstated figure
@@ -107,6 +107,11 @@ struct HomeView: View {
                 headlineFigure
             }
 
+            if !model.reliefByCategory.isEmpty {
+                compositionBar
+                    .padding(.top, 4)
+            }
+
             // Spec §13: the largest computed figure in the app had nothing anywhere on
             // the screen saying it is an estimate. A footnote, not a banner — it has to
             // be readable without competing with the number it qualifies. Kept out of the
@@ -118,10 +123,64 @@ struct HomeView: View {
         }
     }
 
+    /// What this year's relief is made of, by family.
+    ///
+    /// The bar is the app's one piece of chrome that is purely about orientation: it says
+    /// where the relief came from before the reader has scrolled anywhere. Segments are
+    /// proportional to the money, so the widest one is genuinely the family carrying the
+    /// year.
+    ///
+    /// Not a progress bar. There is no honest total to be a fraction of — the sum of every
+    /// cap is the theoretical maximum for someone who qualifies for everything, which is
+    /// the figure Home was fixed out of leading with.
+    @ViewBuilder
+    private var compositionBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            GeometryReader { proxy in
+                HStack(spacing: 2) {
+                    ForEach(model.reliefByCategory, id: \.category) { part in
+                        Theme.tint(part.category)
+                            .frame(width: width(for: part.allowed, in: proxy.size.width))
+                    }
+                }
+                .clipShape(Capsule())
+            }
+            .frame(height: 10)
+
+            // No written key. Six labelled chips cost three rows above the fold and the
+            // colours are taught anyway by the cards below and by the Reliefs list, where
+            // each family is named beside its own hue. The accessibility label still
+            // spells out every family and its amount, so nothing is lost by not drawing
+            // them — which is the test for whether a piece of chrome is carrying meaning
+            // or just occupying space.
+            Text("\(model.totalRelief.formatted()) of relief this year")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(compositionLabel)
+    }
+
+    private func width(for amount: Money, in total: CGFloat) -> CGFloat {
+        guard model.totalRelief.sen > 0 else { return 0 }
+        let share = CGFloat(amount.sen) / CGFloat(model.totalRelief.sen)
+        // A hairline minimum, so a small family is still visible as a segment rather than
+        // vanishing into the gap between two others.
+        return max(6, (total - CGFloat(model.reliefByCategory.count) * 2) * share)
+    }
+
+    private var compositionLabel: String {
+        let parts = model.reliefByCategory
+            .map { "\($0.category.title), \($0.allowed.formatted())" }
+            .joined(separator: "; ")
+        return "\(model.totalRelief.formatted()) of relief this year: \(parts)"
+    }
+
     /// The number and its label, with a chevron when it leads somewhere.
     private var headlineFigure: some View {
         VStack(alignment: .leading, spacing: 4) {
-            MoneyText(amount: model.headline, font: .system(size: headlineSize), weight: .bold)
+            MoneyText(amount: model.headline, font: Theme.figure(headlineSize), weight: .bold)
                 // Spec §11.3: rolling digits are motion. Reduce Motion swaps the value
                 // outright instead.
                 .contentTransition(reduceMotion ? .identity : .numericText())
@@ -192,6 +251,8 @@ struct HomeView: View {
         AdaptiveRow(spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
+                    .foregroundStyle(.tint)
+                    .font(.body.weight(.medium))
                 Text(title)
             }
         } trailing: {
@@ -214,7 +275,8 @@ struct HomeView: View {
             }
         }
         .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(.background.secondary,
+                    in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -225,10 +287,13 @@ struct HomeView: View {
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Biggest opportunities")
-                    .font(.headline)
+                    .font(Theme.eyebrow)
+                    .foregroundStyle(.secondary)
                 ForEach(model.opportunities) { row in
                     NavigationLink(value: row.code) {
-                        OpportunityRowView(row: row)
+                        Card(tint: Theme.tint(for: row.code)) {
+                            OpportunityRowView(row: row)
+                        }
                     }
                     .buttonStyle(.plain)
                     .matchedTransitionSource(id: row.code, in: namespace)
@@ -250,21 +315,29 @@ struct OpportunityRowView: View {
     let row: OpportunityRow
 
     var body: some View {
-        AdaptiveRow {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(row.shortName)
-                // A bar at zero is not information, it is a horizontal rule sitting
-                // under a label — and every untouched relief drew one, so the list read
-                // as a stack of underlined headings. Shown only once there is progress
-                // to show.
-                if row.usedPercent > 0 && !row.needsAnswer {
-                    ProgressView(value: Double(row.usedPercent), total: 100)
-                        .tint(.accentColor)
-                }
+        // Stacked, not a label fighting a figure for one line. Inside a card the usable
+        // width is already reduced by the padding and the spine, and the first cut had
+        // "Parents and grandparents" overlapping its own amount.
+        VStack(alignment: .leading, spacing: 6) {
+            if let category = ReliefCategory(row.code) {
+                // Which family this belongs to, above the name. The card's spine carries
+                // the same colour, so the two read as one mark.
+                CategoryLabel(category: category)
             }
-        } trailing: {
+            Text(row.shortName)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.primary)
             trailingFigure
+            // A bar at zero is not information, it is a horizontal rule sitting under a
+            // label — and every untouched relief drew one, so the list read as a stack of
+            // underlined headings. Shown only once there is progress to show.
+            if row.usedPercent > 0 && !row.needsAnswer {
+                ProgressView(value: Double(row.usedPercent), total: 100)
+                    .tint(ReliefCategory(row.code).map(Theme.tint) ?? .accentColor)
+                    .padding(.top, 2)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         // Spec §11.8: VoiceOver reads the amounts, never "68 percent".
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -290,16 +363,18 @@ struct OpportunityRowView: View {
                     .foregroundStyle(.tint)
             }
         } else {
-            VStack(alignment: .trailing, spacing: 2) {
-                MoneyText(amount: row.headroom, font: .subheadline, weight: .semibold)
-                if let saved = row.taxSaved {
-                    // "→ RM 1,520.00" said nothing about what the smaller figure was.
-                    // It is the tax the headroom above is worth, and the row now says so.
-                    HStack(spacing: 3) {
-                        MoneyText(amount: saved, font: .caption)
-                        Text("in tax").font(.caption)
-                    }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                MoneyText(amount: row.headroom, font: Theme.figure(20, .bold))
+                Text("left")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if let saved = row.taxSaved {
+                    // "→ RM 1,520.00" said nothing about what the smaller figure was. It
+                    // is the tax the headroom is worth, and the row now says so.
+                    Text("· \(saved.formatted()) in tax")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
         }

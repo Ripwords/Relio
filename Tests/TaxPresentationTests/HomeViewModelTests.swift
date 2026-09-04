@@ -333,3 +333,63 @@ import TaxData
         #expect(model.filteredEntries.count == 1)
     }
 }
+
+/// The bar at the top of Home. A composition of what the year's relief is made of, not
+/// progress towards a total — there is no honest total to be a fraction of, and the
+/// obvious denominator (every cap in the rulebook) is the same theoretical maximum that
+/// once had Home telling a new user they could claim RM 87,350.
+@Suite("Home: what the relief is made of") @MainActor struct HomeCompositionTests {
+
+    @Test("the parts add up to the total, and the total is the relief allowed")
+    func partsAddUp() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await HomeViewModelTests.model(store)
+
+        let summed = model.reliefByCategory.reduce(Money.zero) { $0 + $1.allowed }
+        #expect(summed == model.totalRelief)
+        #expect(model.totalRelief == model.context.result?.totalAllowed)
+    }
+
+    /// A sub-limit's amount is already inside its parent's. Counting both would inflate
+    /// every segment and the total with it.
+    @Test("a sub-limit is not counted twice")
+    func subLimitsAreNotDoubleCounted() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        _ = try await store.save(EntryDraft(year: 2025, code: .lifeInsurance,
+                                            amount: Money(ringgit: 2_000), vendor: "GE"))
+        let model = await HomeViewModelTests.model(store)
+        let summed = model.reliefByCategory.reduce(Money.zero) { $0 + $1.allowed }
+        #expect(summed == model.context.result?.totalAllowed)
+    }
+
+    @Test("families with nothing allowed do not take up a segment")
+    func emptyFamiliesAreOmitted() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await HomeViewModelTests.model(store)
+        #expect(model.reliefByCategory.allSatisfy { $0.allowed > .zero })
+    }
+
+    /// Biggest first, and stable — a bar that reorders between launches reads as a bug.
+    @Test("the order is by size and does not reshuffle")
+    func orderIsStable() async throws {
+        let store = try await PresentationFixture.store()
+        try await PresentationFixture.seedTypicalHousehold(store)
+        let model = await HomeViewModelTests.model(store)
+        let first = model.reliefByCategory.map(\.category)
+
+        await model.refresh()
+        #expect(model.reliefByCategory.map(\.category) == first)
+        #expect(model.reliefByCategory.map(\.allowed)
+                == model.reliefByCategory.map(\.allowed).sorted(by: >))
+    }
+
+    @Test("nothing logged means nothing to compose")
+    func emptyProfileHasNoComposition() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await HomeViewModelTests.model(store)
+        #expect(model.reliefByCategory.isEmpty || model.totalRelief > .zero)
+    }
+}

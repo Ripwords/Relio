@@ -74,6 +74,18 @@ public final class HomeViewModel {
     /// what the unreachable "Nothing logged yet" branch was already written to say.
     public private(set) var hasLoggedAnything = false
 
+    /// What this year's relief is made of, biggest family first.
+    ///
+    /// A composition, deliberately, and not progress towards a total. The obvious bar to
+    /// draw here would be "used RM 37,800 of RM 84,000" — and that denominator is the sum
+    /// of every cap in the rulebook, the same theoretical maximum that made Home tell a
+    /// new user they could claim RM 87,350. There is no honest total to be a fraction of,
+    /// so the bar shows the parts of a real figure rather than a share of an invented one.
+    public private(set) var reliefByCategory: [(category: ReliefCategory, allowed: Money)] = []
+
+    /// The sum of the above — the relief actually allowed this year.
+    public private(set) var totalRelief: Money = .zero
+
     private let store: TaxStore
 
     public init(context: YearContext, store: TaxStore) {
@@ -99,6 +111,8 @@ public final class HomeViewModel {
             remainingOpportunityCount = 0
             prompts = .none
             hasLoggedAnything = false
+            reliefByCategory = []
+            totalRelief = .zero
             return
         }
 
@@ -118,6 +132,7 @@ public final class HomeViewModel {
         remainingOpportunityCount = max(0, candidates.count - opportunities.count)
         prompts = await makePrompts(result)
         hasLoggedAnything = !((try? await store.entryDrafts(forYear: context.year)) ?? []).isEmpty
+        (reliefByCategory, totalRelief) = Self.composition(of: result)
     }
 
     /// Eligible-or-unanswered reliefs with room left, best first.
@@ -161,6 +176,31 @@ public final class HomeViewModel {
                 if leftValue != rightValue { return leftValue > rightValue }
                 return left.code.rawValue < right.code.rawValue
             }
+    }
+
+    /// Groups the year's allowed relief by family.
+    ///
+    /// Top-level assessments only, the same rule `totalAllowed` follows: a sub-limit's
+    /// amount is already inside its parent's, so counting both would inflate every
+    /// segment and the total with it.
+    static func composition(of result: EvaluationResult)
+        -> (parts: [(category: ReliefCategory, allowed: Money)], total: Money) {
+        var byCategory: [ReliefCategory: Money] = [:]
+        for assessment in result.assessments where assessment.allowed > .zero {
+            guard let category = ReliefCategory(assessment.code) else { continue }
+            byCategory[category, default: .zero] = byCategory[category, default: .zero]
+                + assessment.allowed
+        }
+        let parts = byCategory
+            .map { (category: $0.key, allowed: $0.value) }
+            // Biggest first, ties broken on the family's declared order so the bar cannot
+            // reshuffle between launches.
+            .sorted { left, right in
+                if left.allowed != right.allowed { return left.allowed > right.allowed }
+                return ReliefCategory.allCases.firstIndex(of: left.category)!
+                    < ReliefCategory.allCases.firstIndex(of: right.category)!
+            }
+        return (parts, parts.reduce(Money.zero) { $0 + $1.allowed })
     }
 
     static func percentUsed(_ assessment: ReliefAssessment) -> Int {
