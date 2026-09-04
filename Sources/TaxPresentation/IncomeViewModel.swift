@@ -12,6 +12,14 @@ public struct IncomeSourceRow: Hashable, Sendable, Identifiable {
     public var total: Money
     public var records: [IncomeRecordDraft]
 
+    /// The records read as a history rather than as a list of dated amounts.
+    ///
+    /// Two rows saying "1 Jan, RM 10,000 a month" and "1 Apr, RM 11,500 a month" *are* a
+    /// raise, and nothing on the screen said so — the reader had to compare the two
+    /// figures and work out what had happened. Naming each entry is what makes the
+    /// timeline legible as the thing it is.
+    public var timeline: [IncomeTimelineEntry] { IncomeTimelineEntry.build(from: records) }
+
     public var id: UUID { draft.id }
     public var name: String { draft.name }
     public var kind: IncomeKind { draft.kind }
@@ -34,6 +42,83 @@ public struct IncomeSourceRow: Hashable, Sendable, Identifiable {
 /// Shows the derivation, not just its result: a user who cannot see why Relio thinks they
 /// earned what it says cannot tell whether it is right, and this figure drives every tax
 /// number in the app. Spec §10.
+/// One dated point in a source's history, with what it did.
+public struct IncomeTimelineEntry: Hashable, Sendable, Identifiable {
+
+    public enum Change: Hashable, Sendable {
+        /// The first rate on record. Nothing to compare it against.
+        case opening
+        /// A rate that replaced a lower one — a raise, by this much a month.
+        case raise(by: Money)
+        /// A rate that replaced a higher one.
+        case cut(by: Money)
+        /// A rate that replaced one of the same amount. Unusual but recordable, and it
+        /// must not be labelled a raise of RM 0.00.
+        case unchanged
+        /// A single payment — a bonus, a freelance invoice, a commission.
+        case oneOff
+
+        public var title: String {
+            switch self {
+            case .opening: "Starting rate"
+            case .raise: "Raise"
+            case .cut: "Lower rate"
+            case .unchanged: "Rate restated"
+            case .oneOff: "One-off payment"
+            }
+        }
+
+        /// Whether the step went up. Only meaningful where `delta` is non-nil.
+        public var isIncrease: Bool {
+            if case .raise = self { return true }
+            return false
+        }
+
+        /// The size of the step, for the entries where a step is what happened.
+        public var delta: Money? {
+            switch self {
+            case .raise(let by), .cut(let by): by
+            case .opening, .unchanged, .oneOff: nil
+            }
+        }
+    }
+
+    public var draft: IncomeRecordDraft
+    public var change: Change
+
+    public var id: UUID { draft.id }
+
+    /// Walks the records in date order and labels each one against the recurring rate in
+    /// force before it.
+    ///
+    /// One-off payments do not participate: a bonus in March does not make April's salary
+    /// a cut, which is what comparing every record against the one before it would say.
+    static func build(from records: [IncomeRecordDraft]) -> [IncomeTimelineEntry] {
+        let ordered = records.sorted {
+            ($0.effectiveFrom, $0.id.uuidString) < ($1.effectiveFrom, $1.id.uuidString)
+        }
+        var previousRate: Money?
+        return ordered.map { record in
+            guard record.shape == .recurring else {
+                return IncomeTimelineEntry(draft: record, change: .oneOff)
+            }
+            defer { previousRate = record.amount }
+            guard let previous = previousRate else {
+                return IncomeTimelineEntry(draft: record, change: .opening)
+            }
+            if record.amount > previous {
+                return IncomeTimelineEntry(draft: record,
+                                           change: .raise(by: record.amount - previous))
+            }
+            if record.amount < previous {
+                return IncomeTimelineEntry(draft: record,
+                                           change: .cut(by: previous - record.amount))
+            }
+            return IncomeTimelineEntry(draft: record, change: .unchanged)
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class IncomeViewModel {

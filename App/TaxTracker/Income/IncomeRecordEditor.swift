@@ -73,8 +73,10 @@ struct IncomeRecordEditor: View {
                         // two options and two fields — with nothing saying which two were
                         // the choice.
                         Picker("This is", selection: $editor.shape) {
-                            Text("A monthly rate").tag(IncomeShape.recurring)
-                            Text("A one-off payment").tag(IncomeShape.oneOff)
+                            Text("A monthly rate — a salary, or a raise")
+                                .tag(IncomeShape.recurring)
+                            Text("A one-off payment — a bonus or an invoice")
+                                .tag(IncomeShape.oneOff)
                         }
                         .pickerStyle(.inline)
                         .labelsHidden()
@@ -92,9 +94,12 @@ struct IncomeRecordEditor: View {
                         DatePicker(editor.shape == .recurring ? "From" : "Received on",
                                    selection: $editor.effectiveFrom, displayedComponents: .date)
                     } footer: {
+                        // Says what the shape is *for*, not only how it is counted. A
+                        // reader who does not know which one a bonus is cannot be helped
+                        // by being told how each is prorated.
                         Text(editor.shape == .recurring
-                             ? "Relio pays this rate from that date until you change it. A change part-way through a month is split by days."
-                             : "Counted in the year it was received.")
+                             ? "For a salary and every change to it. Relio pays this rate from that date until another replaces it, and splits a mid-month change by days — so recording a raise is how you tell it about one."
+                             : "For a bonus, a commission or a freelance invoice: one amount, on one date. Counted in the year it was received. A freelance invoice belongs to a part-time or occasional source rather than to your job, because the two are declared differently.")
                     }
 
                     if let error = editor.validationError, !editor.amountText.isEmpty {

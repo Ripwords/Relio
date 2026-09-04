@@ -47,21 +47,21 @@ struct IncomeView: View {
 
             ForEach(model.sources) { source in
                 Section {
-                    ForEach(source.records) { record in
+                    ForEach(source.timeline) { entry in
                         Button {
                             editing = IncomeRecordEditorViewModel(
-                                mode: .edit(record),
-                                today: record.effectiveFrom,
+                                mode: .edit(entry.draft),
+                                today: entry.draft.effectiveFrom,
                                 // A record never collides with itself.
                                 occupiedDays: model.occupiedDays(forSource: source.id,
-                                                                 excluding: record.id))
-                        } label: { recordRow(record) }
+                                                                 excluding: entry.id))
+                        } label: { recordRow(entry) }
                             .buttonStyle(.plain)
                             .swipeActions {
                                 Button("Delete", role: .destructive) {
                                     Task {
                                         deleteError = nil
-                                        let deleted = await model.deleteRecord(id: record.id)
+                                        let deleted = await model.deleteRecord(id: entry.id)
                                         if !deleted {
                                             deleteError = "Relio could not remove that record. It is still here — try again."
                                         }
@@ -69,7 +69,10 @@ struct IncomeView: View {
                                 }
                             }
                     }
-                    Button("Add a change") {
+                    // "Add a change" named the mechanism and not the thing. A raise is the
+                    // reason almost anyone opens this screen twice, and the timeline
+                    // feature exists for it — the label should say so.
+                    Button("Add a raise, bonus or change") {
                         // The day after this source's latest record, clamped into the year
                         // on screen — never today, and never a date that ties with a rate
                         // already there. See `IncomeViewModel.newRecordDate(forSource:)`.
@@ -350,35 +353,73 @@ struct IncomeView: View {
         }
     }
 
-    private func recordRow(_ record: IncomeRecordDraft) -> some View {
-        ViewThatFits(in: .horizontal) {
+    private func recordRow(_ entry: IncomeTimelineEntry) -> some View {
+        let record = entry.draft
+        return ViewThatFits(in: .horizontal) {
             HStack {
-                recordDate(record)
+                recordDate(entry)
                 Spacer()
-                MoneyText(amount: record.amount, font: .subheadline)
+                recordAmount(entry)
             }
             VStack(alignment: .leading, spacing: 2) {
-                recordDate(record)
-                MoneyText(amount: record.amount, font: .subheadline)
+                recordDate(entry)
+                recordAmount(entry)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(record))
+        .accessibilityLabel(accessibilityLabel(entry))
     }
 
-    private func recordDate(_ record: IncomeRecordDraft) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(record.effectiveFrom, format: .dateTime.day().month(.abbreviated).year())
-            Text(record.shape == .recurring ? "a month" : "one-off")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    /// The figure, with the unit that qualifies it.
+    ///
+    /// "a month" belongs beside the amount rather than after the change's name, where it
+    /// ran the two together as "Starting rate a month".
+    private func recordAmount(_ entry: IncomeTimelineEntry) -> some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            MoneyText(amount: entry.draft.amount, font: Theme.figure(17, .semibold))
+            if entry.draft.shape == .recurring {
+                Text("a month")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    private func accessibilityLabel(_ record: IncomeRecordDraft) -> String {
+    /// The date, what happened on it, and by how much.
+    ///
+    /// "1 Apr 2025 / a month" left the reader comparing two figures to work out that the
+    /// second was a raise. Naming it is what turns a list of dated amounts into the
+    /// history the timeline was built to be.
+    private func recordDate(_ entry: IncomeTimelineEntry) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(entry.draft.effectiveFrom,
+                 format: .dateTime.day().month(.abbreviated).year())
+            HStack(spacing: 4) {
+                Text(entry.change.title)
+                if let delta = entry.change.delta {
+                    // A lower rate reads "−", not "+RM 2,000" under a heading that
+                    // already says the rate went down.
+                    Text("\(entry.change.isIncrease ? "+" : "−")\(delta.formatted())")
+                        .monospacedDigit()
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The same history the row shows, said in full.
+    private func accessibilityLabel(_ entry: IncomeTimelineEntry) -> String {
+        let record = entry.draft
         let date = record.effectiveFrom.formatted(.dateTime.day().month(.wide).year())
-        return record.shape == .recurring
-            ? "From \(date), \(record.amount.formatted()) a month"
-            : "\(date), \(record.amount.formatted()) received"
+        guard record.shape == .recurring else {
+            return "\(date), one-off payment of \(record.amount.formatted()) received"
+        }
+        let base = "From \(date), \(record.amount.formatted()) a month"
+        guard let delta = entry.change.delta else {
+            return "\(base), \(entry.change.title.lowercased())"
+        }
+        return "\(base), \(entry.change.title.lowercased()) of "
+             + "\(delta.formatted()) a month"
     }
 }

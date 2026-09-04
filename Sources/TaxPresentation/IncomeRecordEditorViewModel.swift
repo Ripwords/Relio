@@ -160,7 +160,7 @@ public final class IncomeRecordEditorViewModel {
         case .employment:
             "Counted in full. Relio handles this."
         case .occasional:
-            "Occasional work is declared on Form BE under other gains and profits. Relio handles this."
+            "Freelance gigs, commissions and side work. Declared on Form BE under other gains and profits, and Relio handles it — keep it separate from your job, because the two are declared differently."
         case .business:
             "A registered business is filed on Form B, where expenses are deductible. Relio counts this income in full, so its estimate will be higher than what you file."
         case .rental:
