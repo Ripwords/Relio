@@ -96,10 +96,6 @@ struct DependentsView: View {
     }
 }
 
-/// `.sheet(item:)` needs an `Identifiable`, and a brand-new draft has a fresh UUID
-/// already, so the draft is its own identity.
-extension DependentDraft: @retroactive Identifiable {}
-
 struct DependentRowView: View {
     let row: DependentRow
 
