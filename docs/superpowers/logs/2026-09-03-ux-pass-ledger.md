@@ -87,13 +87,16 @@ waiting to trip over them. `NewUserJourneyTests` now covers all three paths.
 
 ## What is still not done
 
-- **Spec §11's three-column iPad layout.** Home now uses a readable measure rather than
-  the full width, and every screen is usable, but the sidebar-and-detail shape is a
-  navigation change and remains to do. `.tabViewStyle(.sidebarAdaptable)` was tried and
-  reverted: it adds a control whose expanded state cannot be reached without tapping.
-- **The zoom row-to-detail transition is unwatched.** It compiles and both screens render,
-  but no one has seen the animation — there is no way to tap this simulator.
+- ~~**Spec §11's three-column iPad layout.**~~ Built: `NavigationSplitView` on a regular
+  size class, the tab bar on compact. `.tabViewStyle(.sidebarAdaptable)` was tried first
+  and reverted — it adds a control whose expanded state cannot be reached without tapping.
+- ~~**The zoom row-to-detail transition is unwatched.**~~ Watched, in the end.
+  `-relio-delay` postpones the navigation so a screen recording catches it mid-flight, and
+  the extracted frames show the detail growing out of the row rather than sliding in. The
+  technique is in the README; it turns "cannot tap" into "cannot tap *interactively*",
+  which is a much smaller limitation than it first looked.
 - **VoiceOver and Reduce Motion.** The labels are unit-tested and read correct; nobody has
-  heard them.
+  heard them. This one is genuinely blocked — the simulator control tool cannot toggle
+  either, and there is no device.
 - **Receipt capture.** The Docs tab names the documents each claim needs and cannot attach
   one, which is said plainly on the screen.

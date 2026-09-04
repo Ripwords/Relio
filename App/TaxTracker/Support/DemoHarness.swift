@@ -44,6 +44,14 @@ enum DemoHarness {
     /// other way to reach it from a screenshot run.
     static var year: Int? { value(after: "-relio-year").flatMap(Int.init) }
 
+    /// Seconds to wait before opening `-relio-screen`, as `-relio-delay 2`.
+    ///
+    /// The only way to see a *transition* on a machine with no tap automation: start a
+    /// screen recording, let the app sit on the list, and have the navigation fire while
+    /// the camera is rolling. Without it the push has already happened by the time
+    /// anything can be captured, which is why the zoom transition shipped unwatched.
+    static var delay: Double? { value(after: "-relio-delay").flatMap(Double.init) }
+
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }
 
     private static func value(after flag: String) -> String? {

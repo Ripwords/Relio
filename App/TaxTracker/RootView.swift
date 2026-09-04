@@ -123,6 +123,9 @@ struct RootView: View {
             #endif
             await home.refresh()
             #if DEBUG
+            if let delay = DemoHarness.delay {
+                try? await Task.sleep(for: .seconds(delay))
+            }
             openDemoScreen()
             #endif
         }

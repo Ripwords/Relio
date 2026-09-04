@@ -137,6 +137,17 @@ proper gate.
 **Devices read on:** iPhone 17 and iPhone SE (3rd generation) — the narrowest screen
 still sold — in light and dark at default and largest Dynamic Type, plus iPad Pro 11-inch.
 
+**Watching a transition.** `-relio-delay <seconds>` postpones `-relio-screen`, so a
+screen recording can be started first and the navigation fires while it is rolling. That
+is how the row-to-detail zoom was checked without a way to tap:
+
+```bash
+xcrun simctl io "Relio Test Phone" recordVideo out.mov &
+xcrun simctl launch "Relio Test Phone" my.relio.TaxTracker \
+  -relio-demo -relio-delay 3 -relio-screen relief:LIFESTYLE
+# then: ffmpeg -ss 3.6 -t 1.4 -i out.mov -vf "fps=15,scale=200:-1,tile=5x5" sheet.png
+```
+
 **Not yet verified:** VoiceOver and Reduce Motion (the simulator control tool cannot
 toggle either) — the accessibility labels are unit-tested and read correct, but no one
 has heard them. CloudKit sync
