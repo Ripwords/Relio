@@ -45,7 +45,7 @@ struct ReliefsListView: View {
                 // detail beside it is the consequence of that choice.
                 List {
                     ForEach(model.sections) { section in
-                        Section(section.title) {
+                        Section {
                             ForEach(section.rows) { row in
                                 Button {
                                     selection.wrappedValue = row.code
@@ -59,19 +59,23 @@ struct ReliefsListView: View {
                                 .accessibilityAddTraits(selection.wrappedValue == row.code
                                                         ? .isSelected : [])
                             }
+                        } header: {
+                            SectionHeading(section.title)
                         }
                     }
                 }
             } else {
                 List {
                     ForEach(model.sections) { section in
-                        Section(section.title) {
+                        Section {
                             ForEach(section.rows) { row in
                                 NavigationLink(value: row.code) {
                                     ReliefRowView(row: row)
                                 }
                                 .matchedTransitionSource(id: row.code, in: namespace)
                             }
+                        } header: {
+                            SectionHeading(section.title)
                         }
                     }
                 }
@@ -94,14 +98,28 @@ struct ReliefRowView: View {
 
     var body: some View {
         AdaptiveRow {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(row.shortName)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 7) {
+                    // The family, as a mark rather than a word. Thirty-two rows is too
+                    // many to repeat six names down; the colour is what carries the
+                    // grouping once it has been learned on Home and in the section
+                    // headers.
+                    if let category = ReliefCategory(row.code) {
+                        Circle()
+                            .fill(Theme.tint(category))
+                            .frame(width: 8, height: 8)
+                    }
+                    Text(row.shortName)
+                }
                 // See `OpportunityRowView`: a bar at zero draws a rule under the name and
                 // says nothing. Most reliefs in this list are untouched, so most rows were
                 // drawing one.
                 if (row.state == .claimable || row.state == .exhausted) && row.usedPercent > 0 {
                     ProgressView(value: Double(row.usedPercent), total: 100)
-                        .tint(row.state == .exhausted ? .secondary : .accentColor)
+                        .tint(row.state == .exhausted
+                              ? Color.secondary
+                              : (ReliefCategory(row.code).map(Theme.tint) ?? .accentColor))
+                        .padding(.leading, 15)
                 }
             }
         } trailing: {
@@ -115,13 +133,14 @@ struct ReliefRowView: View {
     private var trailing: some View {
         switch row.state {
         case .claimable:
-            MoneyText(amount: row.headroom, font: .subheadline, weight: .semibold)
+            MoneyText(amount: row.headroom, font: Theme.figure(17, .semibold))
         case .exhausted:
             Text("Full").font(.subheadline).foregroundStyle(.secondary)
         case .granted:
             // The amount, not a status word: it is real relief the user is getting, and
             // the section heading already says it arrived without being claimed.
-            MoneyText(amount: row.allowed, font: .subheadline).foregroundStyle(.secondary)
+            MoneyText(amount: row.allowed, font: Theme.figure(17, .regular))
+                .foregroundStyle(.secondary)
         case .needsAnswer:
             Image(systemName: "questionmark.circle").foregroundStyle(.tint)
         case .needsDependent:

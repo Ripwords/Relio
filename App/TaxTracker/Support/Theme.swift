@@ -106,3 +106,24 @@ struct CategoryLabel: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// A section heading that reads as one.
+///
+/// The Reliefs list has grouped by status since it was written — needs an answer, no one
+/// to claim for, still claimable, granted, fully claimed — and the groups were invisible
+/// because a default grouped-list header is small grey capitals that the eye skips. The
+/// sections were doing real work and looked like nothing.
+struct SectionHeading: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .textCase(nil)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+    }
+}
