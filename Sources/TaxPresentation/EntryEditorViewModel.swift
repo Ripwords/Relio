@@ -82,6 +82,25 @@ public final class EntryEditorViewModel {
     private var storedVendor: String = ""
     private var storedSpentOn: Date?
 
+    /// What is attached to this entry. Empty for a new one — there is no entry to attach
+    /// to until it has been saved, which is why the section that shows these is hidden
+    /// until then.
+    public private(set) var documents: [DocumentDraft] = []
+
+    /// The last document removed, so the toast can put it back. Spec §11.6: removing a
+    /// receipt puts its claim back to unsupported, which is worth being able to undo.
+    public private(set) var lastRemovedDocument: DocumentDraft?
+
+    /// The document kinds this relief actually requires, best first.
+    ///
+    /// Offered as the default when attaching, because the one that satisfies the claim is
+    /// almost always the one the user is holding. `.other` is the fallback for a relief
+    /// the rulebook asks nothing for.
+    public var requiredDocumentKinds: [DocumentKind] {
+        guard let selectedCode, let rule = context.rule(for: selectedCode) else { return [] }
+        return rule.requiredDocuments
+    }
+
     public private(set) var availableCodes: [ReliefOption] = []
     public private(set) var availableDependents: [DependentOption] = []
 
@@ -152,6 +171,7 @@ public final class EntryEditorViewModel {
         selectedCode = existing.code
         amountText = existing.amount.formattedForEditing()
         originalAmount = existing.amount
+        await reloadDocuments()
         vendor = existing.vendor
         spentOn = existing.spentOn
         claimant = existing.claimant
@@ -165,6 +185,59 @@ public final class EntryEditorViewModel {
     /// can switch an entry that opened against an automatic relief onto a manual one,
     /// and a sticky flag would leave that form permanently unsaveable while citing a
     /// code it no longer holds.
+    /// Attaches a file that the caller has already written to disk.
+    ///
+    /// The bytes do not pass through here. `DocumentFileStore` writes them and reports a
+    /// hash and a byte count; this records that and links it to the entry, which is what
+    /// re-derives whether the claim is still short of a document.
+    @discardableResult
+    public func attachDocument(kind: DocumentKind,
+                               contentHash: String,
+                               byteCount: Int,
+                               uti: String,
+                               thumbnail: Data?) async -> Bool {
+        guard let editingID else { return false }
+        var draft = DocumentDraft(kind: kind,
+                                  vendor: vendor,
+                                  documentDate: spentOn,
+                                  thumbnail: thumbnail,
+                                  byteCount: byteCount,
+                                  contentHash: contentHash,
+                                  uti: uti)
+        draft.total = MoneyParsing.money(from: amountText)
+        do {
+            _ = try await store.attach(draft, toEntry: editingID)
+            await reloadDocuments()
+            await context.reload()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    public func removeDocument(id: UUID) async {
+        let removed = documents.first { $0.id == id }
+        try? await store.softDeleteDocument(id: id)
+        lastRemovedDocument = removed
+        await reloadDocuments()
+        await context.reload()
+    }
+
+    public func undoRemoveDocument() async {
+        guard let lastRemovedDocument else { return }
+        try? await store.restoreDocument(id: lastRemovedDocument.id)
+        self.lastRemovedDocument = nil
+        await reloadDocuments()
+        await context.reload()
+    }
+
+    public func clearDocumentUndo() { lastRemovedDocument = nil }
+
+    public func reloadDocuments() async {
+        guard let editingID else { documents = []; return }
+        documents = (try? await store.documentDrafts(forEntry: editingID)) ?? []
+    }
+
     public var readOnlyReason: String? {
         guard let selectedCode, Self.isAutomatic(selectedCode, in: context) else { return nil }
         return "\(reliefName(selectedCode)) is granted automatically from your household details. Any amount recorded here is ignored — edit your details instead."
@@ -232,6 +305,9 @@ public final class EntryEditorViewModel {
         public var headroom: Money
         /// How much of this entry would exceed the cap. Zero when it fits.
         public var overBy: Money
+        /// What would still be claimable once this entry is counted. `nil` until an
+        /// amount has been typed, and zero once the entry fills the cap.
+        public var remainingAfter: Money?
     }
 
     public var capGuidance: CapGuidance? {
@@ -250,10 +326,20 @@ public final class EntryEditorViewModel {
         let amount = MoneyParsing.money(from: amountText) ?? .zero
         let overBy = amount > headroom ? amount - headroom : .zero
 
+        // "RM 2,500.00 of this relief is still claimable" while an amount of 1,700 is on
+        // screen is true — that is the room excluding this entry — and reads as what will
+        // be left after it. What the user wants is the figure they will be on once they
+        // save, so it is computed here rather than left as arithmetic for them.
+        let typed = MoneyParsing.money(from: amountText)
+        let remainingAfter = typed.map { amount in
+            amount >= headroom ? Money.zero : headroom - amount
+        }
+
         return CapGuidance(cap: assessment.cap,
                            claimedElsewhere: claimedElsewhere,
                            headroom: headroom,
-                           overBy: overBy)
+                           overBy: overBy,
+                           remainingAfter: remainingAfter)
     }
 
     /// The relief as the user knows it, for a message the user reads.

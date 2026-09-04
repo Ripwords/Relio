@@ -126,6 +126,13 @@ struct RootView: View {
             if let delay = DemoHarness.delay {
                 try? await Task.sleep(for: .seconds(delay))
             }
+            // Needs a fetch, so it cannot live in the synchronous switch below. Opening a
+            // *saved* entry is the only way to see the documents section, which is hidden
+            // until an entry has an identity to attach to.
+            if DemoHarness.screen == "entry-existing",
+               let first = try? await store.entryDrafts(forYear: context.year).first {
+                path.append(EntryRoute(entryID: first.id))
+            }
             openDemoScreen()
             #endif
         }

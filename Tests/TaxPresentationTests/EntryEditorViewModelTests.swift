@@ -716,3 +716,123 @@ struct EntryEditorCapGuidanceTests {
         #expect(model.allowsDependent == true)
     }
 }
+
+/// Attaching a receipt is the half of the document loop that never existed. Home's prompt,
+/// the Docs tab and the relief detail's amber row could all say a claim was short of one,
+/// and nothing anywhere could stop them saying it.
+@Suite("Entry editor: documents") @MainActor struct EntryEditorDocumentTests {
+
+    static func editor(_ store: TaxStore, editing: UUID?) async -> EntryEditorViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = EntryEditorViewModel(context: context, store: store, editing: editing)
+        await model.load()
+        return model
+    }
+
+    static func seededEntry(_ store: TaxStore) async throws -> UUID {
+        try await store.save(EntryDraft(year: 2025, code: .lifestyle,
+                                        amount: Money(ringgit: 300), vendor: "Kinokuniya"))
+    }
+
+    /// A new entry has no identity to attach to. The section that offers it is hidden
+    /// until the entry is saved, and the model refuses rather than pretending.
+    @Test("a new entry has nothing to attach to")
+    func newEntryCannotAttach() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store, editing: nil)
+        #expect(model.documents.isEmpty)
+        let attached = await model.attachDocument(kind: .officialReceipt,
+                                                  contentHash: "abc", byteCount: 10,
+                                                  uti: "public.jpeg", thumbnail: nil)
+        #expect(attached == false)
+    }
+
+    @Test("attaching the required kind clears the claim's missing-document flag")
+    func attachingSatisfiesTheClaim() async throws {
+        let store = try await PresentationFixture.store()
+        let entryID = try await Self.seededEntry(store)
+        let model = await Self.editor(store, editing: entryID)
+        #expect(model.documents.isEmpty)
+
+        let attached = await model.attachDocument(kind: .officialReceipt,
+                                                  contentHash: "abc", byteCount: 10,
+                                                  uti: "public.jpeg", thumbnail: nil)
+        #expect(attached)
+        #expect(model.documents.count == 1)
+        #expect(try await store.entryDrafts(forYear: 2025).first?.needsDocument == false)
+    }
+
+    /// The relief's own requirement, offered as the default when attaching — the document
+    /// the user is holding is almost always the one that satisfies the claim.
+    @Test("the editor knows which kinds the relief asks for")
+    func requiredKindsComeFromTheRulebook() async throws {
+        let store = try await PresentationFixture.store()
+        let entryID = try await Self.seededEntry(store)
+        let model = await Self.editor(store, editing: entryID)
+        #expect(model.requiredDocumentKinds == [.officialReceipt])
+    }
+
+    @Test("removing a receipt is undoable, and the claim follows it both ways")
+    func removingIsUndoable() async throws {
+        let store = try await PresentationFixture.store()
+        let entryID = try await Self.seededEntry(store)
+        let model = await Self.editor(store, editing: entryID)
+        await model.attachDocument(kind: .officialReceipt, contentHash: "abc",
+                                   byteCount: 10, uti: "public.jpeg", thumbnail: nil)
+        let documentID = try #require(model.documents.first?.id)
+
+        await model.removeDocument(id: documentID)
+        #expect(model.documents.isEmpty)
+        #expect(model.lastRemovedDocument != nil)
+        #expect(try await store.entryDrafts(forYear: 2025).first?.needsDocument == true)
+
+        await model.undoRemoveDocument()
+        #expect(model.documents.count == 1)
+        #expect(try await store.entryDrafts(forYear: 2025).first?.needsDocument == false)
+    }
+}
+
+/// "RM 2,500.00 of this relief is still claimable" with an amount of 1,700 on screen is
+/// true — that is the room excluding this entry — and reads as what will be left after it.
+@Suite("Entry editor: what is left after this") @MainActor struct EntryEditorRemainderTests {
+
+    static func editor(_ store: TaxStore) async -> EntryEditorViewModel {
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = EntryEditorViewModel(context: context, store: store, editing: nil)
+        await model.load()
+        return model
+    }
+
+    @Test("no amount typed means no remainder to report yet")
+    func noAmountNoRemainder() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        #expect(model.capGuidance?.remainingAfter == nil)
+    }
+
+    @Test("the remainder is what is left once this entry is counted")
+    func remainderCountsThisEntry() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.amountText = "1000"
+        // Lifestyle is capped at RM 2,500 and nothing is claimed against it here.
+        #expect(model.capGuidance?.remainingAfter == Money(ringgit: 1_500))
+    }
+
+    /// Over the cap, the remainder is zero rather than negative — a negative ringgit
+    /// figure in a footnote reads as a debt, and the over-cap warning already says the
+    /// part that matters.
+    @Test("an amount past the cap leaves nothing, not a negative")
+    func overCapLeavesNothing() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await Self.editor(store)
+        model.selectedCode = .lifestyle
+        model.amountText = "9000"
+        #expect(model.capGuidance?.remainingAfter == .zero)
+        #expect(model.capGuidance?.overBy == Money(ringgit: 6_500))
+    }
+}
