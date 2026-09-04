@@ -123,6 +123,17 @@ struct HomeView: View {
         }
     }
 
+    @ViewBuilder
+    private var headlineLabel: some View {
+        Text(model.headlineKind == .taxSaved
+             ? "in tax still claimable"
+             : "of relief still claimable")
+        if model.headlineKind == .taxSaved {
+            Text("see the whole sum")
+                .foregroundStyle(.tint)
+        }
+    }
+
     /// What this year's relief is made of, by family.
     ///
     /// The bar is the app's one piece of chrome that is purely about orientation: it says
@@ -184,14 +195,14 @@ struct HomeView: View {
                 // Spec §11.3: rolling digits are motion. Reduce Motion swaps the value
                 // outright instead.
                 .contentTransition(reduceMotion ? .identity : .numericText())
-            HStack(spacing: 4) {
-                Text(model.headlineKind == .taxSaved
-                     ? "in tax still claimable"
-                     : "of relief still claimable")
-                if model.headlineKind == .taxSaved {
-                    Text("· see the whole sum")
-                        .foregroundStyle(.tint)
-                }
+            // Two Texts side by side cannot wrap as one sentence: each wraps on its own,
+            // and at the largest type sizes this broke "claimable" across a line as
+            // "claimabl / e" with the link fighting it for width. The same rule written on
+            // MoneyText, broken here because these are two labels rather than a label and
+            // a figure — it applies to any two runs of words sharing a line.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 4) { headlineLabel }
+                VStack(alignment: .leading, spacing: 2) { headlineLabel }
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
