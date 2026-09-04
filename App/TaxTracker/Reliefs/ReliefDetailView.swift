@@ -57,7 +57,7 @@ struct ReliefDetailView: View {
                     // without the other either hides a trim or overstates the claim.
                     labelled("Allowed", assessment.allowed)
                 } header: {
-                    Text("How that is worked out")
+                    SectionHeading("How that is worked out")
                 }
 
                 if let card = ReliefCopy.card(for: model.advice,
@@ -92,7 +92,7 @@ struct ReliefDetailView: View {
                             }
                         }
                     } header: {
-                        Text("To claim this")
+                        SectionHeading("To claim this")
                     } footer: {
                         if answerable.count < questions.count {
                             // Names where, rather than leaving the user to wonder which
@@ -104,15 +104,17 @@ struct ReliefDetailView: View {
                 }
 
                 if case .ineligible(let reasons) = assessment.eligibility {
-                    Section("Why you cannot claim this") {
+                    Section {
                         ForEach(reasons, id: \.self) { reason in
                             Label(reason, systemImage: "xmark.circle")
                         }
+                    } header: {
+                        SectionHeading("Why you cannot claim this")
                     }
                 }
 
                 if !model.subLimits.isEmpty {
-                    Section("Within this relief") {
+                    Section {
                         ForEach(model.subLimits) { child in
                             NavigationLink(value: child.code) {
                                 AdaptiveRow {
@@ -136,20 +138,24 @@ struct ReliefDetailView: View {
                                 }
                             }
                         }
+                    } header: {
+                        SectionHeading("Within this relief")
                     }
                 }
 
                 if !model.requirements.isEmpty {
-                    Section("Documents") {
+                    Section {
                         ForEach(model.requirements, id: \.kind) { check in
                             Label(ReliefCopy.text(for: check.kind),
                                   systemImage: check.isSatisfied ? "checkmark.circle" : "exclamationmark.circle")
                                 .foregroundStyle(check.isSatisfied ? Color.primary : Color.orange)
                         }
+                    } header: {
+                        SectionHeading("Documents")
                     }
                 }
 
-                Section("Entries") {
+                Section {
                     // The screen says RM 800 is still claimable and, until now, offered no
                     // way to claim it: the only route to a new entry was Home's + button,
                     // which opens an empty editor and asks the user to find this relief
@@ -205,11 +211,13 @@ struct ReliefDetailView: View {
                                         }
                                     }
                                     Spacer()
-                                    MoneyText(amount: entry.amount, font: .subheadline)
+                                    MoneyText(amount: entry.amount, font: Theme.figure(15, .medium))
                                 }
                             }
                         }
                     }
+                } header: {
+                    SectionHeading("Entries")
                 }
 
                 // Spec §13: the disclaimer is not conditional on the relief happening to
@@ -293,19 +301,23 @@ struct ReliefDetailView: View {
     @ViewBuilder
     private func headline(_ assessment: ReliefAssessment) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            if let category = ReliefCategory(model.code) {
+                CategoryLabel(category: category)
+                    .padding(.bottom, 2)
+            }
             if case .needsInfo = assessment.eligibility {
                 // The same overstatement Home was fixed out of, one screen in. This
                 // relief's headroom is its whole cap because nothing is claimed against
                 // it — and nothing can be, until the question below is answered. Calling
                 // that "still claimable" tells someone who is not registered with JKM
                 // that they have RM 7,000 waiting for them.
-                MoneyText(amount: assessment.headroom, font: .largeTitle, weight: .bold)
+                MoneyText(amount: assessment.headroom, font: Theme.figure(34), weight: .bold)
                     .foregroundStyle(.secondary)
                 Text("if this relief applies to you")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else if assessment.headroom > .zero {
-                MoneyText(amount: assessment.headroom, font: .largeTitle, weight: .bold)
+                MoneyText(amount: assessment.headroom, font: Theme.figure(34), weight: .bold)
                 Text("still claimable")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -340,7 +352,7 @@ struct ReliefDetailView: View {
                 // Granted, not claimed. "You have used all of this relief" credits the
                 // user with an action they did not take, and sat directly above "Nothing
                 // logged for this relief yet".
-                MoneyText(amount: assessment.allowed, font: .largeTitle, weight: .bold)
+                MoneyText(amount: assessment.allowed, font: Theme.figure(34), weight: .bold)
                 Text("granted automatically")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -369,11 +381,11 @@ struct ReliefDetailView: View {
             HStack {
                 Text(title)
                 Spacer()
-                MoneyText(amount: amount, font: .body, weight: .medium)
+                MoneyText(amount: amount, font: Theme.figure(17, .medium))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                MoneyText(amount: amount, font: .body, weight: .medium)
+                MoneyText(amount: amount, font: Theme.figure(17, .medium))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
