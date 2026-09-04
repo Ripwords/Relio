@@ -49,9 +49,9 @@ struct DocumentsView: View {
                             }
                         }
                     } header: {
-                        Text(model.outstanding.count == 1
-                             ? "1 claim needs a document"
-                             : "\(model.outstanding.count) claims need documents")
+                        SectionHeading(model.outstanding.count == 1
+                                       ? "1 claim needs a document"
+                                       : "\(model.outstanding.count) claims need documents")
                     } footer: {
                         // The stake, stated once. Not a per-row figure: repeating it on
                         // every row would read as eight separate risks rather than one
@@ -83,16 +83,26 @@ struct DocumentRowView: View {
         AdaptiveRow {
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.vendor.isEmpty ? "Untitled entry" : row.vendor)
-                Text(row.shortName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.body.weight(.medium))
+                HStack(spacing: 6) {
+                    // The family, so a worklist of seven claims can be scanned by area
+                    // rather than read line by line.
+                    if let category = ReliefCategory(row.code) {
+                        Circle()
+                            .fill(Theme.tint(category))
+                            .frame(width: 7, height: 7)
+                    }
+                    Text(row.shortName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 // What to go and find. The whole point of the screen.
                 Text(missingList)
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
         } trailing: {
-            MoneyText(amount: row.amount, font: .subheadline, weight: .semibold)
+            MoneyText(amount: row.amount, font: Theme.figure(17, .semibold))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)

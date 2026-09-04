@@ -42,7 +42,7 @@ struct CompareView: View {
                                                   comparisonYear: model.comparisonYear)
                         }
                     } header: {
-                        Text("What moved for you")
+                        SectionHeading("What moved for you")
                     } footer: {
                         Text("Reliefs you claimed that the two years treat differently.")
                     }
@@ -60,7 +60,7 @@ struct CompareView: View {
                             .accessibilityElement(children: .combine)
                         }
                     } header: {
-                        Text("Other changes")
+                        SectionHeading("Other changes")
                     } footer: {
                         // Says why they carry no figure, so their absence does not read
                         // as the app failing to price them.
@@ -106,8 +106,7 @@ struct CompareView: View {
                 // into "RM 500.00 | more" over "relief" at the largest type sizes — the
                 // same break the entry editor's cap note and Home's unlock row had.
                 Text("\(model.headlineAmount.formatted()) more relief")
-                    .font(.title2.weight(.bold))
-                    .monospacedDigit()
+                    .font(Theme.figure(22))
                 if let tax = model.headlineTax {
                     Text("\(tax.formatted()) in tax")
                         .font(.subheadline.weight(.semibold))

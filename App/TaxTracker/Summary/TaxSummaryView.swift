@@ -24,7 +24,7 @@ struct TaxSummaryView: View {
                 line("Relief allowed", summary.reliefAllowed, subtracted: true)
                 line("Chargeable income", summary.chargeableIncome, emphasised: true)
             } header: {
-                Text("In \(String(year))")
+                SectionHeading("In \(String(year))")
             } footer: {
                 Text("Relief comes off your income before tax is worked out. Chargeable income is what is left.")
             }
@@ -69,7 +69,9 @@ struct TaxSummaryView: View {
                 if subtracted {
                     Text("−").foregroundStyle(.secondary)
                 }
-                MoneyText(amount: amount, weight: emphasised ? .semibold : .regular)
+                MoneyText(amount: amount,
+                          font: Theme.figure(emphasised ? 20 : 17,
+                                             emphasised ? .semibold : .regular))
             }
         }
         .accessibilityElement(children: .ignore)
