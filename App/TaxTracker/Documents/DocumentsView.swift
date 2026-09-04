@@ -7,9 +7,11 @@ import TaxPresentation
 ///
 /// It replaces a `ContentUnavailableView` reading "Receipt capture arrives in a later
 /// release" — a whole tab spent telling the user about something that does not exist.
-/// Capture genuinely is not built, and this screen does not pretend otherwise. What it
-/// does is name the claims LHDN would ask questions about and the document each one
-/// needs, which is the part someone can act on today with a drawer and a scanner.
+///
+/// Each row opens its entry, where the document can now be attached. The screen is a
+/// worklist: what is outstanding, biggest claim first, and one tap to the place that
+/// clears it. OCR and MyInvois e-invoices are still to come; picking a photo or a file is
+/// not.
 struct DocumentsView: View {
 
     @State private var model: DocumentsViewModel

@@ -23,13 +23,12 @@ public struct OutstandingDocument: Hashable, Sendable, Identifiable {
 /// What the Docs tab shows.
 ///
 /// The tab was a placeholder reading "Receipt capture arrives in a later release", and
-/// Home's "8 claims need documents" prompt pointed at nothing at all. Capture really is
-/// not built — but the requirement checks that decide whether a claim is complete have
-/// been built and tested since the first plan, and their answer was reaching no one.
+/// Home's "8 claims need documents" prompt pointed at nothing at all — while the
+/// requirement checks that decide whether a claim is complete had been built and tested
+/// since the first plan, reaching no one.
 ///
-/// So this screen does the part that can be done honestly: it names each claim and the
-/// document it still needs. That is what someone needs before they go through a drawer or
-/// an email archive, and it does not promise an attachment flow that does not exist.
+/// A worklist, then: each claim, the document it still needs, biggest first, and a tap
+/// through to the entry where it can be attached.
 @MainActor
 @Observable
 public final class DocumentsViewModel {

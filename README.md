@@ -26,7 +26,8 @@ and for what remains unverified.
 | iOS app — Home, Reliefs, entry CRUD, Income, onboarding | ✅ Built; every screen read on the simulator |
 | Settings, Compare, Documents outstanding, Dependants, Tax summary | ✅ Built and read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
-| Receipt capture, OCR, MyInvois e-invoices | Not started — the Docs tab lists what each claim still needs, but nothing can attach one yet |
+| Attaching a receipt (photo or file), local file store | ✅ Built and read on the simulator |
+| OCR, MyInvois e-invoices, iCloud Drive file sync | Not started — files are kept on one device |
 | On-device AI assistant | Not started |
 | iPad | Runs, and every screen is usable; not the three-column layout spec §11 describes |
 | watchOS, macOS, widgets | Not started |
