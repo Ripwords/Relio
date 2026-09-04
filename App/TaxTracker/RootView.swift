@@ -17,6 +17,10 @@ struct RootView: View {
     /// tab's view builder would be replaced by a fresh empty one on every re-render.
     @State private var documents: DocumentsViewModel
     @State private var selectedTab: Tab = .home
+    /// The relief the iPad's detail column is showing. Unused on iPhone, where a relief
+    /// is pushed onto a stack instead.
+    @State private var selectedRelief: ReliefCode?
+    @State private var columns = NavigationSplitViewVisibility.all
     /// Ties a relief row to the detail screen it opens. See `ReliefsListView.namespace`.
     @Namespace private var reliefTransition
     @Namespace private var homeReliefTransition
@@ -32,6 +36,7 @@ struct RootView: View {
     @State private var needsOnboarding: Bool?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
     init(store: TaxStore) {
@@ -52,7 +57,25 @@ struct RootView: View {
     /// `ContentUnavailableView` placeholders describing features that do not exist, which
     /// spent two thirds of the tab bar on apologies. Reliefs takes the Ask tab's place: it
     /// is a primary surface that was reachable only through Home's "See all" link.
-    private enum Tab: Hashable { case home, reliefs, docs }
+    private enum Tab: Hashable, CaseIterable {
+        case home, reliefs, docs
+
+        var title: String {
+            switch self {
+            case .home: "Home"
+            case .reliefs: "Reliefs"
+            case .docs: "Docs"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .home: "house"
+            case .reliefs: "list.bullet.rectangle"
+            case .docs: "doc.text"
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -62,7 +85,15 @@ struct RootView: View {
                     Task { await context.reload(); await home.refresh() }
                 }
             } else if needsOnboarding == false {
-                tabs
+                // Spec §11 draws iPhone as three tabs over the content and iPad as a
+                // sidebar, a list and a detail column side by side. The size class is the
+                // honest test rather than the idiom: an iPad in a narrow split window is a
+                // compact width and wants the tab bar too.
+                if horizontalSizeClass == .compact {
+                    tabs
+                } else {
+                    splitView
+                }
             } else {
                 ProgressView()
             }
@@ -140,7 +171,16 @@ struct RootView: View {
                                                 amount: Money(ringgit: Decimal(ringgit))))
             }
         case let name where name.hasPrefix("relief:"):
-            path.append(ReliefCode(String(name.dropFirst("relief:".count))))
+            let code = ReliefCode(String(name.dropFirst("relief:".count)))
+            // Two layouts, two destinations. On iPhone a relief is pushed onto the stack;
+            // on iPad it fills the split view's detail column, which the path does not
+            // feed.
+            if horizontalSizeClass == .compact {
+                path.append(code)
+            } else {
+                selectedTab = .reliefs
+                selectedRelief = code
+            }
         default:
             print("[DemoHarness] unknown screen '\(screen)'")
         }
@@ -210,6 +250,138 @@ struct RootView: View {
                 Text("YA \(String(context.year))").fontWeight(.semibold)
                 Image(systemName: "chevron.down").font(.caption2)
             }
+        }
+    }
+
+    /// Spec §11's iPad shape: a sidebar of destinations, the chosen one's list, and the
+    /// relief detail beside it rather than on top of it.
+    ///
+    /// The detail column is shared by every tab. Selecting a relief from the Reliefs list
+    /// or from Home's opportunities fills the same column, which is the point of the
+    /// layout — the list stays visible and the selection stays highlighted while the
+    /// figures are read.
+    private var splitView: some View {
+        NavigationSplitView(columnVisibility: $columns) {
+            // Buttons with an explicit selected background, not `List(selection:)`:
+            // every single-selection `List` initialiser taking a `Binding<Value?>` is
+            // unavailable on iOS in this SDK.
+            List {
+                ForEach(Tab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        HStack {
+                            Label(tab.title, systemImage: tab.symbol)
+                                .foregroundStyle(selectedTab == tab ? Color.accentColor : .primary)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(selectedTab == tab
+                                       ? Color.accentColor.opacity(0.12)
+                                       : Color.clear)
+                    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+                }
+            }
+            .navigationTitle("Relio")
+            .toolbar {
+                ToolbarItem(placement: .principal) { yearMenu(canCompare: true) }
+            }
+        } content: {
+            NavigationStack(path: $path) {
+                splitContent
+                    .navigationDestination(for: IncomeRoute.self) { _ in IncomeView(model: income) }
+                    .navigationDestination(for: EntryHistoryRoute.self) { route in
+                        EntryHistoryView(store: store, year: context.year,
+                                         restrictedTo: route.restrictedTo)
+                    }
+                    .navigationDestination(for: SettingsRoute.self) { _ in
+                        SettingsView(context: context, store: store) {
+                            Task { await home.refresh(); await documents.refresh() }
+                        }
+                    }
+                    .navigationDestination(for: DependentsRoute.self) { _ in
+                        DependentsView(model: DependentsViewModel(context: context,
+                                                                  store: store)) {
+                            Task { await home.refresh(); await documents.refresh() }
+                        }
+                    }
+                    .navigationDestination(for: CompareRoute.self) { _ in
+                        CompareView(model: CompareViewModel(store: store,
+                                                            loader: BundledRuleSetLoader(),
+                                                            baselineYear: context.year))
+                    }
+                    .navigationDestination(for: TaxSummaryRoute.self) { _ in
+                        if let result = context.result, let summary = TaxSummary(result) {
+                            TaxSummaryView(summary: summary, year: context.year)
+                        }
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            NavigationLink(value: SettingsRoute()) {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityLabel("Settings")
+                        }
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                editingEntry = EntryEditorViewModel(context: context,
+                                                                    store: store, editing: nil)
+                            } label: { Image(systemName: "plus") }
+                                .accessibilityLabel("Add an entry")
+                        }
+                    }
+            }
+        } detail: {
+            NavigationStack {
+                if let selectedRelief {
+                    ReliefDetailView(model: ReliefDetailViewModel(context: context,
+                                                                  store: store,
+                                                                  code: selectedRelief),
+                                     context: context,
+                                     store: store)
+                    .id(selectedRelief)
+                } else {
+                    // Not a failure — the third column simply has nothing chosen yet, and
+                    // saying so beats an empty panel the reader has to interpret.
+                    ContentUnavailableView("No relief chosen",
+                                           systemImage: "hand.tap",
+                                           description: Text("Pick one from the list to see its cap, what you have claimed and what LHDN asks for."))
+                }
+            }
+        }
+        .sheet(item: $editingEntry) { model in
+            EntryEditorView(model: model, presentation: .sheet,
+                            onSaved: handleSaved, onDeleted: handleDeleted)
+        }
+        .overlay(alignment: .bottom) {
+            if showUndo, let lastDeleted {
+                UndoToast(message: "Entry deleted",
+                          undo: {
+                              await lastDeleted.undoDelete()
+                              await home.refresh()
+                              await documents.refresh()
+                          },
+                          isPresented: $showUndo)
+                .padding(.bottom, 24)
+            }
+        }
+        .animation(reduceMotion ? nil : .spring(duration: 0.3), value: showUndo)
+    }
+
+    /// The middle column: whichever destination the sidebar has selected.
+    @ViewBuilder
+    private var splitContent: some View {
+        switch selectedTab {
+        case .home:
+            content
+        case .reliefs:
+            ReliefsListView(model: ReliefsListViewModel(context: context),
+                            namespace: reliefTransition,
+                            selection: $selectedRelief)
+        case .docs:
+            DocumentsView(model: documents)
         }
     }
 

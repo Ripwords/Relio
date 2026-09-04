@@ -19,21 +19,60 @@ struct ReliefsListView: View {
     /// namespace effect does not cross one. It also honours Reduce Motion itself.
     let namespace: Namespace.ID
 
-    init(model: ReliefsListViewModel, namespace: Namespace.ID) {
+    /// Where a tapped relief goes.
+    ///
+    /// `nil` on iPhone: the row is a `NavigationLink` and the detail is pushed onto the
+    /// stack. Bound on iPad, where spec §11 draws the detail as a third column beside this
+    /// list rather than on top of it — so the row sets a selection and the split view
+    /// renders the detail itself.
+    let selection: Binding<ReliefCode?>?
+
+    init(model: ReliefsListViewModel,
+         namespace: Namespace.ID,
+         selection: Binding<ReliefCode?>? = nil) {
         _model = State(initialValue: model)
         self.namespace = namespace
+        self.selection = selection
     }
 
     var body: some View {
         @Bindable var model = model
-        return List {
-            ForEach(model.sections) { section in
-                Section(section.title) {
-                    ForEach(section.rows) { row in
-                        NavigationLink(value: row.code) {
-                            ReliefRowView(row: row)
+        return Group {
+            if let selection {
+                // Buttons with an explicit selected background rather than
+                // `List(selection:)`, which is unavailable on iOS for a single optional
+                // binding. The row still has to look and read as chosen, because the
+                // detail beside it is the consequence of that choice.
+                List {
+                    ForEach(model.sections) { section in
+                        Section(section.title) {
+                            ForEach(section.rows) { row in
+                                Button {
+                                    selection.wrappedValue = row.code
+                                } label: {
+                                    ReliefRowView(row: row).contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(selection.wrappedValue == row.code
+                                                   ? Color.accentColor.opacity(0.12)
+                                                   : Color.clear)
+                                .accessibilityAddTraits(selection.wrappedValue == row.code
+                                                        ? .isSelected : [])
+                            }
                         }
-                        .matchedTransitionSource(id: row.code, in: namespace)
+                    }
+                }
+            } else {
+                List {
+                    ForEach(model.sections) { section in
+                        Section(section.title) {
+                            ForEach(section.rows) { row in
+                                NavigationLink(value: row.code) {
+                                    ReliefRowView(row: row)
+                                }
+                                .matchedTransitionSource(id: row.code, in: namespace)
+                            }
+                        }
                     }
                 }
             }
