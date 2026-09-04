@@ -44,31 +44,35 @@ public enum ReliefCategory: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Where each family's colour comes from, as a light/dark pair of sRGB components.
+    /// Where each family's colour comes from, as light/dark sRGB components in 0...255.
     ///
     /// Drawn from Malaysian ringgit notes rather than picked to look nice: the RM1 blue,
     /// the RM10 red, the RM50 turquoise, the RM100 purple. It is the one palette a
     /// Malaysian taxpayer already associates with money, which is what makes it a choice
     /// about this app rather than a set of pleasant hues.
     ///
+    /// Integer components, not the fractions a colour API wants. The package bans `Double`
+    /// in every source file — deliberately a blanket scan rather than a list of money
+    /// paths — and a colour is not worth being the exception that softens that rule. The
+    /// app divides by 255 at the point it builds the `Color`.
+    ///
     /// Held here rather than in the view layer because the mapping from family to hue is a
-    /// decision, not a rendering detail, and this is where the families are defined. The
-    /// `Color` itself is built in the app, which is the only target that can.
-    public var tint: (light: (red: Double, green: Double, blue: Double),
-                      dark: (red: Double, green: Double, blue: Double)) {
+    /// decision, not a rendering detail, and this is where the families are defined.
+    public var tint: (light: (red: Int, green: Int, blue: Int),
+                      dark: (red: Int, green: Int, blue: Int)) {
         switch self {
         // RM1 blue.
-        case .you: ((0.145, 0.388, 0.659), (0.404, 0.612, 0.855))
+        case .you: ((37, 99, 168), (103, 156, 218))
         // RM10 red, warmed so it reads as a family rather than an alarm.
-        case .children: ((0.788, 0.278, 0.341), (0.925, 0.478, 0.529))
+        case .children: ((201, 71, 87), (236, 122, 135))
         // RM50 turquoise.
-        case .health: ((0.055, 0.518, 0.475), (0.259, 0.729, 0.678))
+        case .health: ((14, 132, 121), (66, 186, 173))
         // The gold of the RM50's foil band.
-        case .learning: ((0.702, 0.475, 0.086), (0.902, 0.678, 0.290))
+        case .learning: ((179, 121, 22), (230, 173, 74))
         // RM20 orange, taken down to a clay.
-        case .living: ((0.659, 0.333, 0.212), (0.878, 0.549, 0.412))
+        case .living: ((168, 85, 54), (224, 140, 105))
         // RM100 purple.
-        case .saving: ((0.420, 0.310, 0.659), (0.635, 0.545, 0.867))
+        case .saving: ((107, 79, 168), (162, 139, 221))
         }
     }
 

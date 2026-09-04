@@ -22,7 +22,13 @@ enum Theme {
         let (light, dark) = category.tint
         return Color(uiColor: UIColor { trait in
             let c = trait.userInterfaceStyle == .dark ? dark : light
-            return UIColor(red: c.red, green: c.green, blue: c.blue, alpha: 1)
+            // The taxonomy holds 0...255 integers because the package bans Double in its
+            // own sources; the division belongs here, in the only target that needs the
+            // fraction.
+            return UIColor(red: CGFloat(c.red) / 255,
+                           green: CGFloat(c.green) / 255,
+                           blue: CGFloat(c.blue) / 255,
+                           alpha: 1)
         })
     }
 
