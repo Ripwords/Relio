@@ -129,6 +129,23 @@ struct RootView: View {
             // Needs a fetch, so it cannot live in the synchronous switch below. Opening a
             // *saved* entry is the only way to see the documents section, which is hidden
             // until an entry has an identity to attach to.
+            if DemoHarness.wantsAttachment,
+               let entry = try? await store.entryDrafts(forYear: context.year).first,
+               let data = DemoHarness.sampleReceiptData(),
+               let files = try? DocumentFileStore(),
+               let stored = try? files.write(data, extension: "jpg") {
+                let draft = DocumentDraft(kind: .officialReceipt,
+                                          vendor: entry.vendor,
+                                          documentDate: entry.spentOn,
+                                          thumbnail: data,
+                                          byteCount: stored.byteCount,
+                                          contentHash: stored.contentHash,
+                                          uti: "public.jpeg")
+                _ = try? await store.attach(draft, toEntry: entry.id)
+                await context.reload()
+                await home.refresh()
+                await documents.refresh()
+            }
             if DemoHarness.screen == "entry-existing",
                let first = try? await store.entryDrafts(forYear: context.year).first {
                 path.append(EntryRoute(entryID: first.id))
