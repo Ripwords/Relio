@@ -41,6 +41,7 @@ screen above it.
 | `DependentDraft` and the whole dependant model | nothing in the app could add one, so five child reliefs were unclaimable |
 | `verifiedOn` (spec §13 mitigation) | nowhere — there was no Settings screen |
 | `softDeleteIncomeSource` | no restore existed, so spec §11.6's undo could not be honoured |
+| `Document`, `DocumentFile`, `documentKinds`, `refreshDerivedFields` | every part of the attach loop except the attach — three screens could say a claim was short of a receipt and nothing could supply one |
 
 ### 2. A zero rendered as an achievement
 
@@ -98,5 +99,29 @@ waiting to trip over them. `NewUserJourneyTests` now covers all three paths.
 - **VoiceOver and Reduce Motion.** The labels are unit-tested and read correct; nobody has
   heard them. This one is genuinely blocked — the simulator control tool cannot toggle
   either, and there is no device.
-- **Receipt capture.** The Docs tab names the documents each claim needs and cannot attach
-  one, which is said plainly on the screen.
+- ~~**Receipt capture.**~~ Attaching is built: photo library or Files, a content-addressed
+  local file store, a ~30 KB thumbnail on the record, removal undoable. **OCR, MyInvois
+  e-invoice parsing and the iCloud Drive file store are not** — files live on one device,
+  which is what the app already is and what Settings already says.
+- **The pickers themselves are untapped.** `PhotosPicker` and `fileImporter` need system
+  UI. Everything they hand to is exercised by `-relio-attach`, which generates a real JPEG
+  and drives the rest of the chain.
+
+---
+
+## Postscript: two "impossible" things that were not
+
+Twice I recorded a limitation and twice it turned out to be narrower than stated.
+
+**"The transition cannot be watched."** True that the simulator cannot be tapped; false
+that the animation could not be seen. Navigation can be fired programmatically, and a
+screen recording does not need anyone to tap. `-relio-delay` postpones the push so the
+recording is already rolling; the extracted frames show the detail growing out of the row.
+
+**"Receipt capture is a whole pipeline."** True of spec §9 entire — OCR, MyInvois QR,
+iCloud Drive. False of the part that closes the loop: attaching a file so the requirement
+check passes is a store method, a file store and a form section, and the rest of the
+pipeline can arrive later without changing any of it.
+
+The pattern in both: a real constraint was allowed to stand for a larger one. Worth
+checking what exactly is blocked before recording something as blocked.
