@@ -102,6 +102,9 @@ extension EntryEditorViewModel {
 
     /// Attaches the waiting receipt to the entry just saved.
     func attachPendingReceipt(to entryID: UUID) async -> Bool {
+        // Mutates a local copy, not `pendingReceipt` itself: on failure `self.pendingReceipt`
+        // is left exactly as it was, so a retry recomputes `kind`/`vendor`/etc. below from
+        // whatever the form holds by then, not from what it held at the failed attempt.
         guard var pending = pendingReceipt else { return true }
         // The relief decides which document this counts as; a QR never does.
         pending.draft.kind = requiredDocumentKinds.first ?? .officialReceipt

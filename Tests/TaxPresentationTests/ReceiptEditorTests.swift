@@ -148,6 +148,52 @@ import TaxCapture
         #expect(try await store.documentDrafts(forEntry: model.newEntryID).count == 1)
     }
 
+    /// `TaxStore.save`'s upsert always revives the entry (`deletedAt = nil`) before `save()`
+    /// can reach `attachPendingReceipt`, so a single, sequential call to `save()` can never
+    /// itself observe the entry missing when the attach runs — the race this guards against
+    /// (another device's sync removing the entry between the entry save and the attach) can
+    /// only land between the two `await`s inside `save()`'s own body, which a test cannot
+    /// reach without racing it. `attachPendingReceipt` is the exact call `save()` makes for
+    /// that second step, so calling it directly with a real, rejected id reproduces the same
+    /// `TaxStore.attach` throw `save()` would hit, with no mock involved.
+    @Test("a failed attach keeps the entry and the receipt, and a retry finishes both")
+    func failedAttachKeepsEntryAndReceiptThenRetries() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let model = await ReceiptFixture.newEditor(store)
+        #expect(await model.prefill(from: ReceiptFixture.reading(), files: files))
+        await model.load()
+        model.selectedCode = .lifestyle
+
+        // The entry itself, saved exactly as `save()`'s first step would save it.
+        #expect(try await store.save(EntryDraft(id: model.newEntryID, year: 2025, code: .lifestyle,
+                                                amount: Money(sen: 7_190),
+                                                vendor: "MPH BOOKSTORES SDN BHD",
+                                                spentOn: ReceiptFixture.day(2025, 3, 7)))
+                == model.newEntryID)
+
+        // (a) + (c): attach a real id `TaxStore.attach` rejects — the entry is not it.
+        let ok = await model.attachPendingReceipt(to: UUID())
+        #expect(ok == false)
+        #expect(model.attachFailed)
+        #expect(model.hasPendingReceipt, "the pending receipt is kept, not dropped")
+
+        // (b) the entry itself stays saved: the failed attach targeted a different id.
+        let entries = try await store.entryDrafts(forYear: 2025)
+        #expect(entries.count == 1)
+        #expect(entries.first?.id == model.newEntryID)
+
+        // (d) retry: `save()` re-targets the real entry, and the still-pending receipt
+        // attaches — one entry, one document, `attachFailed` cleared.
+        #expect(await model.save())
+        #expect(model.attachFailed == false)
+        #expect(model.hasPendingReceipt == false)
+        let entriesAfter = try await store.entryDrafts(forYear: 2025)
+        #expect(entriesAfter.count == 1)
+        #expect(entriesAfter.first?.id == model.newEntryID)
+        #expect(try await store.documentDrafts(forEntry: model.newEntryID).count == 1)
+    }
+
     @Test("cancelling deletes a file nothing else uses")
     func cancelDeletesAnUnusedFile() async throws {
         let store = try await PresentationFixture.store()
