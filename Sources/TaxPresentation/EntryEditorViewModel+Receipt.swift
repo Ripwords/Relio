@@ -138,14 +138,26 @@ extension EntryEditorViewModel {
         // Asked before attaching, so this entry's own new document is not what it finds.
         await warnIfAlreadySupporting(hash: stored.contentHash, uuid: reading.eInvoiceUUID,
                                       excluding: editingID)
+        let documentID: UUID
         do {
-            _ = try await store.attach(draft, toEntry: editingID)
+            documentID = try await store.attach(draft, toEntry: editingID)
         } catch {
             if (try? await store.isFileReferenced(hash: stored.contentHash)) == false {
                 try? files.delete(hash: stored.contentHash,
                                   extension: reading.document.fileExtension)
             }
             return .couldNotAttach
+        }
+
+        // M9: the same e-invoice UUID, already on this entry as a different file, is
+        // `store.attach` returning the *existing* document rather than storing this one —
+        // the file just written above is then referenced by nothing, and would sit on disk
+        // forever if left there.
+        if let existing = try? await store.documentDrafts(forEntry: editingID)
+            .first(where: { $0.id == documentID }),
+           existing.contentHash != stored.contentHash,
+           (try? await store.isFileReferenced(hash: stored.contentHash)) == false {
+            try? files.delete(hash: stored.contentHash, extension: reading.document.fileExtension)
         }
 
         receiptAmountOffer = reading.total.flatMap { $0.isConfirmed ? $0.value : nil }
@@ -174,6 +186,12 @@ extension EntryEditorViewModel {
     }
 
     /// Attaches the waiting receipt to the entry just saved.
+    ///
+    /// M9 does not apply here: the orphaned-file case needs a *second* e-invoice write to
+    /// land on an entry that already carries the first one under a different hash, and
+    /// `entryID` here is `newEntryID` — a fresh id this editor has never saved before, so
+    /// `entry.documents` is always empty when `store.attach` below runs. There is nothing
+    /// yet for the dedupe to fall back to.
     func attachPendingReceipt(to entryID: UUID) async -> Bool {
         // Mutates a local copy, not `pendingReceipt` itself: on failure `self.pendingReceipt`
         // is left exactly as it was, so a retry recomputes `kind`/`vendor`/etc. below from

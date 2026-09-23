@@ -421,6 +421,52 @@ struct ReceiptAttachTests {
         #expect(ReceiptFixture.fileExists(files, bytes: "receipt-one") == false)
     }
 
+    /// M9. `store.attach` dedupes a second e-invoice by UUID onto the first document
+    /// without ever storing the second file's hash — but this view model had already
+    /// written that second file to disk before calling it, and nothing then removed it.
+    @Test("re-attaching the same e-invoice as a different file deletes the orphaned write")
+    func reAttachedEInvoiceDeletesTheOrphanedFile() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let model = try await Self.savedEditor(store)
+
+        let first = await model.attach(
+            ReceiptFixture.reading(bytes: "receipt-a", eInvoiceUUID: "UUID0000001"), files: files)
+        #expect(first == .attached)
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-a"))
+
+        let second = await model.attach(
+            ReceiptFixture.reading(bytes: "receipt-b", eInvoiceUUID: "UUID0000001"), files: files)
+        #expect(second == .attached)
+        #expect(model.documents.count == 1, "the same e-invoice is one document")
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-a"),
+                "still the document's own file")
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-b") == false,
+                "the second write, deduped away, would otherwise never be cleaned up")
+    }
+
+    /// The orphan only arises when `store.attach` keeps an *existing* document's file over
+    /// the one just written. A file another live document still references is not that.
+    @Test("re-attaching the same e-invoice keeps the file if something else also references it")
+    func reAttachedEInvoiceKeepsAFileAnotherDocumentUses() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let holder = try await Self.savedEditor(store, ringgit: 230)
+        #expect(await holder.attach(
+            ReceiptFixture.reading(bytes: "receipt-b"), files: files) == .attached)
+
+        let model = try await Self.savedEditor(store)
+        #expect(await model.attach(
+            ReceiptFixture.reading(bytes: "receipt-a", eInvoiceUUID: "UUID0000001"),
+            files: files) == .attached)
+        #expect(await model.attach(
+            ReceiptFixture.reading(bytes: "receipt-b", eInvoiceUUID: "UUID0000001"),
+            files: files) == .attached)
+
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-b"),
+                "holder's own document still references this hash")
+    }
+
     @Test("the entry vanishes before the attach: the file is kept when another document uses it")
     func vanishedEntryKeepsAFileAnotherDocumentUses() async throws {
         let store = try await PresentationFixture.store()
