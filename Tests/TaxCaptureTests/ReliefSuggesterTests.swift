@@ -85,4 +85,11 @@ import TaxKit
             }
         }
     }
+
+    @Test("PTPTN loan repayment carries no relief")
+    func ptptnNoRelief() throws {
+        #expect(ReliefSuggester.suggest(vendor: "PERBADANAN TABUNG PENDIDIKAN TINGGI NASIONAL",
+                                        text: "PTPTN LOAN REPAYMENT",
+                                        in: try Self.rules(2025)).isEmpty)
+    }
 }

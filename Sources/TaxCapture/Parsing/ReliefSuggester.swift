@@ -37,7 +37,7 @@ public enum ReliefSuggester {
         Row(keywords: ["UNIVERSITI", "UNIVERSITY", "KOLEJ", "COLLEGE", "YURAN PENGAJIAN",
                        "TUITION FEE"],
             codes: [.educationSelf]),
-        Row(keywords: ["SSPN", "PTPTN"], codes: [.sspn]),
+        Row(keywords: ["SSPN"], codes: [.sspn]),
         Row(keywords: ["BREAST PUMP", "PAM SUSU"], codes: [.breastfeeding]),
         Row(keywords: ["INSURANCE", "INSURANS", "TAKAFUL"],
             codes: [.insuranceEduMedical, .lifeInsurance]),
