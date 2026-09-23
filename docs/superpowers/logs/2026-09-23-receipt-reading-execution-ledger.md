@@ -3,7 +3,7 @@
 Spec: `docs/superpowers/specs/2026-09-23-receipt-reading-design.md`
 Branch: `feat/receipt-reading`, worktree `.claude/worktrees/receipt-reading`, from `master` at
 `9476a18`.
-Commit range: `git log --oneline 9476a18..HEAD` — 21 commits, `8715f5e..23b9281`.
+Commit range: `git log --oneline 9476a18..HEAD` — 34 commits, `8715f5e..` the merge-ready HEAD.
 Executed with subagent-driven development — a fresh implementer per task, a spec+quality
 review after each, a fix loop, then this close-out.
 
