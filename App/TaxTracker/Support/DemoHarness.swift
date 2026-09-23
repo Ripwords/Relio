@@ -62,17 +62,24 @@ enum DemoHarness {
     /// re-derived, and the row rendered with its thumbnail.
     static var wantsAttachment: Bool { arguments.contains("-relio-attach") }
 
+    /// I2: the same attach as `-relio-attach`, but the generated receipt carries a
+    /// MyInvois QR, so the saved document row it produces can be photographed with the
+    /// "MyInvois e-invoice" badge. `-relio-attach` alone reads no QR at all.
+    static var wantsEInvoiceAttachment: Bool { arguments.contains("-relio-attach-einvoice") }
+
     /// Open a new-entry editor prefilled from a generated receipt, as `-relio-scan`, or
     /// `-relio-scan-einvoice` for one that carries a MyInvois QR.
     static var wantsScan: Bool {
         arguments.contains("-relio-scan") || arguments.contains("-relio-scan-einvoice")
     }
 
-    /// The QR the generated receipt carries, if any. LHDN's own example document ID.
+    /// LHDN's own example MyInvois document link — the QR every demo e-invoice receipt
+    /// carries.
+    static let eInvoiceLink = "https://myinvois.hasil.gov.my/F9D425P6DS7D8IU/share/RZ6FQYX9J1G6V3K8H2M4T7W0"
+
+    /// The QR the generated receipt carries, if any.
     static var scanQR: String? {
-        arguments.contains("-relio-scan-einvoice")
-            ? "https://myinvois.hasil.gov.my/F9D425P6DS7D8IU/share/RZ6FQYX9J1G6V3K8H2M4T7W0"
-            : nil
+        arguments.contains("-relio-scan-einvoice") ? eInvoiceLink : nil
     }
 
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }

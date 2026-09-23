@@ -52,6 +52,10 @@ public struct DocumentDraft: Hashable, Sendable, Identifiable {
         self.ocrText = ocrText
         self.eInvoiceUUID = eInvoiceUUID
     }
+
+    /// Whether this row has a MyInvois e-invoice UUID — what the "MyInvois e-invoice"
+    /// badge is shown for. The UUID itself is never displayed.
+    public var isEInvoice: Bool { eInvoiceUUID != nil }
 }
 
 extension TaxStore {

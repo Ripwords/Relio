@@ -377,6 +377,11 @@ struct EntryEditorView: View {
                     documentThumbnail(document.thumbnail)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ReliefCopy.text(for: document.kind))
+                        if document.isEInvoice {
+                            Label("MyInvois e-invoice", systemImage: "checkmark.seal")
+                                .font(.caption)
+                                .foregroundStyle(.tint)
+                        }
                         Text(document.byteCount.formatted(.byteCount(style: .file)))
                             .font(.caption)
                             .foregroundStyle(.secondary)

@@ -135,9 +135,10 @@ struct RootView: View {
             // Needs a fetch, so it cannot live in the synchronous switch below. Opening a
             // *saved* entry is the only way to see the documents section, which is hidden
             // until an entry has an identity to attach to.
-            if DemoHarness.wantsAttachment,
+            if DemoHarness.wantsAttachment || DemoHarness.wantsEInvoiceAttachment,
                let entry = try? await store.entryDrafts(forYear: context.year).first,
-               let data = SampleReceipt.jpeg(),
+               let data = SampleReceipt.jpeg(
+                   qr: DemoHarness.wantsEInvoiceAttachment ? DemoHarness.eInvoiceLink : nil),
                case .read(let reading) = await CapturePipeline.read(.image(data),
                                                                     ruleSet: context.ruleSet),
                let files = try? DocumentFileStore() {

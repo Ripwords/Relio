@@ -123,6 +123,7 @@ import TaxCapture
         #expect(document.contentHash == DocumentFileStore.hash(Data("receipt-one".utf8)))
         #expect(document.ocrText == "MPH BOOKSTORES SDN BHD\nTOTAL RM 71.90")
         #expect(document.total == Money(sen: 7_190))
+        #expect(document.isEInvoice == false, "no QR was read")
         #expect(model.hasPendingReceipt == false)
     }
 
@@ -136,6 +137,7 @@ import TaxCapture
         let document = try #require(try await store.documentDrafts(forEntry: model.newEntryID).first)
         #expect(document.kind == .officialReceipt)
         #expect(document.eInvoiceUUID == "F9D425P6DS7D8IU")
+        #expect(document.isEInvoice, "the saved row is badged too, not just the pending one")
     }
 
     @Test("saving twice is one entry, not two")
@@ -309,6 +311,7 @@ struct ReceiptAttachTests {
         #expect(document.documentDate == ReceiptFixture.day(2025, 3, 7))
         #expect(document.eInvoiceUUID == "F9D425P6DS7D8IU")
         #expect(document.kind == .officialReceipt)
+        #expect(document.isEInvoice, "attach-to-existing badges the row too")
     }
 
     @Test("a confident total that disagrees is offered, and applied only when taken")
