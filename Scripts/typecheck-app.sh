@@ -19,9 +19,14 @@ SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 TARGET="arm64-apple-ios26.0-simulator"
 
 # The package must be built for iOS, not the host, or its .swiftmodule files are rejected.
+# The Clang importer flags are needed too, not just -Xswiftc: without them, an imported
+# Objective-C framework (e.g. CoreImage) has its module map built against the host macOS
+# sysroot instead of the iOS simulator one, which then fails to find iOS-only headers.
 swift build --scratch-path .build-ios \
   -Xswiftc -sdk -Xswiftc "$SDK" \
-  -Xswiftc -target -Xswiftc "$TARGET" >/dev/null
+  -Xswiftc -target -Xswiftc "$TARGET" \
+  -Xcc -isysroot -Xcc "$SDK" \
+  -Xcc -target -Xcc "$TARGET" >/dev/null
 
 mapfile -t SOURCES < <(find App/TaxTracker -name '*.swift' | sort)
 if [ ${#SOURCES[@]} -eq 0 ]; then
