@@ -266,7 +266,7 @@ already-confident reading untouched by design.
 **Whether the model ever ran, exactly.** A temporary `print` confirmed
 `FoundationModelsReceiptModel.init?()` succeeded on this simulator
 (`[Task13] on-device model available: true`, removed before committing) — Apple
-Intelligence is available here and the model object was constructed and asked a question.
+Intelligence is available here and the model object was constructed; that it was then asked a question was not observed.
 **What was not verified is whether an answer arrived within the 3 s timeout on this
 particular scan** — the review's own parked Minor notes `ReceiptModelCheck.answer` does not
 observe the caller's cancellation, and since a model relief choice only ever reorders
@@ -341,7 +341,7 @@ Numbered on from the highest item number in the earlier ledgers (item 19, in
     device.
 23. **The Foundation Models path runs only where Apple Intelligence is available.** On this
     simulator, `init?()` succeeded (`available: true`, confirmed in Task 13 with a
-    temporary `print`), so the model object exists and was asked a question this run.
+    temporary `print`), so the model object was constructed this run; that it was asked a question was not observed.
     **Whether an answer arrived within the 3 s timeout was not verified** — the sample
     receipt's single confident total and vendor give the fact-check nothing to change
     either way, and a model relief choice only reorders `suggestedReliefs` in the relief
