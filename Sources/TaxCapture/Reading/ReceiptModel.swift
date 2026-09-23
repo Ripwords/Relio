@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import TaxKit
 
 /// A relief the model may name, with the name it goes by.
@@ -78,24 +77,17 @@ public enum ReceiptModelCheck {
                                     reliefs: reliefs)
     }
 
-    /// The answer, or nil if the model threw or took longer than `timeout`.
+    /// The answer, or nil if the model threw, took longer than `timeout`, or the caller
+    /// was cancelled first.
     ///
-    /// Returns at the timeout even if the model ignores cancellation. A task group would
-    /// wait for its child, so this races the two with a continuation that only the first
-    /// to finish may resume.
+    /// Returns at the timeout even if the model ignores cancellation. See `Racing`: a
+    /// task group would wait for its losing child, so this races the two with a
+    /// continuation instead, cancellation-aware so a cancelled caller does not sit out
+    /// the full timeout waiting for a result nobody wants any more.
     public static func answer(from model: any ReceiptModel, to question: ReceiptModelQuestion,
                               within timeout: Duration) async -> ReceiptModelAnswer? {
-        let once = Once()
-        return await withCheckedContinuation { continuation in
-            let work = Task {
-                let answer = try? await model.answer(question)
-                once.run { continuation.resume(returning: answer) }
-            }
-            Task {
-                try? await Task.sleep(for: timeout)
-                work.cancel()
-                once.run { continuation.resume(returning: nil) }
-            }
+        await Racing.firstToFinish(timeout: timeout) {
+            try await model.answer(question)
         }
     }
 
@@ -132,18 +124,5 @@ public enum ReceiptModelCheck {
     /// Upper-cased, with every run of whitespace — newlines included — one space.
     static func collapsed(_ text: String) -> String {
         text.split(whereSeparator: \.isWhitespace).joined(separator: " ").uppercased()
-    }
-}
-
-/// Runs its body once, whichever caller gets there first.
-private final class Once: Sendable {
-    private let done = Mutex(false)
-
-    func run(_ body: () -> Void) {
-        let first = done.withLock { done in
-            defer { done = true }
-            return !done
-        }
-        if first { body() }
     }
 }

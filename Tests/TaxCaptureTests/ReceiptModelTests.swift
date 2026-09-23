@@ -141,6 +141,23 @@ struct SilentModel: ReceiptModel {
                                                within: .seconds(1)) == nil)
     }
 
+    /// M3. Cancelling the caller must not leave the race to sit out the full timeout: the
+    /// race is wrapped in `withTaskCancellationHandler`, so cancellation resolves it
+    /// immediately rather than waiting for `SilentModel`, which ignores cancellation.
+    @Test("a cancelled caller returns promptly, well under the timeout")
+    func cancelledCallerReturnsPromptly() async {
+        let task = Task<ReceiptModelAnswer?, Never> {
+            await ReceiptModelCheck.answer(from: SilentModel(), to: Self.question(),
+                                           within: .seconds(30))
+        }
+        try? await Task.sleep(for: .milliseconds(10))
+        let started = ContinuousClock.now
+        task.cancel()
+        let answer = await task.value
+        #expect(answer == nil)
+        #expect(ContinuousClock.now - started < .seconds(2))
+    }
+
     @Test("no text, no question")
     func noTextNoQuestion() throws {
         var reading = Self.unsure()
