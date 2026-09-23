@@ -51,7 +51,8 @@ swift build --scratch-path .build-ios \
 rm -rf "$STAGE"; mkdir -p "$APP"
 mapfile -t SOURCES < <(find App/TaxTracker -name '*.swift' | sort)
 mapfile -t OBJS < <(find .build-ios/debug/TaxKit.build .build-ios/debug/TaxData.build \
-                         .build-ios/debug/TaxPresentation.build -name '*.o' | sort)
+                         .build-ios/debug/TaxPresentation.build \
+                         .build-ios/debug/TaxCapture.build -name '*.o' | sort)
 xcrun swiftc -sdk "$SDK" -target "$TARGET" -swift-version 6 -parse-as-library -DDEBUG \
   -I .build-ios/debug/Modules -emit-executable -o "$APP/Relio" \
   "${SOURCES[@]}" "${OBJS[@]}" 2>&1 | grep -v "using sysroot" || true

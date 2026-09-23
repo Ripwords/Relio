@@ -380,15 +380,36 @@ import TaxKit
         // instead of being enforced. There is nothing to keep updating now, and a module
         // added tomorrow is covered the day it exists.
         //
-        // One exemption, by name. `Money.lossyDoubleForCharting` is the single deliberate
-        // crossing into `Double` in the package, and it is named that loudly precisely so
-        // it can be spelled out here and nowhere else. Any other line is a mistake.
+        // Two exemptions, by name.
+        //
+        // `Money.lossyDoubleForCharting` is the single deliberate crossing into `Double`
+        // on a money path, and it is named that loudly precisely so it can be spelled out
+        // here and nowhere else.
+        //
+        // `Sources/TaxCapture/` (matched on the path, not the bare filename, so a
+        // like-named file elsewhere is not caught by accident) is not a calculation path
+        // at all — it is a reader. Its `Double`s are OCR confidence scores and page
+        // geometry, and the Vision and CoreGraphics adapters it wraps cannot avoid
+        // floating point. Its only money output is the `Money` that
+        // `ReceiptAmount.swift` builds from matched digits, which is why that one file
+        // stays covered by the rule below, and every value `TaxCapture` reads is
+        // confirmed by the user before it reaches an entry. Any other line, in either
+        // exemption, is a mistake.
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let files = try swiftFiles(under: root.appending(path: "Sources"))
         #expect(!files.isEmpty)
 
+        let receiptAmountPath = "/Sources/TaxCapture/Parsing/ReceiptAmount.swift"
+        // The exemption below only widens correctly while this file is still checked —
+        // if it ever stopped being found, the `hasSuffix` skip could be exempting the
+        // whole package unnoticed.
+        #expect(files.contains { $0.path.hasSuffix(receiptAmountPath) })
+
         for file in files {
+            if file.path.contains("/Sources/TaxCapture/"), !file.path.hasSuffix(receiptAmountPath) {
+                continue
+            }
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)

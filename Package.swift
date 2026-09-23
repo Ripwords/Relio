@@ -7,7 +7,8 @@ let package = Package(
     products: [
         .library(name: "TaxKit", targets: ["TaxKit"]),
         .library(name: "TaxData", targets: ["TaxData"]),
-        .library(name: "TaxPresentation", targets: ["TaxPresentation"])
+        .library(name: "TaxPresentation", targets: ["TaxPresentation"]),
+        .library(name: "TaxCapture", targets: ["TaxCapture"]),
     ],
     targets: [
         .target(
@@ -50,12 +51,24 @@ let package = Package(
         ),
         .target(
             name: "TaxPresentation",
-            dependencies: ["TaxKit", "TaxData"],
+            dependencies: ["TaxKit", "TaxData", "TaxCapture"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "TaxPresentationTests",
             dependencies: ["TaxPresentation"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // Reads a receipt: OCR, the MyInvois QR, and a deterministic parser over the
+        // result. Depends on TaxKit only — TaxData must never need it.
+        .target(
+            name: "TaxCapture",
+            dependencies: ["TaxKit"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "TaxCaptureTests",
+            dependencies: ["TaxCapture"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

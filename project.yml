@@ -40,6 +40,8 @@ targets:
         product: TaxData
       - package: TaxKit
         product: TaxPresentation
+      - package: TaxKit
+        product: TaxCapture
     configFiles:
       Debug: Config/Signing.xcconfig
       Release: Config/Signing.xcconfig
