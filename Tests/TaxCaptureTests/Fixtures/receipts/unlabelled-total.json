@@ -1,0 +1,15 @@
+{
+  "lines": [
+    "PASAR MALAM STALL 12",
+    "NASI LEMAK AYAM             8.50",
+    "TEH TARIK                   2.50"
+  ],
+  "expect": {
+    "total": "8.50",
+    "totalConfirmed": false,
+    "date": null,
+    "dateConfirmed": null,
+    "vendor": "PASAR MALAM STALL 12",
+    "vendorConfirmed": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "lines": [
+    "SUSHI KING SDN BHD",
+    "IOI CITY MALL",
+    "62502 PUTRAJAYA",
+    "TAX INVOICE",
+    "DATE: 18/05/2025",
+    "SALMON SUSHI               22.80",
+    "CHAWANMUSHI                 7.90",
+    "RAMEN                      48.10",
+    "SUBTOTAL                   78.80",
+    "SERVICE CHARGE 10%          7.88",
+    "SST 8%                      6.60",
+    "TOTAL (INCL. SST)          93.28",
+    "VISA                       93.28"
+  ],
+  "expect": {
+    "total": "93.28",
+    "totalConfirmed": true,
+    "date": "2025-05-18",
+    "dateConfirmed": true,
+    "vendor": "SUSHI KING SDN BHD",
+    "vendorConfirmed": true
+  }
+}

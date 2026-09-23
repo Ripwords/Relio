@@ -1,0 +1,28 @@
+{
+  "lines": [
+    "AEON CO. (M) BHD (126926-H)",
+    "AEON MALL SHAH ALAM",
+    "NO. 1 JALAN AKUATIK 13/64",
+    "40100 SHAH ALAM, SELANGOR",
+    "TEL: 03-5510 7800",
+    "SST ID: W10-1808-31000123",
+    "TAX INVOICE",
+    "14/03/2025 18:42  POS 12  TRANS 3391",
+    "MILO 1KG                 17.90",
+    "BREAD WHOLEMEAL           4.50",
+    "DISC                      4.00-",
+    "SUB-TOTAL                18.40",
+    "TOTAL                    18.40",
+    "CASH                     20.00",
+    "CHANGE                    1.60",
+    "THANK YOU. PLEASE COME AGAIN"
+  ],
+  "expect": {
+    "total": "18.40",
+    "totalConfirmed": true,
+    "date": "2025-03-14",
+    "dateConfirmed": true,
+    "vendor": "AEON CO. (M) BHD",
+    "vendorConfirmed": true
+  }
+}

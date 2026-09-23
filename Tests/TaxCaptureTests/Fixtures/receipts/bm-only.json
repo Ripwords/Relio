@@ -1,0 +1,23 @@
+{
+  "lines": [
+    "KEDAI BUKU ILMU ENTERPRISE",
+    "(SA0123456-X)",
+    "NO 5 JALAN BESAR",
+    "16800 PASIR PUTEH KELANTAN",
+    "RESIT",
+    "TARIKH: 28-OGOS-2024",
+    "BUKU LATIHAN               15.00",
+    "MAJALAH                    12.00",
+    "JUMLAH BESAR               27.00",
+    "TUNAI                      30.00",
+    "BAKI                        3.00"
+  ],
+  "expect": {
+    "total": "27.00",
+    "totalConfirmed": true,
+    "date": "2024-08-28",
+    "dateConfirmed": true,
+    "vendor": "KEDAI BUKU ILMU ENTERPRISE",
+    "vendorConfirmed": true
+  }
+}

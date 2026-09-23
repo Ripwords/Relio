@@ -1,0 +1,22 @@
+{
+  "lines": [
+    "MPH BOOKSTORES SDN BHD",
+    "MID VALLEY MEGAMALL",
+    "59200 KUALA LUMPUR",
+    "RESIT RASMI",
+    "TARIKH 07 Mac 2025",
+    "THE MALAYSIAN TAX GUIDE    59.90",
+    "PENSIL 2B X2               12.00",
+    "JUMLAH                     71.90",
+    "TUNAI                     100.00",
+    "BAKI                       28.10"
+  ],
+  "expect": {
+    "total": "71.90",
+    "totalConfirmed": true,
+    "date": "2025-03-07",
+    "dateConfirmed": true,
+    "vendor": "MPH BOOKSTORES SDN BHD",
+    "vendorConfirmed": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "lines": [
+    "大众书局 POPULAR BOOK CO. (M) SDN BHD",
+    "(113354-H)",
+    "LOT 2.19 1 UTAMA SHOPPING CENTRE",
+    "47800 PETALING JAYA",
+    "TAX INVOICE",
+    "DATE 21/01/2025",
+    "BOOK: 三体                 39.90",
+    "TOTAL                      39.90",
+    "CARD                       39.90"
+  ],
+  "expect": {
+    "total": "39.90",
+    "totalConfirmed": true,
+    "date": "2025-01-21",
+    "dateConfirmed": true,
+    "vendor": "大众书局 POPULAR BOOK CO. (M) SDN BHD",
+    "vendorConfirmed": true
+  }
+}

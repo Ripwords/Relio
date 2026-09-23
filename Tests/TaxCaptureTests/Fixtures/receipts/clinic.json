@@ -1,0 +1,22 @@
+{
+  "lines": [
+    "KLINIK MEDIVIRON",
+    "NO 12 JALAN SS 15/4",
+    "47500 SUBANG JAYA, SELANGOR",
+    "TEL 03-5633 1122",
+    "RECEIPT",
+    "2025-04-09 10:15",
+    "CONSULTATION               45.00",
+    "MEDICATION                 32.50",
+    "TOTAL AMOUNT PAYABLE       77.50",
+    "PAID BY CARD               77.50"
+  ],
+  "expect": {
+    "total": "77.50",
+    "totalConfirmed": true,
+    "date": "2025-04-09",
+    "dateConfirmed": true,
+    "vendor": "KLINIK MEDIVIRON",
+    "vendorConfirmed": false
+  }
+}

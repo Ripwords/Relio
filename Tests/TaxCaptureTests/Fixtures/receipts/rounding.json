@@ -1,0 +1,25 @@
+{
+  "lines": [
+    "99 SPEED MART SDN BHD",
+    "NO 22 JALAN MERANTI",
+    "TAMAN SRI GOMBAK",
+    "68100 BATU CAVES",
+    "RECEIPT",
+    "DATE: 14/06/2025",
+    "MAGGI KARI 5S               6.50",
+    "MINYAK MASAK 2KG           17.48",
+    "TOTAL                      23.98",
+    "ROUNDING                    0.02",
+    "TOTAL                      24.00",
+    "CASH                       50.00",
+    "CHANGE                     26.00"
+  ],
+  "expect": {
+    "total": "24.00",
+    "totalConfirmed": true,
+    "date": "2025-06-14",
+    "dateConfirmed": true,
+    "vendor": "99 SPEED MART SDN BHD",
+    "vendorConfirmed": true
+  }
+}

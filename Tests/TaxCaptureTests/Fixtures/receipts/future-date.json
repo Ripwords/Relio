@@ -1,0 +1,19 @@
+{
+  "lines": [
+    "TADIKA CERIA ENTERPRISE",
+    "NO 3 JALAN MAWAR",
+    "RESIT",
+    "DATE: 20/07/2025",
+    "YURAN BULAN JULAI         350.00",
+    "JUMLAH                    350.00",
+    "DICETAK 15/06/2025 09:00"
+  ],
+  "expect": {
+    "total": "350.00",
+    "totalConfirmed": true,
+    "date": null,
+    "dateConfirmed": null,
+    "vendor": "TADIKA CERIA ENTERPRISE",
+    "vendorConfirmed": true
+  }
+}

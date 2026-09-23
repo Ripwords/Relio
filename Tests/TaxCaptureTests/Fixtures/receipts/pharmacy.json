@@ -1,0 +1,25 @@
+{
+  "lines": [
+    "WATSON'S PERSONAL CARE STORES SDN BHD",
+    "(179023-W)",
+    "LOT G-12, SUNWAY PYRAMID",
+    "47500 PETALING JAYA",
+    "SIMPLIFIED TAX INVOICE",
+    "INVOICE NO: 00482-1193",
+    "DATE: 21/05/2025  TIME: 14:05",
+    "PANADOL ACTIFAST 20S       12.90",
+    "VITAMIN C 1000MG 30S       41.35",
+    "SUB TOTAL                  54.25",
+    "SST 6%                      3.26",
+    "GRAND TOTAL                57.51",
+    "VISA ****1234              57.51"
+  ],
+  "expect": {
+    "total": "57.51",
+    "totalConfirmed": true,
+    "date": "2025-05-21",
+    "dateConfirmed": true,
+    "vendor": "WATSON'S PERSONAL CARE STORES SDN BHD",
+    "vendorConfirmed": true
+  }
+}

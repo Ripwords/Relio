@@ -1,0 +1,16 @@
+{
+  "lines": [
+    "PARKING TICKET",
+    "ENTRY 09:12",
+    "EXIT 11:40",
+    "THANK YOU"
+  ],
+  "expect": {
+    "total": null,
+    "totalConfirmed": null,
+    "date": null,
+    "dateConfirmed": null,
+    "vendor": "PARKING TICKET",
+    "vendorConfirmed": false
+  }
+}

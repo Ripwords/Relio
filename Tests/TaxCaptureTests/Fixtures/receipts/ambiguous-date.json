@@ -1,0 +1,20 @@
+{
+  "lines": [
+    "FITNESS FIRST MALAYSIA SDN BHD",
+    "(591489-K)",
+    "MENARA PJ",
+    "46350 PETALING JAYA",
+    "OFFICIAL RECEIPT",
+    "DATE: 04/05/2025",
+    "MONTHLY MEMBERSHIP        199.00",
+    "TOTAL                     199.00"
+  ],
+  "expect": {
+    "total": "199.00",
+    "totalConfirmed": true,
+    "date": "2025-05-04",
+    "dateConfirmed": false,
+    "vendor": "FITNESS FIRST MALAYSIA SDN BHD",
+    "vendorConfirmed": true
+  }
+}

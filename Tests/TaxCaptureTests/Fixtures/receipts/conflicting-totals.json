@@ -1,0 +1,21 @@
+{
+  "lines": [
+    "KEDAI RUNCIT AH HOCK",
+    "TAMAN MELATI",
+    "RECEIPT",
+    "DATE 22/04/2025",
+    "GULA 2KG                    6.00",
+    "BERAS 10KG                 39.00",
+    "TOTAL                      45.00",
+    "TELUR 30S                   9.00",
+    "TOTAL                      54.00"
+  ],
+  "expect": {
+    "total": "54.00",
+    "totalConfirmed": false,
+    "date": "2025-04-22",
+    "dateConfirmed": true,
+    "vendor": "KEDAI RUNCIT AH HOCK",
+    "vendorConfirmed": false
+  }
+}
