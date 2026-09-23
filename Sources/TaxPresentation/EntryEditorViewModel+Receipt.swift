@@ -149,6 +149,7 @@ extension EntryEditorViewModel {
         }
 
         receiptAmountOffer = reading.total.flatMap { $0.isConfirmed ? $0.value : nil }
+        attachedReceiptCouldNotRead = reading.couldNotRead
         await reloadDocuments()
         await context.reload()
         return .attached

@@ -314,6 +314,28 @@ struct ReceiptAttachTests {
         #expect(document.isEInvoice, "attach-to-existing badges the row too")
     }
 
+    /// M8. Attach-to-existing had nowhere to say a scan came back with nothing: `prefill`
+    /// sets `couldNotReadReceipt`, but that flag only renders inside the pending-receipt
+    /// section, which attach-to-existing never shows.
+    @Test("a receipt with no text at all is flagged, so the attach UI can say so")
+    func unreadableReceiptIsFlagged() async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        let result = await model.attach(ReceiptFixture.reading(ocrText: nil),
+                                        files: try ReceiptFixture.files())
+        #expect(result == .attached)
+        #expect(model.attachedReceiptCouldNotRead)
+    }
+
+    @Test("a receipt that read fine does not raise the could-not-read flag")
+    func readableReceiptIsNotFlagged() async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        let result = await model.attach(ReceiptFixture.reading(), files: try ReceiptFixture.files())
+        #expect(result == .attached)
+        #expect(model.attachedReceiptCouldNotRead == false)
+    }
+
     @Test("a confident total that disagrees is offered, and applied only when taken")
     func offersADifferentConfidentTotal() async throws {
         let store = try await PresentationFixture.store()

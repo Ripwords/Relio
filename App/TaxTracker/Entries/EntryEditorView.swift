@@ -395,6 +395,12 @@ struct EntryEditorView: View {
                 }
             }
 
+            if model.attachedReceiptCouldNotRead {
+                Text("Relio couldn't read this receipt.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             if let offer = model.receiptAmountOfferText {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(offer)

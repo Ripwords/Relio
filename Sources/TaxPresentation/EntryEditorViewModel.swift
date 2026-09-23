@@ -118,6 +118,10 @@ public final class EntryEditorViewModel {
     public internal(set) var couldNotReadReceipt = false
     /// The receipt carried a MyInvois QR. A badge; the document kind is unchanged.
     public internal(set) var isEInvoice = false
+    /// M8: an attach-to-existing scan produced no text at all. `couldNotReadReceipt` says
+    /// the same thing for a new entry's pending receipt, but that flag only renders inside
+    /// the pending-receipt section, which attaching to an already-saved entry never shows.
+    public internal(set) var attachedReceiptCouldNotRead = false
     /// "This receipt already supports your RM 230.00 lifestyle claim from 3 Mar."
     public internal(set) var receiptDuplicateWarning: String?
     /// The entry saved but its receipt could not be attached. Save again to retry.
