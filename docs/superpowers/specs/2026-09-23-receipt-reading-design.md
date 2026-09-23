@@ -28,7 +28,8 @@ A receipt should save the user typing, not just sit next to a claim.
 ### Success criteria
 
 1. A clear photo of a typical Malaysian till receipt prefills the correct total and date.
-2. A MyInvois e-invoice's QR sets `eInvoiceUUID` and marks the document as an e-invoice.
+2. A MyInvois e-invoice's QR sets `eInvoiceUUID` and badges the document as an e-invoice,
+   without changing which document kind it counts as.
 3. A number the on-device model returns that does not appear in the receipt's text never
    reaches the editor.
 4. A failed read at any stage leaves the user exactly where attaching leaves them today:
@@ -65,7 +66,8 @@ A new target, `TaxCapture`, depending only on `TaxKit`. `TaxData` does not depen
 ```
 TaxCapture
 ├── Parsing/            pure — no Vision, no FoundationModels, no SwiftUI
-│   ├── OCRLine          text, normalised bounding box, recogniser confidence
+│   ├── OCRLine          text, page, vertical position, recogniser confidence
+│   ├── RowAssembler     [TextFragment] -> [OCRLine]  (rejoins a row Vision split)
 │   ├── ReceiptParser    [OCRLine] -> ReceiptFields
 │   ├── MyInvoisLink     String -> MyInvoisLink?   (uuid, longId)
 │   └── ReliefSuggester  (ReceiptFields, RuleSet) -> [ReliefCode] (≤ 3)
@@ -155,23 +157,34 @@ stripped. Low confidence by default (0.6) unless a company suffix matched.
 
 ### Relief suggestion
 
-`ReliefSuggester` maps vendor and line keywords to a `ReliefCategory` family, then to the
-codes in **that year's rulebook** within the family that are user-claimable (not
-automatic). Examples: `FARMASI`, `PHARMACY`, `CLINIC`, `KLINIK`, `HOSPITAL`, `DENTAL` →
-Health; `BOOK`, `BUKU`, `POPULAR`, `MPH` → Learning/lifestyle; `GYM`, `FITNESS`,
-`SPORTS` → sports; `TADIKA`, `NURSERY`, `CHILDCARE` → childcare. At most three codes,
+`ReliefSuggester` maps whole-word vendor and line keywords straight to relief codes, then
+keeps only codes present and user-claimable (not automatic) in **that year's rulebook**.
+Examples: `KLINIK`, `CLINIC`, `HOSPITAL` → serious medical and check-up; `DENTAL`,
+`PERGIGIAN` → dental; `BUKU`, `BOOKSTORE`, `MPH` → lifestyle; `GYM`, `FITNESS`,
+`DECATHLON` → sports; `TADIKA`, `TASKA`, `NURSERY` → childcare. At most three codes,
 never auto-selected. No match means no suggestions, not a guess.
 
-The keyword table is data in `TaxCapture`, tested row by row; the family-to-code step
-reads the `RuleSet`, so a relief a year does not have can never be suggested for it.
+Straight to codes rather than through `ReliefCategory`: that type lives in
+`TaxPresentation`, and a family is too coarse — "Health" holds eight reliefs, and a
+dental receipt belongs to one of them. The table is data in `TaxCapture`, tested row by
+row against every shipped rulebook.
 
 ### MyInvois QR
 
 `VNDetectBarcodesRequest` limited to QR. A payload is accepted only when it parses as an
-HTTPS URL on `myinvois.hasil.gov.my` or `preprod.myinvois.hasil.gov.my` with the path
-`/{uuid}/share/{longId}`, where `uuid` is a canonical UUID. Accepted: `eInvoiceUUID` is
-set, the document kind becomes `.eInvoice`, and the editor shows an "MyInvois e-invoice"
-badge. Anything else is ignored and reading continues.
+HTTPS URL on `myinvois.hasil.gov.my` or `preprod.myinvois.hasil.gov.my` with exactly the
+path `/{uuid}/share/{longId}`, no query and no fragment. MyInvois document IDs are **not**
+RFC 4122 UUIDs — LHDN's own API example is `F9D425P6DS7D8IU` — so `uuid` must be 10–40
+ASCII letters and digits, and `longId` at least 10. Accepted: `eInvoiceUUID` is set and the
+editor shows a "MyInvois e-invoice" badge. Anything else is ignored and reading continues.
+
+**The document kind does not become `.eInvoice`.** `TaxStore` decides a claim is supported
+when `requiredDocuments ⊆ documentKinds`, and twelve YA2025 reliefs require
+`officialReceipt`. Recording a MyInvois receipt as `.eInvoice` would leave the claim
+flagged as missing its receipt. The kind is chosen as attaching chooses it today — the
+selected relief's first required kind, else `officialReceipt` — and the e-invoice status
+lives in `eInvoiceUUID`. Whether LHDN treats an e-invoice as satisfying every requirement
+is a rulebook question, out of scope here.
 
 ### The on-device model (last unit)
 
@@ -263,7 +276,7 @@ their thumbnail is page one rendered at 320 px.
   two conflicting totals, ambiguous day/month, future date. Each fixture pins the expected
   total, date, vendor and confidence band.
 - **MyInvois:** valid production and preprod links; wrong host, `http`, extra path
-  segments, non-canonical UUID, trailing query — all rejected.
+  segments, an ID with punctuation, trailing query — all rejected.
 - **Suggester:** keyword table rows; a code absent from the year's rulebook is never
   returned; automatic codes never returned.
 - **Adapters:** run for real in `swift test` on macOS — receipts rendered with CoreGraphics
