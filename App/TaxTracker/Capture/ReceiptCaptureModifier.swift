@@ -23,6 +23,10 @@ struct ReceiptCaptureModifier: ViewModifier {
 
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var isReading = false
+    /// The in-flight read, so it can be dropped if the editor goes away (or a new read
+    /// starts) before it finishes. Without this, a stale `attach`/`prefill` could still
+    /// write to the store after the sheet that asked for it is gone.
+    @State private var readTask: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
@@ -30,7 +34,7 @@ struct ReceiptCaptureModifier: ViewModifier {
                 DocumentCameraView { result in
                     source = nil
                     switch result {
-                    case .scanned(let pages): Task { await read(.scannedPages(pages)) }
+                    case .scanned(let pages): startRead(.scannedPages(pages))
                     case .cancelled: break
                     case .failed: onError("The camera stopped before the scan finished. Try again.")
                     }
@@ -56,6 +60,7 @@ struct ReceiptCaptureModifier: ViewModifier {
                 }
             }
             .allowsHitTesting(!isReading)
+            .onDisappear { readTask?.cancel() }
     }
 
     /// `source` is the single piece of state; each presenter sees only its own case.
@@ -69,7 +74,7 @@ struct ReceiptCaptureModifier: ViewModifier {
             onError("That photo could not be read. Try another.")
             return
         }
-        await read(.image(data))
+        startRead(.image(data))
     }
 
     /// The security-scoped URL has to be opened and closed around the read, or the bytes
@@ -86,13 +91,25 @@ struct ReceiptCaptureModifier: ViewModifier {
             return
         }
         let isPDF = UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true
-        await read(isPDF ? .pdf(data) : .image(data))
+        startRead(isPDF ? .pdf(data) : .image(data))
+    }
+
+    /// Starts a read, dropping whatever read was already in flight — only the latest one
+    /// should ever be able to call `onRead`/`onError`.
+    private func startRead(_ input: CaptureInput) {
+        readTask?.cancel()
+        readTask = Task { await read(input) }
     }
 
     private func read(_ input: CaptureInput) async {
         isReading = true
         defer { isReading = false }
-        switch await CapturePipeline.read(input, ruleSet: ruleSet) {
+        let outcome = await CapturePipeline.read(input, ruleSet: ruleSet)
+        // The pipeline records cancellation as a soft failure rather than throwing, so a
+        // stale read still returns a normal outcome here — it must be dropped explicitly,
+        // before either callback can write anything.
+        guard !Task.isCancelled else { return }
+        switch outcome {
         case .read(let reading): await onRead(reading)
         case .failed(let message): onError(message)
         }
