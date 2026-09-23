@@ -17,6 +17,15 @@ struct PendingReceipt {
     var files: DocumentFileStore
 }
 
+public enum AttachResult: Hashable, Sendable {
+    case attached
+    /// The file could not be written. "Relio could not save that file. Try again."
+    case couldNotSave
+    /// No saved entry to attach to, or the store refused.
+    /// "Relio could not attach that. Nothing was lost — try again."
+    case couldNotAttach
+}
+
 extension EntryEditorViewModel {
 
     public var hasPendingReceipt: Bool { pendingReceipt != nil }
@@ -98,6 +107,66 @@ extension EntryEditorViewModel {
         let year = calendar.component(.year, from: spentOn)
         guard year != context.year else { return nil }
         return "This receipt is dated \(year). It will count towards YA \(context.year) — switch year first if that is wrong."
+    }
+
+    /// Spec §5, attaching to an existing entry: the same reading, recorded on the
+    /// `Document`, and the receipt's total offered when it is confident and differs.
+    public func attach(_ reading: ReceiptReading, files: DocumentFileStore) async -> AttachResult {
+        guard let editingID else { return .couldNotAttach }
+        let stored: DocumentFileStore.Stored
+        do {
+            stored = try files.write(reading.document.data,
+                                     extension: reading.document.fileExtension)
+        } catch {
+            return .couldNotSave
+        }
+
+        let draft = DocumentDraft(kind: requiredDocumentKinds.first ?? .officialReceipt,
+                                  vendor: reading.vendor?.value
+                                      ?? vendor.trimmingCharacters(in: .whitespaces),
+                                  documentDate: reading.date?.value ?? spentOn,
+                                  total: reading.total?.value ?? MoneyParsing.money(from: amountText),
+                                  thumbnail: reading.document.thumbnail,
+                                  byteCount: stored.byteCount,
+                                  contentHash: stored.contentHash,
+                                  uti: reading.document.uti,
+                                  ocrText: reading.ocrText,
+                                  eInvoiceUUID: reading.eInvoiceUUID)
+        // Asked before attaching, so this entry's own new document is not what it finds.
+        await warnIfAlreadySupporting(hash: stored.contentHash, uuid: reading.eInvoiceUUID,
+                                      excluding: editingID)
+        do {
+            _ = try await store.attach(draft, toEntry: editingID)
+        } catch {
+            if (try? await store.isFileReferenced(hash: stored.contentHash)) == false {
+                try? files.delete(hash: stored.contentHash,
+                                  extension: reading.document.fileExtension)
+            }
+            return .couldNotAttach
+        }
+
+        receiptAmountOffer = reading.total.flatMap { $0.isConfirmed ? $0.value : nil }
+        await reloadDocuments()
+        await context.reload()
+        return .attached
+    }
+
+    /// "The receipt says RM 128.40. Use that?" — until the amount already says it.
+    public var receiptAmountOfferText: String? {
+        guard let offer = receiptAmountOffer,
+              MoneyParsing.money(from: amountText) != offer else { return nil }
+        return "The receipt says \(offer.formatted()). Use that?"
+    }
+
+    /// Sets the field. The user still saves.
+    public func useReceiptAmount() {
+        guard let offer = receiptAmountOffer else { return }
+        amountText = offer.formattedForEditing()
+        receiptAmountOffer = nil
+    }
+
+    public func dismissReceiptAmountOffer() {
+        receiptAmountOffer = nil
     }
 
     /// Attaches the waiting receipt to the entry just saved.

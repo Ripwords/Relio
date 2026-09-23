@@ -124,6 +124,8 @@ public final class EntryEditorViewModel {
     public internal(set) var attachFailed = false
     /// A scanned receipt already written to the file store, waiting for Save.
     var pendingReceipt: PendingReceipt?
+    /// A confident receipt total that disagrees with the amount. Offered, never applied.
+    public internal(set) var receiptAmountOffer: Money?
 
     let context: YearContext
     let store: TaxStore
@@ -212,36 +214,6 @@ public final class EntryEditorViewModel {
     /// can switch an entry that opened against an automatic relief onto a manual one,
     /// and a sticky flag would leave that form permanently unsaveable while citing a
     /// code it no longer holds.
-    /// Attaches a file that the caller has already written to disk.
-    ///
-    /// The bytes do not pass through here. `DocumentFileStore` writes them and reports a
-    /// hash and a byte count; this records that and links it to the entry, which is what
-    /// re-derives whether the claim is still short of a document.
-    @discardableResult
-    public func attachDocument(kind: DocumentKind,
-                               contentHash: String,
-                               byteCount: Int,
-                               uti: String,
-                               thumbnail: Data?) async -> Bool {
-        guard let editingID else { return false }
-        var draft = DocumentDraft(kind: kind,
-                                  vendor: vendor,
-                                  documentDate: spentOn,
-                                  thumbnail: thumbnail,
-                                  byteCount: byteCount,
-                                  contentHash: contentHash,
-                                  uti: uti)
-        draft.total = MoneyParsing.money(from: amountText)
-        do {
-            _ = try await store.attach(draft, toEntry: editingID)
-            await reloadDocuments()
-            await context.reload()
-            return true
-        } catch {
-            return false
-        }
-    }
-
     public func removeDocument(id: UUID) async {
         let removed = documents.first { $0.id == id }
         try? await store.softDeleteDocument(id: id)

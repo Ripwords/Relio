@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import TaxKit
 import TaxData
+import TaxCapture
 @testable import TaxPresentation
 
 @Suite("Money parsing") struct MoneyParsingTests {
@@ -742,10 +743,9 @@ struct EntryEditorCapGuidanceTests {
         let store = try await PresentationFixture.store()
         let model = await Self.editor(store, editing: nil)
         #expect(model.documents.isEmpty)
-        let attached = await model.attachDocument(kind: .officialReceipt,
-                                                  contentHash: "abc", byteCount: 10,
-                                                  uti: "public.jpeg", thumbnail: nil)
-        #expect(attached == false)
+        let attached = await model.attach(ReceiptFixture.reading(),
+                                          files: try ReceiptFixture.files())
+        #expect(attached == .couldNotAttach)
     }
 
     @Test("attaching the required kind clears the claim's missing-document flag")
@@ -755,10 +755,9 @@ struct EntryEditorCapGuidanceTests {
         let model = await Self.editor(store, editing: entryID)
         #expect(model.documents.isEmpty)
 
-        let attached = await model.attachDocument(kind: .officialReceipt,
-                                                  contentHash: "abc", byteCount: 10,
-                                                  uti: "public.jpeg", thumbnail: nil)
-        #expect(attached)
+        let attached = await model.attach(ReceiptFixture.reading(),
+                                          files: try ReceiptFixture.files())
+        #expect(attached == .attached)
         #expect(model.documents.count == 1)
         #expect(try await store.entryDrafts(forYear: 2025).first?.needsDocument == false)
     }
@@ -778,8 +777,7 @@ struct EntryEditorCapGuidanceTests {
         let store = try await PresentationFixture.store()
         let entryID = try await Self.seededEntry(store)
         let model = await Self.editor(store, editing: entryID)
-        await model.attachDocument(kind: .officialReceipt, contentHash: "abc",
-                                   byteCount: 10, uti: "public.jpeg", thumbnail: nil)
+        _ = await model.attach(ReceiptFixture.reading(), files: try ReceiptFixture.files())
         let documentID = try #require(model.documents.first?.id)
 
         await model.removeDocument(id: documentID)

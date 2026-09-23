@@ -273,3 +273,103 @@ import TaxCapture
                                     files: try ReceiptFixture.files()) == false)
     }
 }
+
+@Suite("Entry editor: attaching a receipt to a saved entry") @MainActor
+struct ReceiptAttachTests {
+
+    static func savedEditor(_ store: TaxStore, ringgit: Decimal = 300,
+                            spentOn: Date? = nil) async throws -> EntryEditorViewModel {
+        let id = try await store.save(EntryDraft(year: 2025, code: .lifestyle,
+                                                 amount: Money(ringgit: ringgit),
+                                                 vendor: "Kinokuniya", spentOn: spentOn))
+        let context = PresentationFixture.context(store, year: 2025)
+        await context.load()
+        let model = EntryEditorViewModel(context: context, store: store, editing: id)
+        await model.load()
+        return model
+    }
+
+    @Test("the document records what the receipt says")
+    func documentRecordsTheReading() async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        let result = await model.attach(ReceiptFixture.reading(eInvoiceUUID: "F9D425P6DS7D8IU"),
+                                        files: try ReceiptFixture.files())
+        #expect(result == .attached)
+        let document = try #require(model.documents.first)
+        #expect(document.vendor == "MPH BOOKSTORES SDN BHD")
+        #expect(document.total == Money(sen: 7_190))
+        #expect(document.documentDate == ReceiptFixture.day(2025, 3, 7))
+        #expect(document.eInvoiceUUID == "F9D425P6DS7D8IU")
+        #expect(document.kind == .officialReceipt)
+    }
+
+    @Test("a confident total that disagrees is offered, and applied only when taken")
+    func offersADifferentConfidentTotal() async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        _ = await model.attach(ReceiptFixture.reading(total: Money(sen: 12_840)),
+                               files: try ReceiptFixture.files())
+
+        #expect(model.receiptAmountOfferText == "The receipt says RM 128.40. Use that?")
+        #expect(model.amountText == "300.00", "offered, never injected")
+
+        model.useReceiptAmount()
+        #expect(model.amountText == "128.40")
+        #expect(model.receiptAmountOfferText == nil)
+        #expect(try await store.entryDrafts(forYear: 2025).first?.amount == Money(ringgit: 300),
+                "the user still saves it")
+    }
+
+    @Test("no offer when the total is unsure, or already the amount",
+          arguments: [(Money(sen: 12_840), 0.4), (Money(ringgit: 300), 0.95)])
+    func noOffer(total: Money, confidence: Double) async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        _ = await model.attach(ReceiptFixture.reading(total: total, totalConfidence: confidence),
+                               files: try ReceiptFixture.files())
+        #expect(model.receiptAmountOfferText == nil)
+    }
+
+    @Test("typing the receipt's figure yourself retires the offer; dismissing does too")
+    func offerRetires() async throws {
+        let store = try await PresentationFixture.store()
+        let model = try await Self.savedEditor(store)
+        _ = await model.attach(ReceiptFixture.reading(total: Money(sen: 12_840)),
+                               files: try ReceiptFixture.files())
+        model.amountText = "128.4"
+        #expect(model.receiptAmountOfferText == nil)
+        model.amountText = "300"
+        #expect(model.receiptAmountOfferText != nil)
+        model.dismissReceiptAmountOffer()
+        #expect(model.receiptAmountOfferText == nil)
+    }
+
+    @Test("a receipt already on another claim is attached, with a warning")
+    func warnsWhenAnotherClaimUsesIt() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let first = try await Self.savedEditor(store, ringgit: 230,
+                                               spentOn: ReceiptFixture.day(2025, 3, 3))
+        _ = await first.attach(ReceiptFixture.reading(), files: files)
+        #expect(first.receiptDuplicateWarning == nil)
+
+        let second = try await Self.savedEditor(store, ringgit: 50)
+        #expect(await second.attach(ReceiptFixture.reading(), files: files) == .attached)
+        #expect(second.receiptDuplicateWarning
+                == "This receipt already supports your RM 230.00 lifestyle claim from 3 Mar.")
+    }
+
+    @Test("the file cannot be written: nothing is attached")
+    func fileWriteFailure() async throws {
+        let store = try await PresentationFixture.store()
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "relio-gone-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let files = try DocumentFileStore(directory: directory)
+        try FileManager.default.removeItem(at: directory)
+
+        let model = try await Self.savedEditor(store)
+        #expect(await model.attach(ReceiptFixture.reading(), files: files) == .couldNotSave)
+        #expect(model.documents.isEmpty)
+    }
+}
