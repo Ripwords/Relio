@@ -76,4 +76,59 @@ actor CountingTextReader: TextReading {
         }
     }
 }
+
+/// I1: `.accurate` fails or hangs on this Mac (see `AdapterTests.visionReadsAPhoto`'s
+/// sibling in the review). These stub the seam `VisionTextReader` drives Vision through,
+/// not Vision itself, so they run in milliseconds regardless of device behaviour.
+@Suite("Vision text: the fallback from accurate to fast") struct VisionTextReaderFallbackTests {
+
+    static let fastLine = TextFragment(text: "fast line", page: 0, left: 0, top: 0,
+                                       bottom: 0.1, confidence: 1)
+
+    @Test("a throw from accurate falls through to fast, and its lines are returned")
+    func accurateThrowFallsThroughToFast() async throws {
+        let reader = VisionTextReader(accurateTimeout: .seconds(8)) { _, level, _, page in
+            if level == .accurate { throw CaptureError.unreadableImage }
+            return [Self.fastLine]
+        }
+        let lines = try await reader.fragments(inImage: Data(), page: 0)
+        #expect(lines == [Self.fastLine])
+    }
+
+    @Test("accurate hanging past a tiny timeout falls through to fast, well under a second")
+    func accurateTimeoutFallsThroughToFast() async throws {
+        let reader = VisionTextReader(accurateTimeout: .milliseconds(20)) { _, level, _, page in
+            if level == .accurate {
+                try await Task.sleep(for: .seconds(30))
+                return []
+            }
+            return [Self.fastLine]
+        }
+        let started = ContinuousClock.now
+        let lines = try await reader.fragments(inImage: Data(), page: 0)
+        #expect(lines == [Self.fastLine])
+        #expect(ContinuousClock.now - started < .seconds(1))
+    }
+
+    @Test("fast failing too, after accurate already failed, throws for real")
+    func bothFailingThrows() async {
+        let reader = VisionTextReader(accurateTimeout: .seconds(8)) { _, _, _, _ in
+            throw CaptureError.unreadableImage
+        }
+        await #expect(throws: CaptureError.unreadableImage) {
+            try await reader.fragments(inImage: Data(), page: 0)
+        }
+    }
+
+    @Test("accurate succeeding within the timeout never touches fast")
+    func accurateSuccessNeverCallsFast() async throws {
+        let reader = VisionTextReader(accurateTimeout: .seconds(8)) { _, level, _, page in
+            if level == .accurate { return [Self.fastLine] }
+            Issue.record("fast should not be called when accurate succeeds")
+            return []
+        }
+        let lines = try await reader.fragments(inImage: Data(), page: 0)
+        #expect(lines == [Self.fastLine])
+    }
+}
 #endif
