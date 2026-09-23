@@ -69,6 +69,7 @@ let package = Package(
         .testTarget(
             name: "TaxCaptureTests",
             dependencies: ["TaxCapture"],
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
