@@ -45,7 +45,9 @@ xcrun simctl bootstatus "$DEVICE" -b >/dev/null 2>&1 || xcrun simctl boot "$DEVI
 # 1. Cross-compile the package for the simulator. Its .o files are genuine iOS objects
 #    (LC_BUILD_VERSION platform 7); the "using sysroot for MacOSX" warning is cosmetic.
 swift build --scratch-path .build-ios \
-  -Xswiftc -sdk -Xswiftc "$SDK" -Xswiftc -target -Xswiftc "$TARGET" >/dev/null
+  -Xswiftc -sdk -Xswiftc "$SDK" -Xswiftc -target -Xswiftc "$TARGET" \
+  -Xcc -isysroot -Xcc "$SDK" \
+  -Xcc -target -Xcc "$TARGET" >/dev/null
 
 # 2. Compile the app sources and link them against those objects.
 rm -rf "$STAGE"; mkdir -p "$APP"
