@@ -60,26 +60,38 @@ public actor DocumentPipeline {
     private let pdfText: any PDFTextReading
     private let barcodes: any BarcodeReading
     private let now: @Sendable () -> Date
+    private let model: (any ReceiptModel)?
+    private let modelTimeout: Duration
 
     public init(normaliser: any ImageNormalising,
                 text: any TextReading,
                 pdfText: any PDFTextReading,
                 barcodes: any BarcodeReading,
-                now: @escaping @Sendable () -> Date = { Date() }) {
+                now: @escaping @Sendable () -> Date = { Date() },
+                model: (any ReceiptModel)? = nil,
+                modelTimeout: Duration = .seconds(3)) {
         self.normaliser = normaliser
         self.text = text
         self.pdfText = pdfText
         self.barcodes = barcodes
         self.now = now
+        self.model = model
+        self.modelTimeout = modelTimeout
     }
 
     #if canImport(Vision) && canImport(PDFKit) && canImport(ImageIO)
     /// The real adapters.
     public static func standard() -> DocumentPipeline {
-        DocumentPipeline(normaliser: ImageNormaliser(),
-                         text: VisionTextReader(),
-                         pdfText: PDFTextReader(ocr: VisionTextReader()),
-                         barcodes: VisionBarcodeReader())
+        #if canImport(FoundationModels)
+        let model: (any ReceiptModel)? = FoundationModelsReceiptModel()
+        #else
+        let model: (any ReceiptModel)? = nil
+        #endif
+        return DocumentPipeline(normaliser: ImageNormaliser(),
+                                text: VisionTextReader(),
+                                pdfText: PDFTextReader(ocr: VisionTextReader()),
+                                barcodes: VisionBarcodeReader(),
+                                model: model)
     }
     #endif
 
@@ -120,14 +132,23 @@ public actor DocumentPipeline {
             ReliefSuggester.suggest(vendor: fields.vendor?.value, text: joined, in: $0)
         } ?? []
 
-        return ReceiptReading(document: document,
-                              ocrText: ocrText,
-                              eInvoiceUUID: eInvoiceUUID,
-                              total: fields.total,
-                              date: fields.date,
-                              vendor: fields.vendor,
-                              totalCandidates: fields.totalCandidates,
-                              suggestedReliefs: suggestions,
-                              failures: failures)
+        var reading = ReceiptReading(document: document,
+                                     ocrText: ocrText,
+                                     eInvoiceUUID: eInvoiceUUID,
+                                     total: fields.total,
+                                     date: fields.date,
+                                     vendor: fields.vendor,
+                                     totalCandidates: fields.totalCandidates,
+                                     suggestedReliefs: suggestions,
+                                     failures: failures)
+        // Last, and optional: unavailable, refusing, slow or wrong, the parser's
+        // reading stands and nothing is said.
+        if let model, let ruleSet,
+           let question = ReceiptModelCheck.question(for: reading, in: ruleSet),
+           let answer = await ReceiptModelCheck.answer(from: model, to: question,
+                                                       within: modelTimeout) {
+            reading = ReceiptModelCheck.apply(answer, to: reading, question: question)
+        }
+        return reading
     }
 }
