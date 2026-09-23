@@ -21,6 +21,13 @@ public struct DocumentDraft: Hashable, Sendable, Identifiable {
     public var contentHash: String
     /// Uniform Type Identifier, e.g. `public.jpeg`, `com.adobe.pdf`.
     public var uti: String
+    /// Every line the recogniser read, joined. What a later search or the assistant reads;
+    /// nothing is derived from it here.
+    public var ocrText: String?
+    /// The MyInvois document UUID from the receipt's QR. A dedupe key and a badge — it
+    /// never changes `kind`, because which document a relief accepts is the rulebook's
+    /// call, not the QR's.
+    public var eInvoiceUUID: String?
 
     public init(id: UUID = UUID(),
                 kind: DocumentKind = .officialReceipt,
@@ -30,7 +37,9 @@ public struct DocumentDraft: Hashable, Sendable, Identifiable {
                 thumbnail: Data? = nil,
                 byteCount: Int = 0,
                 contentHash: String = "",
-                uti: String = "public.jpeg") {
+                uti: String = "public.jpeg",
+                ocrText: String? = nil,
+                eInvoiceUUID: String? = nil) {
         self.id = id
         self.kind = kind
         self.vendor = vendor
@@ -40,6 +49,8 @@ public struct DocumentDraft: Hashable, Sendable, Identifiable {
         self.byteCount = byteCount
         self.contentHash = contentHash
         self.uti = uti
+        self.ocrText = ocrText
+        self.eInvoiceUUID = eInvoiceUUID
     }
 }
 
@@ -67,10 +78,16 @@ extension TaxStore {
             throw DocumentAttachmentError.noSuchEntry
         }
 
+        // The same photo twice, or the same e-invoice twice as two different files — a
+        // PDF downloaded from the portal and a photo of the printout share a UUID and
+        // nothing else.
         let hash = draft.contentHash
-        if !hash.isEmpty,
-           let existing = (entry.documents ?? [])
-               .first(where: { $0.isLive && $0.file?.contentHash == hash }) {
+        let uuid = draft.eInvoiceUUID
+        if let existing = (entry.documents ?? []).first(where: { document in
+            document.isLive
+                && ((!hash.isEmpty && document.file?.contentHash == hash)
+                    || (uuid != nil && document.eInvoiceUUID == uuid))
+        }) {
             return existing.id
         }
 
@@ -81,6 +98,8 @@ extension TaxStore {
         document.documentDate = draft.documentDate
         document.total = draft.total
         document.thumbnail = draft.thumbnail
+        document.ocrText = draft.ocrText
+        document.eInvoiceUUID = draft.eInvoiceUUID
         document.updatedAt = stamp
 
         let file = DocumentFile(id: UUID())
@@ -117,7 +136,9 @@ extension TaxStore {
                               thumbnail: document.thumbnail,
                               byteCount: document.file?.byteCount ?? 0,
                               contentHash: document.file?.contentHash ?? "",
-                              uti: document.file?.uti ?? "public.data")
+                              uti: document.file?.uti ?? "public.data",
+                              ocrText: document.ocrText,
+                              eInvoiceUUID: document.eInvoiceUUID)
             }
     }
 
@@ -147,9 +168,91 @@ extension TaxStore {
         try modelContext.fetch(
             FetchDescriptor<Document>(predicate: #Predicate { $0.id == id })).first
     }
+
+    /// The other claims this file or e-invoice already supports — what the duplicate
+    /// warning prints. Spec §5: warned about, never blocked, because one bill can
+    /// honestly split across two reliefs.
+    ///
+    /// Only a live document on a live, unmerged entry counts. A receipt the user took off
+    /// a claim supports nothing, and warning about it would be warning about nothing.
+    public func claimsSupported(byHash hash: String,
+                                orEInvoiceUUID uuid: String?,
+                                excludingEntry excluded: UUID?) throws -> [SupportedClaim] {
+        var documents: [Document] = []
+        if !hash.isEmpty {
+            documents += try modelContext.fetch(FetchDescriptor<DocumentFile>(
+                predicate: #Predicate { $0.contentHash == hash }))
+                .compactMap(\.document)
+        }
+        if uuid != nil {
+            // Optional to optional, so the predicate macro compares like with like.
+            let match: String? = uuid
+            documents += try modelContext.fetch(FetchDescriptor<Document>(
+                predicate: #Predicate { $0.eInvoiceUUID == match }))
+        }
+
+        let liveDocuments: [Document] = documents.filter(\.isLive)
+        let candidateEntries: [ReliefEntry] = liveDocuments.flatMap { $0.entries ?? [] }
+        let eligibleEntries: [ReliefEntry] = candidateEntries.filter {
+            $0.isLive && $0.mergedInto == nil && $0.id != excluded
+        }
+
+        var seen: Set<UUID> = []
+        let deduped: [ReliefEntry] = eligibleEntries.filter { seen.insert($0.id).inserted }
+        let claims: [SupportedClaim] = deduped.map {
+            SupportedClaim(entryID: $0.id, code: $0.reliefCode,
+                           amount: $0.amount, spentOn: $0.spentOn)
+        }
+        return claims.sorted(by: Self.isEarlier)
+    }
+
+    /// Earliest `spentOn` first, undated last, ties broken on entry id for a stable order.
+    private static func isEarlier(_ lhs: SupportedClaim, _ rhs: SupportedClaim) -> Bool {
+        switch (lhs.spentOn, rhs.spentOn) {
+        case let (l?, r?):
+            if l != r { return l < r }
+            return lhs.entryID.uuidString < rhs.entryID.uuidString
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            return lhs.entryID.uuidString < rhs.entryID.uuidString
+        }
+    }
+
+    /// Whether any document row points at this file. Cancelling a scan deletes the file it
+    /// wrote only when this is false.
+    ///
+    /// Soft-deleted rows count: `restoreDocument` would bring the row back, and a restored
+    /// receipt whose file had been deleted underneath it is a thumbnail with nothing behind
+    /// it. Deliberately stricter than "a live `DocumentFile`" (spec §5) for that reason.
+    public func isFileReferenced(hash: String) throws -> Bool {
+        guard !hash.isEmpty else { return false }
+        var descriptor = FetchDescriptor<DocumentFile>(
+            predicate: #Predicate { $0.contentHash == hash })
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
+    }
 }
 
 public enum DocumentAttachmentError: Error, Hashable, Sendable {
     /// The entry is gone. Attaching to it would create a document nothing can reach.
     case noSuchEntry
+}
+
+/// Another claim a receipt already supports: what the duplicate warning prints, and
+/// nothing more.
+public struct SupportedClaim: Hashable, Sendable {
+    public var entryID: UUID
+    public var code: ReliefCode
+    public var amount: Money
+    public var spentOn: Date?
+
+    public init(entryID: UUID, code: ReliefCode, amount: Money, spentOn: Date?) {
+        self.entryID = entryID
+        self.code = code
+        self.amount = amount
+        self.spentOn = spentOn
+    }
 }
