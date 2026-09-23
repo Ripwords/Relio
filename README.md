@@ -68,8 +68,10 @@ but never picks one. Fields it was unsure of carry an orange mark until you edit
 confirm them. Nothing is saved until you tap Save, and the receipt is attached then.
 
 - **All on the device.** Apple's Vision reads the text, and a fixed set of rules picks out the
-  figures. Where Apple Intelligence is available, the on-device model may choose between
-  two conflicting totals or fill in a missing vendor. Anything it says that is not in the
+  figures. Where Apple Intelligence is available, the on-device model may pick the total
+  from the parser's own candidates when it is unsure, or supply or replace a vendor the
+  parser was unsure of — using only what the receipt's own text says — and it may move one
+  relief it names to the front of the suggestions. Anything it says that is not in the
   receipt's own text is thrown away, and whatever it supplies is always marked unconfirmed.
   There is no network call.
 - **MyInvois e-invoices.** The QR is read for its document ID, which badges the receipt
