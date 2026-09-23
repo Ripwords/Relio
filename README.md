@@ -26,8 +26,9 @@ and for what remains unverified.
 | iOS app — Home, Reliefs, entry CRUD, Income, onboarding | ✅ Built; every screen read on the simulator |
 | Settings, Compare, Documents outstanding, Dependants, Tax summary | ✅ Built and read on the simulator |
 | iCloud sync | Built, not verified end to end — needs two signed-in devices |
-| Attaching a receipt (photo or file), local file store | ✅ Built and read on the simulator |
-| OCR, MyInvois e-invoices, iCloud Drive file sync | Not started — files are kept on one device |
+| Scanning or attaching a receipt (camera, photo or file), read on device: total, date, vendor, relief suggestions | ✅ Built and read on the simulator; the document camera needs a real device |
+| MyInvois e-invoices | QR read offline for the document ID and a badge; the verified figures behind the link are not fetched |
+| iCloud Drive file sync, share extension | Not started — files are kept on one device |
 | On-device AI assistant | Not started |
 | iPad | Runs, and every screen is usable; not the three-column layout spec §11 describes |
 | watchOS, macOS, widgets | Not started |
@@ -58,6 +59,29 @@ Still claimable         RM   5,563.20
 ```
 
 Those are the recorded values in [`golden-ya2025.json`](Tests/TaxKitTests/Fixtures/golden-ya2025.json), so the suite fails if the engine ever stops producing them.
+
+## Reading receipts
+
+A receipt starts an entry. **Scan a receipt** (beside **+**) opens the document camera,
+Photos or Files. Relio reads the total, date and vendor, and suggests up to three reliefs,
+but never picks one. Fields it was unsure of carry an orange mark until you edit or
+confirm them. Nothing is saved until you tap Save, and the receipt is attached then.
+
+- **All on the device.** Apple's Vision reads the text, and a fixed set of rules picks out the
+  figures. Where Apple Intelligence is available, the on-device model may choose between
+  two conflicting totals or fill in a missing vendor. Anything it says that is not in the
+  receipt's own text is thrown away, and whatever it supplies is always marked unconfirmed.
+  There is no network call.
+- **MyInvois e-invoices.** The QR is read for its document ID, which badges the receipt
+  and catches the same e-invoice attached twice. The figures behind the link are not
+  fetched, since that would mean a network call to LHDN.
+- **Attaching to a saved entry** reads the receipt too. If its total is certain and
+  differs from the entry, Relio offers it ("The receipt says RM 128.40. Use that?") and
+  leaves the choice to you.
+- **The same receipt on two claims** is warned about, not blocked. One bill can
+  legitimately split across two reliefs.
+- Photos are resized and stripped of their metadata, GPS included, before they are
+  stored.
 
 ## What TaxData adds
 
@@ -107,6 +131,8 @@ they did. A DEBUG-only harness fixes it: anything after `--` is passed to the ap
 ./Scripts/run-app.sh shot.png -- -relio-demo                      # seeded Home
 ./Scripts/run-app.sh shot.png -- -relio-demo -relio-screen docs   # any named screen
 ./Scripts/run-app.sh shot.png -- -relio-demo -relio-screen entry:LIFESTYLE:3000
+./Scripts/run-app.sh shot.png -- -relio-demo -relio-scan          # a scanned receipt, prefilled
+./Scripts/run-app.sh shot.png -- -relio-demo -relio-scan-einvoice # the same, with a MyInvois QR
 ```
 
 `-relio-demo` seeds the household this README's worked example describes.
@@ -117,6 +143,11 @@ forces the welcome flow, `-relio-empty` completes it and seeds nothing (every em
 lives there), and `-relio-year 2023` opens on another Year of Assessment. Combine with `xcrun simctl ui <device>
 appearance dark` and `content_size accessibility-extra-extra-extra-large` to check both
 of the axes the spec requires.
+
+`-relio-scan` feeds a generated receipt through the real reading pipeline into a
+prefilled new-entry editor (`-relio-scan-einvoice` adds a MyInvois QR; `-relio-screen
+scan-picker` opens its relief picker), and `-relio-attach` attaches the same receipt to
+the first seeded entry. Only the camera and the system pickers are skipped.
 
 `RELIO_SIM_DEVICE_TYPE` drives the same script from an iPad:
 

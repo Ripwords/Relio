@@ -16,6 +16,9 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <!-- VisionKit's document camera. Without this key the app is killed on first scan. -->
+    <key>NSCameraUsageDescription</key>
+    <string>Relio uses the camera to scan receipts. The photo stays on this device.</string>
     <!-- `local` or `cloudKit`, from TAXTRACKER_STORAGE_MODE in Config/Signing.xcconfig.
          A plist value rather than a #if, so both paths compile in every build. -->
     <key>RelioStorageMode</key>

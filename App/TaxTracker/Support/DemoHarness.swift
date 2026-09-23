@@ -3,6 +3,7 @@ import Foundation
 import UIKit
 import TaxKit
 import TaxData
+import TaxCapture
 
 /// Deterministic app state, driven by launch arguments, so any screen can be put on
 /// screen and photographed without touching the device.
@@ -53,28 +54,25 @@ enum DemoHarness {
     /// anything can be captured, which is why the zoom transition shipped unwatched.
     static var delay: Double? { value(after: "-relio-delay").flatMap(Double.init) }
 
-    /// Attach a generated image to the first seeded entry on launch.
+    /// Attach a generated receipt to the first seeded entry on launch, read through the
+    /// real pipeline and `EntryEditorViewModel.attach(_:files:)`.
     ///
     /// The picker itself needs a tap and cannot be driven here, but everything behind it
-    /// can: bytes to `DocumentFileStore`, a hash back, `TaxStore.attach`, the requirement
-    /// re-derived, and the row rendered with its thumbnail. This exercises all of that,
-    /// which is the difference between the attach path being tested and being seen.
+    /// can: normalising, OCR, the file store, `TaxStore.attach`, the requirement
+    /// re-derived, and the row rendered with its thumbnail.
     static var wantsAttachment: Bool { arguments.contains("-relio-attach") }
 
-    /// A small solid-colour JPEG. Real bytes, so the hash, the byte count and the
-    /// thumbnail are all genuinely computed rather than stubbed.
-    static func sampleReceiptData() -> Data? {
-        let size = CGSize(width: 900, height: 1300)
-        let image = UIGraphicsImageRenderer(size: size).image { context in
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: size))
-            UIColor.darkGray.setFill()
-            for row in 0..<12 {
-                let y = 120.0 + Double(row) * 90.0
-                context.fill(CGRect(x: 90, y: y, width: 720 - Double(row % 4) * 120, height: 26))
-            }
-        }
-        return image.jpegData(compressionQuality: 0.8)
+    /// Open a new-entry editor prefilled from a generated receipt, as `-relio-scan`, or
+    /// `-relio-scan-einvoice` for one that carries a MyInvois QR.
+    static var wantsScan: Bool {
+        arguments.contains("-relio-scan") || arguments.contains("-relio-scan-einvoice")
+    }
+
+    /// The QR the generated receipt carries, if any. LHDN's own example document ID.
+    static var scanQR: String? {
+        arguments.contains("-relio-scan-einvoice")
+            ? "https://myinvois.hasil.gov.my/F9D425P6DS7D8IU/share/RZ6FQYX9J1G6V3K8H2M4T7W0"
+            : nil
     }
 
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }

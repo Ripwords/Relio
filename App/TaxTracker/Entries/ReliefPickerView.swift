@@ -15,6 +15,8 @@ import TaxPresentation
 struct ReliefPickerView: View {
 
     let options: [ReliefOption]
+    /// Read off the receipt. Shown first, never selected — the user still chooses.
+    var suggested: [ReliefCode] = []
     @Binding var selection: ReliefCode?
 
     @State private var search = ""
@@ -22,38 +24,15 @@ struct ReliefPickerView: View {
 
     var body: some View {
         List {
-            ForEach(matches) { option in
-                Button {
-                    selection = option.code
-                    dismiss()
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(ReliefCopy.shortName(for: option.code, fullName: option.name))
-                                .foregroundStyle(.primary)
-                            // LHDN's own wording, which is what says whether this receipt
-                            // belongs here. Two lines is enough to disambiguate without
-                            // turning the list into a wall.
-                            //
-                            // Omitted where the two are the same string: "Breastfeeding
-                            // equipment" above "Breastfeeding equipment" is noise, and a
-                            // few reliefs are already short enough to need no shortening.
-                            let full = option.name
-                            if full != ReliefCopy.shortName(for: option.code, fullName: full) {
-                                Text(full)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        Spacer(minLength: 8)
-                        if selection == option.code {
-                            Image(systemName: "checkmark").foregroundStyle(.tint)
-                        }
-                    }
-                    .contentShape(Rectangle())
+            if !suggestedMatches.isEmpty {
+                Section("Suggested from the receipt") {
+                    ForEach(suggestedMatches) { row($0) }
                 }
-                .buttonStyle(.plain)
+                Section("All reliefs") {
+                    ForEach(matches) { row($0) }
+                }
+            } else {
+                ForEach(matches) { row($0) }
             }
         }
         .navigationTitle("Choose a relief")
@@ -64,6 +43,40 @@ struct ReliefPickerView: View {
                 ContentUnavailableView.search(text: search)
             }
         }
+    }
+
+    private func row(_ option: ReliefOption) -> some View {
+        Button {
+            selection = option.code
+            dismiss()
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ReliefCopy.shortName(for: option.code, fullName: option.name))
+                        .foregroundStyle(.primary)
+                    // LHDN's own wording, which is what says whether this receipt
+                    // belongs here. Two lines is enough to disambiguate without
+                    // turning the list into a wall.
+                    //
+                    // Omitted where the two are the same string: "Breastfeeding
+                    // equipment" above "Breastfeeding equipment" is noise, and a
+                    // few reliefs are already short enough to need no shortening.
+                    let full = option.name
+                    if full != ReliefCopy.shortName(for: option.code, fullName: full) {
+                        Text(full)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 8)
+                if selection == option.code {
+                    Image(systemName: "checkmark").foregroundStyle(.tint)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// Matches the short name, LHDN's full name and the code, the same three the Reliefs
@@ -78,5 +91,11 @@ struct ReliefPickerView: View {
                 || option.name.lowercased().contains(needle)
                 || option.code.rawValue.lowercased().contains(needle)
         }
+    }
+
+    /// In the suggester's order, and only those that are both offered here and matching
+    /// the search. A suggestion the list cannot show is not shown.
+    private var suggestedMatches: [ReliefOption] {
+        suggested.compactMap { code in matches.first { $0.code == code } }
     }
 }

@@ -32,6 +32,9 @@ extension EntryEditorViewModel {
 
     public var pendingReceiptThumbnail: Data? { pendingReceipt?.draft.thumbnail }
 
+    /// The open year's rulebook, which relief suggestions are drawn from.
+    public var receiptRuleSet: RuleSet? { context.ruleSet }
+
     /// Opens a new entry from a receipt: amount, date and vendor set, relief candidates
     /// ready, and the file written and waiting. Call before `load()`.
     ///

@@ -2,6 +2,7 @@ import SwiftUI
 import TaxKit
 import TaxData
 import TaxPresentation
+import TaxCapture
 
 struct RootView: View {
 
@@ -28,6 +29,11 @@ struct RootView: View {
     /// stack needs a path to append to.
     @State private var path = NavigationPath()
     @State private var editingEntry: EntryEditorViewModel?
+    /// Home's "Scan a receipt": which picker is open.
+    @State private var captureSource: ReceiptSource?
+    /// A receipt that could not be decoded or saved. Shown as an alert, since no editor
+    /// is open yet to show it in.
+    @State private var captureError: String?
     @State private var showUndo = false
     @State private var lastDeleted: EntryEditorViewModel?
     // `nil` means the preference has not been read yet. Defaulting this to "show
@@ -131,18 +137,14 @@ struct RootView: View {
             // until an entry has an identity to attach to.
             if DemoHarness.wantsAttachment,
                let entry = try? await store.entryDrafts(forYear: context.year).first,
-               let data = DemoHarness.sampleReceiptData(),
-               let files = try? DocumentFileStore(),
-               let stored = try? files.write(data, extension: "jpg") {
-                let draft = DocumentDraft(kind: .officialReceipt,
-                                          vendor: entry.vendor,
-                                          documentDate: entry.spentOn,
-                                          thumbnail: data,
-                                          byteCount: stored.byteCount,
-                                          contentHash: stored.contentHash,
-                                          uti: "public.jpeg")
-                _ = try? await store.attach(draft, toEntry: entry.id)
-                await context.reload()
+               let data = SampleReceipt.jpeg(),
+               case .read(let reading) = await CapturePipeline.read(.image(data),
+                                                                    ruleSet: context.ruleSet),
+               let files = try? DocumentFileStore() {
+                let editor = EntryEditorViewModel(context: context, store: store,
+                                                  editing: entry.id)
+                await editor.load()
+                _ = await editor.attach(reading, files: files)
                 await home.refresh()
                 await documents.refresh()
             }
@@ -151,6 +153,14 @@ struct RootView: View {
                 path.append(EntryRoute(entryID: first.id))
             }
             openDemoScreen()
+            // Scan first, through the same pipeline and `openScanned` a real scan takes.
+            // Only the camera is skipped, which the simulator does not have.
+            if DemoHarness.wantsScan,
+               let data = SampleReceipt.jpeg(qr: DemoHarness.scanQR),
+               case .read(let reading) = await CapturePipeline.read(.image(data),
+                                                                    ruleSet: context.ruleSet) {
+                await openScanned(reading)
+            }
             #endif
         }
         // Duplicates arriving while the app was closed are what this catches. One that
@@ -208,6 +218,8 @@ struct RootView: View {
                 selectedTab = .reliefs
                 selectedRelief = code
             }
+        case "scan-picker":
+            break   // `-relio-scan` opens the editor; the editor opens its picker.
         default:
             print("[DemoHarness] unknown screen '\(screen)'")
         }
@@ -352,6 +364,9 @@ struct RootView: View {
                             .accessibilityLabel("Settings")
                         }
                         ToolbarItem(placement: .primaryAction) {
+                            ReceiptSourceMenu(source: $captureSource)
+                        }
+                        ToolbarItem(placement: .primaryAction) {
                             Button {
                                 editingEntry = EntryEditorViewModel(context: context,
                                                                     store: store, editing: nil)
@@ -381,6 +396,15 @@ struct RootView: View {
         .sheet(item: $editingEntry) { model in
             EntryEditorView(model: model, presentation: .sheet,
                             onSaved: handleSaved, onDeleted: handleDeleted)
+        }
+        .receiptCapture(source: $captureSource,
+                        ruleSet: context.ruleSet,
+                        onRead: { reading in await openScanned(reading) },
+                        onError: { captureError = $0 })
+        .alert(captureError ?? "",
+               isPresented: Binding(get: { captureError != nil },
+                                    set: { if !$0 { captureError = nil } })) {
+            Button("OK", role: .cancel) {}
         }
         .overlay(alignment: .bottom) {
             if showUndo, let lastDeleted {
@@ -494,6 +518,9 @@ struct RootView: View {
                             .accessibilityLabel("Settings")
                         }
                         ToolbarItem(placement: .primaryAction) {
+                            ReceiptSourceMenu(source: $captureSource)
+                        }
+                        ToolbarItem(placement: .primaryAction) {
                             Button {
                                 editingEntry = EntryEditorViewModel(context: context,
                                                                     store: store,
@@ -546,6 +573,15 @@ struct RootView: View {
                             onSaved: handleSaved,
                             onDeleted: handleDeleted)
         }
+        .receiptCapture(source: $captureSource,
+                        ruleSet: context.ruleSet,
+                        onRead: { reading in await openScanned(reading) },
+                        onError: { captureError = $0 })
+        .alert(captureError ?? "",
+               isPresented: Binding(get: { captureError != nil },
+                                    set: { if !$0 { captureError = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
         .overlay(alignment: .bottom) {
             if showUndo, let lastDeleted {
                 UndoToast(message: "Entry deleted",
@@ -585,6 +621,18 @@ struct RootView: View {
         let model = EntryEditorViewModel(context: context, store: store, editing: nil)
         model.prefill(code: route.code, amount: route.amount)
         return model
+    }
+
+    /// Scan first (spec §5): a new-entry editor holding what the receipt said, its file
+    /// already written and waiting for Save.
+    private func openScanned(_ reading: ReceiptReading) async {
+        let model = EntryEditorViewModel(context: context, store: store, editing: nil)
+        guard let files = try? DocumentFileStore(),
+              await model.prefill(from: reading, files: files) else {
+            captureError = "Relio could not save that file. Try again."
+            return
+        }
+        editingEntry = model
     }
 
     private func handleDeleted(_ model: EntryEditorViewModel) {

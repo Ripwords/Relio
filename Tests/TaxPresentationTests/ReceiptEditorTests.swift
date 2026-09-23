@@ -272,6 +272,13 @@ import TaxCapture
         #expect(await model.prefill(from: ReceiptFixture.reading(),
                                     files: try ReceiptFixture.files()) == false)
     }
+
+    @Test("a receipt is read against the open year's rulebook")
+    func readsAgainstTheOpenYear() async throws {
+        let store = try await PresentationFixture.store()
+        let model = await ReceiptFixture.newEditor(store, year: 2024)
+        #expect(model.receiptRuleSet?.yearOfAssessment == 2024)
+    }
 }
 
 @Suite("Entry editor: attaching a receipt to a saved entry") @MainActor

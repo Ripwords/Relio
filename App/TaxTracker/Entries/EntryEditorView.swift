@@ -1,9 +1,8 @@
 import SwiftUI
-import PhotosUI
-import UniformTypeIdentifiers
 import TaxKit
 import TaxData
 import TaxPresentation
+import TaxCapture
 
 /// How the editor is on screen.
 ///
@@ -36,12 +35,9 @@ struct EntryEditorView: View {
     /// A button plus `navigationDestination(isPresented:)` rather than a NavigationLink,
     /// so a screenshot run can open the picker — there is no way to tap this simulator.
     @State private var isPickingRelief = false
-    @State private var pickedPhoto: PhotosPickerItem?
-    @State private var isImportingFile = false
     @State private var attachError: String?
-    /// Which kind the next attachment will be recorded as. Defaults to what the relief
-    /// asks for, because that is almost always what the user is holding.
-    @State private var attachingKind: DocumentKind = .officialReceipt
+    /// Which picker, if any, is open. See `ReceiptCaptureModifier`.
+    @State private var captureSource: ReceiptSource?
 
     init(model: EntryEditorViewModel,
          presentation: EntryEditorPresentation,
@@ -73,6 +69,10 @@ struct EntryEditorView: View {
                 }
             }
 
+            if model.hasPendingReceipt {
+                receiptSection
+            }
+
             Section {
                 // A searchable list rather than a `Picker`. Two dozen reliefs with no way
                 // to search is a lot of scrolling on the screen the app exists to make
@@ -95,11 +95,16 @@ struct EntryEditorView: View {
                 }
                 .buttonStyle(.plain)
 
-                LabeledContent("Amount") {
+                LabeledContent {
                     TextField("0.00", text: $model.amountText)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .monospacedDigit()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Amount")
+                        unconfirmedMark(.amount)
+                    }
                 }
 
                 // The cap, while there is still time to do something about it. Without
@@ -129,7 +134,10 @@ struct EntryEditorView: View {
             }
 
             Section {
-                TextField("Vendor", text: $model.vendor)
+                HStack {
+                    TextField("Vendor", text: $model.vendor)
+                    unconfirmedMark(.vendor)
+                }
                 // A button that reveals the picker, not a toggle labelled "Has a date" —
                 // the same shape the dependant editor uses, and better for the same
                 // reason: it asks the user to do the thing they want rather than to
@@ -138,10 +146,14 @@ struct EntryEditorView: View {
                 // The three-state care is unchanged. `spentOn` stays nil until the picker
                 // is actually moved, so an entry with no date keeps having no date.
                 if hasDate {
-                    DatePicker("Spent on",
-                               selection: Binding(get: { model.spentOn ?? Date() },
+                    DatePicker(selection: Binding(get: { model.spentOn ?? Date() },
                                                   set: { model.spentOn = $0 }),
-                               displayedComponents: .date)
+                               displayedComponents: .date) {
+                        HStack(spacing: 6) {
+                            Text("Spent on")
+                            unconfirmedMark(.date)
+                        }
+                    }
                     Button("Remove the date") {
                         hasDate = false
                         model.spentOn = nil
@@ -184,12 +196,18 @@ struct EntryEditorView: View {
         }
             .navigationTitle(model.isEditing ? "Edit entry" : "New entry")
             .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(model.hasPendingReceipt)
             .toolbar {
                 // The pushed copy already has a back button doing exactly this; only the
                 // sheet, which has no way out otherwise, needs its own.
                 if presentation == .sheet {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        Button("Cancel") {
+                            Task {
+                                await model.discardPendingReceipt()
+                                dismiss()
+                            }
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -198,6 +216,8 @@ struct EntryEditorView: View {
                             if await model.save() {
                                 onSaved()
                                 dismiss()
+                            } else if model.attachFailed {
+                                onSaved()
                             }
                         }
                     }
@@ -206,13 +226,14 @@ struct EntryEditorView: View {
             }
             .navigationDestination(isPresented: $isPickingRelief) {
                 ReliefPickerView(options: model.availableCodes,
+                                 suggested: model.suggestedReliefs,
                                  selection: $model.selectedCode)
             }
             .task {
                 await model.load()
                 hasDate = model.spentOn != nil
                 #if DEBUG
-                if DemoHarness.screen == "relief-picker" { isPickingRelief = true }
+                if ["relief-picker", "scan-picker"].contains(DemoHarness.screen) { isPickingRelief = true }
                 #endif
             }
             .onChange(of: hasDate) { _, isOn in
@@ -228,14 +249,10 @@ struct EntryEditorView: View {
             .onChange(of: model.claimant) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.dependentID) { Task { await model.checkForDuplicate() } }
             .onChange(of: model.spentOn) { Task { await model.checkForDuplicate() } }
-            .onChange(of: pickedPhoto) { _, item in
-                guard let item else { return }
-                Task { await attach(from: item) }
-            }
-            .fileImporter(isPresented: $isImportingFile,
-                          allowedContentTypes: [.image, .pdf]) { result in
-                Task { await attach(from: result) }
-            }
+            .receiptCapture(source: $captureSource,
+                            ruleSet: model.receiptRuleSet,
+                            onRead: { reading in await attach(reading) },
+                            onError: { attachError = $0 })
             // The claim's supporting document is a destructive thing to remove, and spec
             // §11.6 wants every one of those undoable.
             .overlay(alignment: .bottom) {
@@ -250,70 +267,101 @@ struct EntryEditorView: View {
             }
     }
 
-    /// A photo from the library. Read as `Data`, written to the file store, then recorded.
-    private func attach(from item: PhotosPickerItem) async {
+    /// Attaches a read receipt to this saved entry. The view model writes the file,
+    /// records what was read, and decides the document kind from the relief.
+    private func attach(_ reading: ReceiptReading) async {
         attachError = nil
-        pickedPhoto = nil
-        guard let data = try? await item.loadTransferable(type: Data.self) else {
-            attachError = "That photo could not be read. Try another."
-            return
-        }
-        await store(data, extension: "jpg", uti: "public.jpeg")
-    }
-
-    /// A file from Files. The security-scoped URL has to be opened and closed around the
-    /// read, or the bytes come back empty for anything outside the app's own container.
-    private func attach(from result: Result<URL, any Error>) async {
-        attachError = nil
-        guard case .success(let url) = result else {
-            attachError = "That file could not be opened. Try another."
-            return
-        }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else {
-            attachError = "That file could not be read. Try another."
-            return
-        }
-        let ext = url.pathExtension.isEmpty ? "dat" : url.pathExtension
-        let uti = UTType(filenameExtension: ext)?.identifier ?? "public.data"
-        await store(data, extension: ext, uti: uti)
-    }
-
-    /// Writes the bytes, then records what they hash to.
-    ///
-    /// The thumbnail is the only part that would ever sync (spec §6), so it is made here
-    /// and kept small rather than mirroring the full image.
-    private func store(_ data: Data, extension ext: String, uti: String) async {
-        do {
-            let files = try DocumentFileStore()
-            let stored = try files.write(data, extension: ext)
-            let attached = await model.attachDocument(
-                kind: attachingKind,
-                contentHash: stored.contentHash,
-                byteCount: stored.byteCount,
-                uti: uti,
-                thumbnail: Self.thumbnail(from: data))
-            if !attached {
-                attachError = "Relio could not attach that. Nothing was lost — try again."
-            }
-            onSaved()
-        } catch {
+        guard let files = try? DocumentFileStore() else {
             attachError = "Relio could not save that file. Try again."
+            return
+        }
+        switch await model.attach(reading, files: files) {
+        case .attached:
+            onSaved()
+        case .couldNotSave:
+            attachError = "Relio could not save that file. Try again."
+        case .couldNotAttach:
+            attachError = "Relio could not attach that. Nothing was lost — try again."
         }
     }
 
-    /// ~30 KB is what spec §6 budgets for the only image bytes that sync. A 256-point
-    /// square is comfortably inside that as JPEG and is legible in a row.
-    private static func thumbnail(from data: Data) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let side: CGFloat = 256
-        let scale = min(side / max(image.size.width, 1), side / max(image.size.height, 1), 1)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let rendered = UIGraphicsImageRenderer(size: size).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
+    /// A small orange mark on a field the receipt filled in without confidence. Tapping it
+    /// confirms the value; editing the field clears it too.
+    @ViewBuilder
+    private func unconfirmedMark(_ field: ReceiptField) -> some View {
+        if model.unconfirmed.contains(field) {
+            Button {
+                model.confirm(field)
+            } label: {
+                Image(systemName: "questionmark.circle.fill")
+                    .foregroundStyle(.orange)
+            }
+            // Borderless, or the whole Form row becomes the button.
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Read from the receipt, not confirmed")
+            .accessibilityHint("Confirms the value")
         }
-        return rendered.jpegData(compressionQuality: 0.7)
+    }
+
+    /// The scanned receipt waiting for Save, and everything the reading has to say.
+    private var receiptSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                documentThumbnail(model.pendingReceiptThumbnail)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Receipt")
+                    if model.isEInvoice {
+                        Label("MyInvois e-invoice", systemImage: "checkmark.seal")
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                    }
+                    Text("Attached when you save.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if model.couldNotReadReceipt {
+                Text("Relio couldn't read this receipt — fill it in below.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            if let mismatch = model.receiptYearMismatch {
+                Label(mismatch, systemImage: "calendar.badge.exclamationmark")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+            if let warning = model.receiptDuplicateWarning {
+                Label(warning, systemImage: "doc.on.doc")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+            if model.attachFailed {
+                Label("Relio could not attach that. Nothing was lost — try again.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        } footer: {
+            if !model.unconfirmed.isEmpty {
+                Text("Relio was not sure of the marked fields. Check them, or tap the mark to confirm.")
+            }
+        }
+    }
+
+    /// 40-point thumbnail, or a document glyph when there is none to show.
+    @ViewBuilder
+    private func documentThumbnail(_ data: Data?) -> some View {
+        if let data, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        } else {
+            Image(systemName: "doc")
+                .frame(width: 40, height: 40)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// The receipts and certificates supporting this claim.
@@ -326,17 +374,7 @@ struct EntryEditorView: View {
         Section {
             ForEach(model.documents) { document in
                 HStack(spacing: 12) {
-                    if let data = document.thumbnail, let image = UIImage(data: data) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 40, height: 40)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    } else {
-                        Image(systemName: "doc")
-                            .frame(width: 40, height: 40)
-                            .foregroundStyle(.secondary)
-                    }
+                    documentThumbnail(document.thumbnail)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ReliefCopy.text(for: document.kind))
                         Text(document.byteCount.formatted(.byteCount(style: .file)))
@@ -352,13 +390,28 @@ struct EntryEditorView: View {
                 }
             }
 
+            if let offer = model.receiptAmountOfferText {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(offer)
+                    // Side by side where they fit, stacked at the largest text sizes.
+                    ViewThatFits {
+                        HStack(spacing: 16) { offerButtons }
+                        VStack(alignment: .leading, spacing: 8) { offerButtons }
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
             if !model.isReadOnly {
-                PhotosPicker(selection: $pickedPhoto, matching: .images) {
+                if DocumentCameraView.isSupported {
+                    Button { captureSource = .camera } label: {
+                        Label("Scan a receipt", systemImage: "doc.viewfinder")
+                    }
+                }
+                Button { captureSource = .photo } label: {
                     Label("Attach a photo", systemImage: "photo")
                 }
-                Button {
-                    isImportingFile = true
-                } label: {
+                Button { captureSource = .file } label: {
                     Label("Attach a file", systemImage: "folder")
                 }
             }
@@ -369,10 +422,21 @@ struct EntryEditorView: View {
         }
     }
 
+    /// Offer, never inject (spec §5): the field changes, and the user still saves.
+    @ViewBuilder
+    private var offerButtons: some View {
+        Button("Use it") { model.useReceiptAmount() }
+        Button("Keep mine") { model.dismissReceiptAmountOffer() }
+            .foregroundStyle(.secondary)
+    }
+
     @ViewBuilder
     private var documentsFooter: some View {
         if let attachError {
             Label(attachError, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+        } else if let warning = model.receiptDuplicateWarning {
+            Label(warning, systemImage: "doc.on.doc")
                 .foregroundStyle(.orange)
         } else if model.documents.isEmpty, let needed = model.requiredDocumentKinds.first {
             // Names the one that would satisfy the claim rather than listing everything a
