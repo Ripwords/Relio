@@ -401,15 +401,17 @@ import TaxKit
         #expect(!files.isEmpty)
 
         let receiptAmountPath = "/Sources/TaxCapture/Parsing/ReceiptAmount.swift"
-        // The exemption below only widens correctly while this file is still checked —
-        // if it ever stopped being found, the `hasSuffix` skip could be exempting the
-        // whole package unnoticed.
-        #expect(files.contains { $0.path.hasSuffix(receiptAmountPath) })
+        func isExemptTaxCaptureFile(_ file: URL) -> Bool {
+            file.path.contains("/Sources/TaxCapture/") && !file.path.hasSuffix(receiptAmountPath)
+        }
+        let checked = files.filter { !isExemptTaxCaptureFile($0) }
+        // Asserted against `checked`, the same set the loop below scans — not `files` —
+        // so this pin and the exemption predicate cannot disagree. If a future edit
+        // widened the exemption to swallow `ReceiptAmount.swift` too, this would fail
+        // here rather than silently letting the whole package through.
+        #expect(checked.contains { $0.path.hasSuffix(receiptAmountPath) })
 
-        for file in files {
-            if file.path.contains("/Sources/TaxCapture/"), !file.path.hasSuffix(receiptAmountPath) {
-                continue
-            }
+        for file in checked {
             let source = try String(contentsOf: file, encoding: .utf8)
             for (number, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let text = String(line)
