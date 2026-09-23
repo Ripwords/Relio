@@ -9,9 +9,12 @@ review after each, a fix loop, then this close-out.
 
 **Test counts, measured directly (not taken from an earlier note):**
 
+- **At merge-ready HEAD** (after the final review's fixes): **789 tests in 96 suites, all
+  passed**. See "Final review" below.
+
 - **Before** (`9476a18`, in a detached scratch worktree, `swift test`): **669 tests in 82
   suites, all passed.**
-- **After** (`HEAD` = `23b9281`, `swift test`): **777 tests in 95 suites — 775 passed, 2
+- **After Task 13** (`23b9281`, `swift test`): **777 tests in 95 suites — 775 passed, 2
   failed.** The 2 failures are `Tests/TaxCaptureTests/AdapterTests.swift`'s
   `"Vision reads the sample receipt, and the parser finds its total"` and
   `"a page with no text layer is OCR'd"`, both with Vision's
@@ -352,17 +355,63 @@ Numbered on from the highest item number in the earlier ledgers (item 19, in
     nothing here backfills them.
 25. **The iCloud Drive file store and the share extension** (spec §8) remain separate,
     unstarted work; documents stay on one device.
+26. **The e-invoice badge has never been seen on screen.** On the simulator, Vision's
+    barcode request throws for the generated QR, so neither the pending badge nor the
+    saved-document badge rendered. Both are driven by a tested `Bool`. Confirm them on a
+    device, together with item 20.
+27. **Parked Minors from the final review** (`final-review.md` numbering):
+    - M4: the model is asked even when every field is already confirmed.
+    - M5: model availability is checked once per launch.
+    - M7: `ReadingStage.model` is never set, and `failures` has no reader in the UI.
+    - M10: the 2000 px long edge may be too small for a QR on a tall receipt. Decide this
+      after item 20's real scan.
+    - M11: camera pages are JPEG-encoded on the main actor.
+    - M12: relief keyword false positives ("POPULAR", "TUITION FEE", "INSURANCE").
+    - M13: PDFTextReader re-creates the document per page, has no cancellation check,
+      and uses a bare 0.8 quality.
+    - M14: duplicated two-digit-year code, bare parser confidence literals, and an unused
+      `record` binding.
+    - The test fixture `SilentModel` leaks a continuation on purpose, and so prints a
+      runtime warning on every `swift test` run, which could mask a real one.
 
 ---
+
+## Final review
+
+- **Reviewer:** opus, over `9476a18..f258790`.
+- **Verdict:** With fixes. 0 Critical, 2 Important, 14 Minor.
+- **I1:** text reading had no fallback. When the accurate mode failed, which it does on
+  this Mac, the user waited 35–50 s behind the reading overlay and then got "couldn't
+  read". The fast mode reads the same receipt in 0.14 s.
+- **I2:** the MyInvois badge showed only before the entry was saved.
+
+**One fix wave** (`0cf3852..a25e4fa`):
+- I1: an 8 s bound on the accurate mode, then one retry in the fast mode, English only.
+- I2: the badge on saved documents.
+- M1 and M2: a failure on one page no longer loses the other pages' text and QR codes.
+- M3: cancelling the caller also cancels the model race.
+- M6: the README now describes what the model may change.
+- M8: attaching a receipt to an existing entry says when nothing could be read.
+- M9: a file left orphaned by e-invoice dedupe is deleted.
+- The two AdapterTests that failed through this plan now pass, because the fast mode
+  reads the receipt when the accurate one fails.
+
+`68a98dd` also committed a debugging screenshot to the repo root by mistake. `c35a970`
+removes it. History was not rewritten.
+
+**The scoped re-review** found one new Critical in the shared race helper. A caller
+already cancelled when the race starts runs the cancellation handler before the
+operation, so the continuation attached afterwards was never resumed and the read hung
+for good. The reviewer reproduced it 10 times out of 10. The controller fixed it
+directly in `003a3bc`:
+- The test "a caller cancelled before the race starts returns promptly" hung before the
+  fix and passes after it.
+- The race now keeps the winning value and resumes a late continuation with it.
 
 ## Verification gates
 
 ```bash
-swift test 2>&1 | tail -5     # 777 tests in 95 suites: 775 passed, 2 failed (environment — see header)
-./Scripts/typecheck-app.sh    # Type-check succeeded (29 files); 1 pre-existing warning, unrelated file
-git status --short            # clean apart from this ledger
+swift test 2>&1 | tail -5     # 789 tests in 96 suites, all passed
+./Scripts/typecheck-app.sh    # Type-check succeeded (29 files)
+swift build --target TaxCapture --triple arm64-apple-watchos26.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"   # complete
 ```
-
-The whole-branch review this plan's process calls for (a final pass over the full diff,
-beyond each task's own review) **has not happened yet** — this close-out is the gate
-count and spec walk, not that review.
