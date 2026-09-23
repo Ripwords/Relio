@@ -372,4 +372,36 @@ struct ReceiptAttachTests {
         #expect(await model.attach(ReceiptFixture.reading(), files: files) == .couldNotSave)
         #expect(model.documents.isEmpty)
     }
+
+    /// `TaxStore.attach` fetches the entry with `deletedAt == nil`, so soft-deleting it out
+    /// from under an in-flight editor — another device's sync, most plausibly — is a real,
+    /// mock-free way to make the attach step throw `.noSuchEntry` after the file has
+    /// already been written. No test reached this branch before.
+    @Test("the entry vanishes before the attach: the file is deleted when nothing else uses it")
+    func vanishedEntryDeletesAnUnusedFile() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let model = try await Self.savedEditor(store)
+        try await store.softDeleteEntry(id: model.editingID!)
+
+        let result = await model.attach(ReceiptFixture.reading(), files: files)
+        #expect(result == .couldNotAttach)
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-one") == false)
+    }
+
+    @Test("the entry vanishes before the attach: the file is kept when another document uses it")
+    func vanishedEntryKeepsAFileAnotherDocumentUses() async throws {
+        let store = try await PresentationFixture.store()
+        let files = try ReceiptFixture.files()
+        let holder = try await Self.savedEditor(store, ringgit: 230)
+        #expect(await holder.attach(ReceiptFixture.reading(), files: files) == .attached)
+
+        let vanishing = try await Self.savedEditor(store, ringgit: 50)
+        try await store.softDeleteEntry(id: vanishing.editingID!)
+
+        let result = await vanishing.attach(ReceiptFixture.reading(), files: files)
+        #expect(result == .couldNotAttach)
+        #expect(ReceiptFixture.fileExists(files, bytes: "receipt-one"),
+                "holder's own document still references this hash")
+    }
 }
