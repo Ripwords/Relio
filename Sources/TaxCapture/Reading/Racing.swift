@@ -44,11 +44,22 @@ private final class Resolution<T: Sendable>: Sendable {
         var workTask: Task<Void, Never>?
         var timerTask: Task<Void, Never>?
         var done = false
+        /// The winning value when the race resolved before the continuation existed —
+        /// a caller already cancelled at the start runs `onCancel` before `operation`.
+        var early: T?
     }
     private let state = Mutex(State())
 
     func attach(_ continuation: CheckedContinuation<T, Never>) {
-        state.withLock { $0.continuation = continuation }
+        // `resolve` sets `early` whenever it wins with no continuation stored.
+        let early = state.withLock { s -> T? in
+            guard s.done else {
+                s.continuation = continuation
+                return nil
+            }
+            return s.early
+        }
+        if let early { continuation.resume(returning: early) }
     }
 
     /// Stored after the tasks are created, so `resolve` — which may already have fired,
@@ -70,6 +81,7 @@ private final class Resolution<T: Sendable>: Sendable {
         let continuation = state.withLock { s -> CheckedContinuation<T, Never>? in
             guard !s.done else { return nil }
             s.done = true
+            if s.continuation == nil { s.early = value }
             let c = s.continuation
             s.workTask?.cancel()
             s.timerTask?.cancel()

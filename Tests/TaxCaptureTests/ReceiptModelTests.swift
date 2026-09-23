@@ -158,6 +158,22 @@ struct SilentModel: ReceiptModel {
         #expect(ContinuousClock.now - started < .seconds(2))
     }
 
+    /// A caller already cancelled when the race starts: the cancellation handler runs
+    /// before the continuation exists, and the race must still resolve, not hang.
+    @Test("a caller cancelled before the race starts returns promptly",
+          .timeLimit(.minutes(1)))
+    func alreadyCancelledCallerReturnsPromptly() async {
+        let task = Task<ReceiptModelAnswer?, Never> {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await ReceiptModelCheck.answer(from: SilentModel(), to: Self.question(),
+                                                  within: .seconds(30))
+        }
+        let started = ContinuousClock.now
+        let answer = await task.value
+        #expect(answer == nil)
+        #expect(ContinuousClock.now - started < .seconds(2))
+    }
+
     @Test("no text, no question")
     func noTextNoQuestion() throws {
         var reading = Self.unsure()
