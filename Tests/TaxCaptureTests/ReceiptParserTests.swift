@@ -94,6 +94,13 @@ struct ReceiptFixture: Decodable {
         #expect(fields.date?.isConfirmed == false)
     }
 
+    @Test("two dates on one labelled line: the parser picks the one printed first")
+    func pickTextuallyFirstDateOnOneLine() {
+        let fields = ReceiptParser.parse([OCRLine(text: "DATE 12 Mar 2025 14/03/2025")],
+                                         now: Self.now)
+        #expect(fields.date?.value == ReceiptDate.noon(2025, 3, 12))
+    }
+
     @Test("the model is offered every labelled total, best first, once each")
     func candidatesForTheModel() {
         let fields = ReceiptParser.parse([OCRLine(text: "TOTAL 45.00"),

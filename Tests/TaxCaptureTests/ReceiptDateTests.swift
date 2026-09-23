@@ -29,6 +29,12 @@ import Foundation
         #expect(found.map(\.date) == [Self.day(y, m, d)])
     }
 
+    @Test("two dates on one line come back in the order they are printed, not by format")
+    func ordersByTextualPosition() {
+        let found = ReceiptDate.dates(in: "12 Mar 2025 PAID 14/03/2025", now: Self.now)
+        #expect(found.map(\.date) == [Self.day(2025, 3, 12), Self.day(2025, 3, 14)])
+    }
+
     @Test("an impossible date is not a date")
     func rejectsImpossible() {
         #expect(ReceiptDate.dates(in: "31/02/2025", now: Self.now).isEmpty)

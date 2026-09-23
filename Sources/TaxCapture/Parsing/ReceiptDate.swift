@@ -38,7 +38,8 @@ public enum ReceiptDate {
     }
 
     public static func dates(in line: String, now: Date) -> [DateCandidate] {
-        var found: [(Int, Int, Int, Bool)] = []   // year, month, day, ambiguous
+        // year, month, day, ambiguous, where the match starts in the line.
+        var found: [(Int, Int, Int, Bool, String.Index)] = []
 
         // Swift's Regex has no lookbehind, so "no digit immediately before" is checked
         // by hand (`startsCleanly`). With the lookaheads, that stops a phone number or an
@@ -55,25 +56,31 @@ public enum ReceiptDate {
         for match in line.matches(of: iso) where startsCleanly(match.range) {
             guard let y = Int(match.output.1), let m = Int(match.output.2),
                   let d = Int(match.output.3) else { continue }
-            found.append((y, m, d, false))
+            found.append((y, m, d, false, match.range.lowerBound))
         }
         for match in line.matches(of: numeric) where startsCleanly(match.range) {
             guard let d = Int(match.output.1), let m = Int(match.output.2),
                   let rawYear = Int(match.output.3) else { continue }
             let y = match.output.3.count == 2 ? 2000 + rawYear : rawYear
-            found.append((y, m, d, d <= 12 && m <= 12 && d != m))
+            found.append((y, m, d, d <= 12 && m <= 12 && d != m, match.range.lowerBound))
         }
         for match in line.matches(of: named) where startsCleanly(match.range) {
             let name = match.output.2.lowercased()
             guard let d = Int(match.output.1), let rawYear = Int(match.output.3),
                   let m = months[String(name.prefix(3))] else { continue }
             let y = match.output.3.count == 2 ? 2000 + rawYear : rawYear
-            found.append((y, m, d, false))
+            found.append((y, m, d, false, match.range.lowerBound))
         }
+
+        // The three loops run iso, then numeric, then named, so without this the order
+        // reflects format, not print position — a named-month date before a numeric one
+        // on the same line would come back second. Readers downstream (the parser's
+        // several-dates-on-one-line arbitration) rely on textual order.
+        found.sort { $0.4 < $1.4 }
 
         let today = startOfDay(now)
         guard let earliest = calendar.date(byAdding: .year, value: -7, to: today) else { return [] }
-        return found.compactMap { y, m, d, ambiguous in
+        return found.compactMap { y, m, d, ambiguous, _ in
             guard let date = noon(y, m, d),
                   startOfDay(date) <= today,
                   date >= earliest else { return nil }
