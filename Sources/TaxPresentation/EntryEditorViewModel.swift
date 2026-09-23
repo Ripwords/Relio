@@ -52,6 +52,7 @@ public final class EntryEditorViewModel {
             guard newValue != storedAmountText else { return }
             storedAmountText = newValue
             duplicateWarning = nil
+            unconfirmed.remove(.amount)
         }
     }
 
@@ -61,6 +62,7 @@ public final class EntryEditorViewModel {
             guard newValue != storedVendor else { return }
             storedVendor = newValue
             duplicateWarning = nil
+            unconfirmed.remove(.vendor)
         }
     }
 
@@ -70,6 +72,7 @@ public final class EntryEditorViewModel {
             guard newValue != storedSpentOn else { return }
             storedSpentOn = newValue
             duplicateWarning = nil
+            unconfirmed.remove(.date)
         }
     }
 
@@ -104,10 +107,34 @@ public final class EntryEditorViewModel {
     public private(set) var availableCodes: [ReliefOption] = []
     public private(set) var availableDependents: [DependentOption] = []
 
-    private let context: YearContext
-    private let store: TaxStore
-    private let editingID: UUID?
+    // MARK: Receipt state — behaviour in EntryEditorViewModel+Receipt.swift
+
+    /// Fields a receipt prefilled below `ReadingConfidence.confirmed`. Editor state only:
+    /// saving the entry *is* the user having looked (spec §2), so nothing is persisted.
+    public internal(set) var unconfirmed: Set<ReceiptField> = []
+    /// Shown first in the relief picker. Never selected for the user.
+    public internal(set) var suggestedReliefs: [ReliefCode] = []
+    /// The receipt produced no text at all.
+    public internal(set) var couldNotReadReceipt = false
+    /// The receipt carried a MyInvois QR. A badge; the document kind is unchanged.
+    public internal(set) var isEInvoice = false
+    /// "This receipt already supports your RM 230.00 lifestyle claim from 3 Mar."
+    public internal(set) var receiptDuplicateWarning: String?
+    /// The entry saved but its receipt could not be attached. Save again to retry.
+    public internal(set) var attachFailed = false
+    /// A scanned receipt already written to the file store, waiting for Save.
+    var pendingReceipt: PendingReceipt?
+
+    let context: YearContext
+    let store: TaxStore
+    let editingID: UUID?
     private var deletedID: UUID?
+    /// The id a new entry is saved under — fixed when the editor opens, not at save time.
+    ///
+    /// When a scanned receipt's attach step fails after the entry saved, tapping Save
+    /// again must update that entry and retry the attach, not create a second entry. A
+    /// fresh `UUID()` in `save()` made every retry a duplicate.
+    let newEntryID = UUID()
     /// The amount this editor opened on, or zero for a new entry. Subtracted from the
     /// evaluation's `claimed` in `capGuidance`, which counts the entry being edited.
     private var originalAmount: Money = .zero
@@ -347,7 +374,7 @@ public final class EntryEditorViewModel {
     /// These two sentences named the rulebook's key — "SELF_AND_DEPENDENTS is granted
     /// automatically…" — which is the leak `ReliefCopy` exists to prevent. The rulebook's
     /// own name is the fallback, and the raw code only if neither is known.
-    private func reliefName(_ code: ReliefCode) -> String {
+    func reliefName(_ code: ReliefCode) -> String {
         let full = availableCodes.first { $0.code == code }?.name
             ?? context.result?.allAssessments.first { $0.code == code }?.name
             ?? code.rawValue
@@ -415,7 +442,7 @@ public final class EntryEditorViewModel {
                                         claimant: claimant,
                                         dependentID: dependentID)
         let existing = (try? await store.entryDrafts(forYear: context.year)) ?? []
-        for entry in existing where entry.id != editingID {
+        for entry in existing where entry.id != (editingID ?? newEntryID) {
             guard let key = try? await store.dedupeKey(forEntry: entry.id), key == candidate else { continue }
             duplicateWarning = "You already logged \(amount.formatted()) for this. Save anyway?"
             return
@@ -428,7 +455,7 @@ public final class EntryEditorViewModel {
               let code = selectedCode,
               let amount = MoneyParsing.money(from: amountText) else { return false }
 
-        let draft = EntryDraft(id: editingID ?? UUID(),
+        let draft = EntryDraft(id: editingID ?? newEntryID,
                                year: context.year,
                                code: code,
                                amount: amount,
@@ -453,6 +480,13 @@ public final class EntryEditorViewModel {
         do {
             _ = try await store.save(draft)
         } catch {
+            return false
+        }
+        // Spec §5: the entry first, then its receipt. If the attach fails the entry stays,
+        // the file stays on disk, and Save again retries both — `newEntryID` makes the
+        // second save an update.
+        if pendingReceipt != nil, await !attachPendingReceipt(to: draft.id) {
+            await context.reload()
             return false
         }
         // Without this the Home headline keeps its old value until something else

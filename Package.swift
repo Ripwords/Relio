@@ -56,7 +56,7 @@ let package = Package(
         ),
         .testTarget(
             name: "TaxPresentationTests",
-            dependencies: ["TaxPresentation"],
+            dependencies: ["TaxPresentation", "TaxCapture"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Reads a receipt: OCR, the MyInvois QR, and a deterministic parser over the
