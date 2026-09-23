@@ -99,30 +99,38 @@ public actor DocumentPipeline {
         let document = try normaliser.normalise(input)
         var failures: Set<ReadingStage> = []
 
+        // M2: a per-page do/catch, not one around the whole loop, so a QR on a later page
+        // is still found when an earlier page throws.
         var eInvoiceUUID: String?
-        do {
-            for image in document.pageImages where eInvoiceUUID == nil {
+        for image in document.pageImages where eInvoiceUUID == nil {
+            do {
                 eInvoiceUUID = try await barcodes.qrPayloads(inImage: image)
                     .lazy.compactMap(MyInvoisLink.init).first?.uuid
+            } catch {
+                failures.insert(.barcode)
             }
-        } catch {
-            failures.insert(.barcode)
         }
 
+        // M1: likewise per page — the lines a page did yield are kept even when a later
+        // page throws, rather than the whole scan's text being thrown away.
         var lines: [OCRLine] = []
-        do {
-            switch document.textSource {
-            case .pdfTextLayer:
+        switch document.textSource {
+        case .pdfTextLayer:
+            do {
                 lines = try await pdfText.lines(inPDF: document.data)
-            case .pageImages:
-                for (page, image) in document.pageImages.enumerated() {
+            } catch {
+                failures.insert(.text)
+                lines = []
+            }
+        case .pageImages:
+            for (page, image) in document.pageImages.enumerated() {
+                do {
                     lines += RowAssembler.lines(from: try await text.fragments(inImage: image,
                                                                                 page: page))
+                } catch {
+                    failures.insert(.text)
                 }
             }
-        } catch {
-            failures.insert(.text)
-            lines = []
         }
 
         let fields = ReceiptParser.parse(lines, now: now())

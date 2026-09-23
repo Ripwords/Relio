@@ -8,8 +8,10 @@ struct StubText: TextReading {
     enum Failure: Error { case failed }
     var lines: [String] = []
     var fails = false
+    /// M1: pages whose OCR throws, so a test can prove the other pages' lines survive.
+    var failingPages: Set<Int> = []
     func fragments(inImage data: Data, page: Int) async throws -> [TextFragment] {
-        if fails { throw Failure.failed }
+        if fails || failingPages.contains(page) { throw Failure.failed }
         return lines.enumerated().map { index, text in
             let top = Double(index) / Double(max(lines.count, 1))
             return TextFragment(text: text, page: page, left: 0.05, top: top,
@@ -18,11 +20,29 @@ struct StubText: TextReading {
     }
 }
 
+/// Counts its own calls so a test can single out one page to fail without depending on
+/// image bytes, which `ImageNormaliser` re-encodes before a stub ever sees them.
+private final class CallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        defer { count += 1 }
+        return count
+    }
+}
+
 struct StubBarcodes: BarcodeReading {
     var payloads: [String] = []
     var fails = false
+    /// M2: 0-based call indices (this instance's first call is 0) that throw instead of
+    /// returning `payloads`.
+    var failingCalls: Set<Int> = []
+    private let calls = CallCounter()
     func qrPayloads(inImage data: Data) async throws -> [String] {
-        if fails { throw StubText.Failure.failed }
+        let index = calls.next()
+        if fails || failingCalls.contains(index) { throw StubText.Failure.failed }
         return payloads
     }
 }
@@ -125,6 +145,30 @@ struct StubPDFText: PDFTextReading {
             .read(try Self.photo(), ruleSet: nil)
         #expect(reading.failures == [.barcode])
         #expect(reading.total?.value == Money(sen: 7190))
+    }
+
+    /// M1. A single catch around the whole page loop used to set `lines = []`, so a scan's
+    /// first page was thrown away along with its second.
+    @Test("text: a page's lines are kept even when a later page throws")
+    func textStageKeepsEarlierPagesOnALaterThrow() async throws {
+        let page = try #require(SampleReceipt.jpeg())
+        let reading = try await Self.pipeline(
+            text: StubText(lines: ["PAGE LINE"], failingPages: [1])
+        ).read(.scannedPages([page, page]), ruleSet: nil)
+        #expect(reading.failures == [.text])
+        #expect(reading.ocrText?.contains("PAGE LINE") == true, "page 0's lines are kept")
+    }
+
+    /// M2. One catch around the whole page loop aborted the rest of the scan, so a QR on
+    /// page 2 was lost whenever page 1 threw.
+    @Test("barcode: a later page's QR is still found when an earlier page throws")
+    func barcodeStageFindsALaterPagesQRAfterAnEarlierThrow() async throws {
+        let page = try #require(SampleReceipt.jpeg())
+        let reading = try await Self.pipeline(
+            barcodes: StubBarcodes(payloads: [Self.link], failingCalls: [0])
+        ).read(.scannedPages([page, page]), ruleSet: nil)
+        #expect(reading.failures == [.barcode])
+        #expect(reading.eInvoiceUUID == "F9D425P6DS7D8IU")
     }
 
     @Test("a PDF from Files is read from its text layer, not OCR'd page by page")
